@@ -30,8 +30,8 @@ function PremiumPlansPage() {
         <AlertTitle>Transparência</AlertTitle>
         <AlertDescription>
           Pode usar hoje todo o fluxo gratuito sem cartão. Os CTAs «Premium» na página pública levam
-          à criação de conta para explorar o app; esta página resume os benefícios futuros e o estado
-          atual do produto.
+          à criação de conta para explorar o app; esta página resume os benefícios futuros e o
+          estado atual do produto.
         </AlertDescription>
       </Alert>
 

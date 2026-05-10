@@ -51,7 +51,10 @@ Deno.serve(async (req) => {
 
   if (!expectedSecret || !secretsMatchConstantTime(cronSecret, expectedSecret)) {
     return new Response(
-      JSON.stringify({ code: "UNAUTHORIZED", message: "Credencial de cron inválida ou não configurada." }),
+      JSON.stringify({
+        code: "UNAUTHORIZED",
+        message: "Credencial de cron inválida ou não configurada.",
+      }),
       { status: 401, headers: { "Content-Type": "application/json" } },
     );
   }

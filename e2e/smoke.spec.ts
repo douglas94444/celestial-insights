@@ -32,5 +32,14 @@ if (!process.env.SKIP_AUTH_E2E && storageState) {
       await page.goto("/dashboard");
       await expect(page.getByRole("heading", { name: /Olá/i })).toBeVisible({ timeout: 20_000 });
     });
+
+    test("momento mostra título e ações do cartão", async ({ page }) => {
+      await page.goto("/momento");
+      await expect(page.getByRole("heading", { name: /Momento com o céu/i })).toBeVisible({
+        timeout: 25_000,
+      });
+      await expect(page.getByRole("button", { name: /Guardar imagem/i })).toBeVisible();
+      await expect(page.getByRole("button", { name: /Copiar legenda/i })).toBeVisible();
+    });
   });
 }

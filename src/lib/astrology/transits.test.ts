@@ -56,6 +56,13 @@ describe("analyzeTransitDay", () => {
     expect(day.scores.trabalho).toBeGreaterThanOrEqual(15);
     expect(day.intensity).toBeGreaterThanOrEqual(0);
     expect(day.intensity).toBeLessThanOrEqual(100);
+    expect(day.transitMoonSign?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it("texto narrativo alinha-se com linhas curtas para cartão Momento", () => {
+    const day = analyzeTransitDay("2026-03-01", stubNatalPlanets(), stubHouses(15), 15, "placidus");
+    expect(day.narrative.length).toBeGreaterThan(0);
+    expect(day.narrative.every((line) => typeof line === "string" && line.length > 3)).toBe(true);
   });
 });
 

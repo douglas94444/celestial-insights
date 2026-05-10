@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTransitosRouteImport } from './routes/_authenticated/transitos'
 import { Route as AuthenticatedPremiumRouteImport } from './routes/_authenticated/premium'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedMomentoRouteImport } from './routes/_authenticated/momento'
 import { Route as AuthenticatedMapasRouteImport } from './routes/_authenticated/mapas'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
@@ -55,6 +56,11 @@ const AuthenticatedPremiumRoute = AuthenticatedPremiumRouteImport.update({
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedMomentoRoute = AuthenticatedMomentoRouteImport.update({
+  id: '/momento',
+  path: '/momento',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedMapasRoute = AuthenticatedMapasRouteImport.update({
@@ -98,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/mapas': typeof AuthenticatedMapasRouteWithChildren
+  '/momento': typeof AuthenticatedMomentoRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/premium': typeof AuthenticatedPremiumRoute
   '/transitos': typeof AuthenticatedTransitosRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/mapas': typeof AuthenticatedMapasRouteWithChildren
+  '/momento': typeof AuthenticatedMomentoRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/premium': typeof AuthenticatedPremiumRoute
   '/transitos': typeof AuthenticatedTransitosRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/mapas': typeof AuthenticatedMapasRouteWithChildren
+  '/_authenticated/momento': typeof AuthenticatedMomentoRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/premium': typeof AuthenticatedPremiumRoute
   '/_authenticated/transitos': typeof AuthenticatedTransitosRoute
@@ -144,6 +153,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/mapas'
+    | '/momento'
     | '/onboarding'
     | '/premium'
     | '/transitos'
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/configuracoes'
     | '/dashboard'
     | '/mapas'
+    | '/momento'
     | '/onboarding'
     | '/premium'
     | '/transitos'
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/_authenticated/configuracoes'
     | '/_authenticated/dashboard'
     | '/_authenticated/mapas'
+    | '/_authenticated/momento'
     | '/_authenticated/onboarding'
     | '/_authenticated/premium'
     | '/_authenticated/transitos'
@@ -238,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/momento': {
+      id: '/_authenticated/momento'
+      path: '/momento'
+      fullPath: '/momento'
+      preLoaderRoute: typeof AuthenticatedMomentoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/mapas': {
       id: '/_authenticated/mapas'
       path: '/mapas'
@@ -301,6 +320,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedMapasRoute: typeof AuthenticatedMapasRouteWithChildren
+  AuthenticatedMomentoRoute: typeof AuthenticatedMomentoRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPremiumRoute: typeof AuthenticatedPremiumRoute
   AuthenticatedTransitosRoute: typeof AuthenticatedTransitosRoute
@@ -311,6 +331,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedMapasRoute: AuthenticatedMapasRouteWithChildren,
+  AuthenticatedMomentoRoute: AuthenticatedMomentoRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPremiumRoute: AuthenticatedPremiumRoute,
   AuthenticatedTransitosRoute: AuthenticatedTransitosRoute,

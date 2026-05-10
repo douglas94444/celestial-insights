@@ -1,5 +1,7 @@
 import type { ServerFnErrorBody } from "@/lib/server-fn-http";
 
+const IA_QUOTA_DENY_CODES = new Set(["PREMIUM_REQUIRED", "RATE_LIMIT", "MONTHLY_LIMIT"]);
+
 /** Registo estruturado mínimo (sem PII); usar para medição de duração nas server functions. */
 export function timedServerFn<TArgs extends object, R>(
   name: string,
@@ -21,12 +23,14 @@ export function timedServerFn<TArgs extends object, R>(
           code = undefined;
         }
       }
+      const resolvedCode = code ?? "THROW";
       console.warn(
         JSON.stringify({
           serverFn: name,
           ms: Date.now() - t0,
           ok: false,
-          code: code ?? "THROW",
+          code: resolvedCode,
+          iaQuotaDeny: IA_QUOTA_DENY_CODES.has(resolvedCode),
         }),
       );
       throw e;

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Sparkles, Stars, Heart, CalendarRange, Check } from "lucide-react";
+import { Sparkles, Stars, Heart, CalendarRange, Check, Coffee } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -84,7 +84,7 @@ function Landing() {
           <h2 className="text-center font-display text-3xl font-bold md:text-4xl">
             Tudo que você precisa para se conhecer pelas estrelas
           </h2>
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 icon: Stars,
@@ -100,6 +100,11 @@ function Landing() {
                 icon: CalendarRange,
                 title: "Trânsitos",
                 desc: "Saiba quando os planetas ativam pontos importantes do seu mapa.",
+              },
+              {
+                icon: Coffee,
+                title: "Momento com o céu",
+                desc: "Ritual diário personalizado ao seu mapa e cartão para partilhar no Instagram.",
               },
             ].map((f) => (
               <div key={f.title} className="rounded-2xl border bg-card p-6 shadow-soft">

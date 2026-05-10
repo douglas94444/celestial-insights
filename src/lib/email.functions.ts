@@ -5,8 +5,9 @@ import { ASPECT_LABELS } from "@/data/chart-detail-interpretations";
 import type { HouseSystemId } from "@/lib/astrology/calculate";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import { analyzeTransitDay, formatTransitDayTitle } from "@/lib/astrology/transits";
-import { PLANETS } from "@/lib/astrology/zodiac";
+import { PLANETS, type SignName } from "@/lib/astrology/zodiac";
 import { chartRowToChartData } from "@/lib/chart-from-row";
+import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
 import { cronTransitDigestSchema, sendTransitDigestInputSchema } from "@/lib/schemas/server-fns";
 import { jsonError, secretsMatchConstantTime, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
@@ -67,6 +68,43 @@ export function buildTransitDigestHtml(chartName: string, day: TransitDayPayload
       <h2>Aspectos trânsito × natal</h2>
       <ul>${aspectLines.join("")}</ul>
       <p style="margin-top:24px;font-size:12px;color:#666;">AstroMap · indicadores para reflexão, não substituem orientação profissional.</p>
+    `;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function buildMomentDailyDigestHtml(opts: {
+  greetingName: string;
+  chartName: string;
+  dateStr: string;
+  luckLine: string;
+  colorLabel: string;
+  colorHex: string;
+  transitMoonSign: string;
+  intensity: number;
+  narrativePreview: string;
+  appBaseUrl: string;
+}): string {
+  const base = opts.appBaseUrl.replace(/\/$/, "");
+  const linkHref = base ? `${base}/momento` : "";
+  const linkBlock = linkHref
+    ? `<p><a href="${escapeHtml(linkHref)}">Abrir o seu Momento</a></p>`
+    : "<p>Abra o AstroMap e vá à página Momento.</p>";
+  return `
+      <h1>Olá, ${escapeHtml(opts.greetingName)}</h1>
+      <p><strong>${escapeHtml(opts.dateStr)}</strong> · mapa ${escapeHtml(opts.chartName)}</p>
+      <p><strong>Sorte do dia:</strong> ${escapeHtml(opts.luckLine)}</p>
+      <p><strong>Cor sugerida:</strong> ${escapeHtml(opts.colorLabel)} (${escapeHtml(opts.colorHex)})</p>
+      <p>Lua em trânsito: ${escapeHtml(opts.transitMoonSign)} · Intensidade ${opts.intensity}/100</p>
+      <blockquote style="margin:16px 0;padding-left:12px;border-left:3px solid #9370db;">${escapeHtml(opts.narrativePreview)}</blockquote>
+      ${linkBlock}
+      <p style="margin-top:24px;font-size:12px;color:#666;">AstroMap · reflexão simbólica; não substitui apoio profissional.</p>
     `;
 }
 
@@ -267,6 +305,107 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
         }
       }
 
+      const appBaseUrl = process.env.APP_PUBLIC_URL ?? "";
+
+      const { data: momentProfiles, error: mpErr } = await supabaseAdmin
+        .from("profiles")
+        .select("id, name, transit_digest_hour, transit_digest_weekdays, email_notifications")
+        .eq("moment_daily_email", true)
+        .eq("email_notifications", true);
+
+      if (mpErr) throw jsonError(500, "PROFILES_MOMENT", mpErr.message);
+
+      let momentSent = 0;
+      let momentSkipped = 0;
+
+      for (const row of momentProfiles ?? []) {
+        if (row.transit_digest_hour !== hour) {
+          momentSkipped++;
+          continue;
+        }
+        const days = row.transit_digest_weekdays ?? [];
+        if (!days.includes(weekday)) {
+          momentSkipped++;
+          continue;
+        }
+
+        const { data: chartRowsM } = await supabaseAdmin
+          .from("charts")
+          .select("*")
+          .eq("user_id", row.id)
+          .order("is_primary", { ascending: false })
+          .limit(1);
+
+        const chartM = chartRowsM?.[0];
+        if (!chartM) {
+          momentSkipped++;
+          continue;
+        }
+
+        const { data: authRowM, error: authErrM } = await supabaseAdmin.auth.admin.getUserById(
+          row.id,
+        );
+        const emailM = authRowM?.user?.email;
+        if (authErrM || !emailM) {
+          momentSkipped++;
+          continue;
+        }
+
+        const cdM = chartRowToChartData(chartM);
+        const houseSystemM = (chartM.house_system as HouseSystemId | undefined) ?? "placidus";
+        const dayM = analyzeTransitDay(
+          dateStr,
+          cdM.planets,
+          cdM.houses,
+          cdM.ascendant,
+          houseSystemM,
+        );
+        const sun = cdM.planets.find((p) => p.key === "sun");
+        const sunSign = (sun?.sign as SignName | undefined) ?? null;
+        const fp = buildTransitLuckFingerprint({
+          date: dayM.date,
+          transitMoonSign: dayM.transitMoonSign,
+          intensity: dayM.intensity,
+        });
+        const extras = buildShareCardDailyExtras(sunSign, dateStr, fp);
+        if (!extras) {
+          momentSkipped++;
+          continue;
+        }
+
+        const greetingName = row.name?.trim().split(/\s+/)[0] ?? chartM.name ?? "Olá";
+        const narrativePreview =
+          dayM.narrative[0]?.replace(/^✦\s*/, "").trim().slice(0, 320) ??
+          "Reserve alguns minutos para ver o seu mapa de hoje.";
+
+        const htmlM = buildMomentDailyDigestHtml({
+          greetingName,
+          chartName: chartM.name,
+          dateStr: dayM.date,
+          luckLine: extras.luckLine,
+          colorLabel: extras.colorLabel,
+          colorHex: extras.colorHex,
+          transitMoonSign: dayM.transitMoonSign || "—",
+          intensity: dayM.intensity,
+          narrativePreview,
+          appBaseUrl,
+        });
+
+        try {
+          await sendViaResend({
+            apiKey,
+            from,
+            to: emailM,
+            subject: `Seu Momento — ${dayM.date}`,
+            html: htmlM,
+          });
+          momentSent++;
+        } catch (e) {
+          console.error("[moment-daily-email-cron]", row.id, e);
+          momentSkipped++;
+        }
+      }
+
       return {
         ok: true as const,
         dateStr,
@@ -275,6 +414,9 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
         sent,
         skipped,
         scanned: profiles?.length ?? 0,
+        momentSent,
+        momentSkipped,
+        momentScanned: momentProfiles?.length ?? 0,
       };
     }),
   );

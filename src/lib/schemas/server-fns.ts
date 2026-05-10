@@ -4,9 +4,7 @@ import { PLANETS, type PlanetKey } from "@/lib/astrology/zodiac";
 /** UUID de recurso `charts.id`. */
 export const chartIdSchema = z.string().uuid();
 
-export const planetKeySchema = z.enum(
-  PLANETS.map((p) => p.key) as [PlanetKey, ...PlanetKey[]],
-);
+export const planetKeySchema = z.enum(PLANETS.map((p) => p.key) as [PlanetKey, ...PlanetKey[]]);
 
 /** Data civil YYYY-MM-DD (uso em trânsitos / digest). */
 export const dateYmdSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data deve ser YYYY-MM-DD");

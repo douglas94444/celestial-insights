@@ -46,7 +46,9 @@ No GitHub Actions, configure secrets opcionais `VITE_SUPABASE_URL` e `VITE_SUPAB
 
 Os utilizadores ativam preferências em Configurações (`transit_digest_*`) com migração aplicada em `profiles`.
 
-**Escolha um único destino de cron** para não enviar o mesmo digest duas vezes (Edge Function **ou** Worker/Lovable — não ambos com o mesmo segredo/horário).
+- **Lembrete Momento (`moment_daily_email`)**: segundo envio opcional no **mesmo** horário e dias (`transit_digest_hour`, `transit_digest_weekdays`), apenas para quem tem também «Notificações por email». Defina **`APP_PUBLIC_URL`** no servidor (URL absoluta do site) para o link «Abrir o seu Momento» funcionar nos emails.
+
+**Escolha um único destino de cron** para não enviar o mesmo digest duas vezes (Edge Function **ou** Worker/Lovable — não ambos com o mesmo segredo/horário). O mesmo cron pode enviar digest **e** lembrete Momento quando configurados (dois emails distintos se ambos activos).
 
 ### Opção A — Supabase Edge Function (recomendado no projeto ligado)
 

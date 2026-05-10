@@ -118,8 +118,8 @@ function MapasList() {
             <div className="space-y-1">
               <p className="font-display text-lg font-semibold">Nenhum mapa guardado</p>
               <p className="max-w-md text-sm text-muted-foreground">
-                Crie o seu primeiro mapa natal — demora menos de um minuto — ou volte ao onboarding se
-                preferir o passo a passo inicial.
+                Crie o seu primeiro mapa natal — demora menos de um minuto — ou volte ao onboarding
+                se preferir o passo a passo inicial.
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">

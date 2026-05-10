@@ -110,8 +110,7 @@
     transparent 55%
   );
   --shadow-mystical:
-    0 14px 44px -12px oklch(0.35 0.08 268 / 0.45),
-    0 0 0 1px oklch(0.62 0.1 78 / 0.35),
+    0 14px 44px -12px oklch(0.35 0.08 268 / 0.45), 0 0 0 1px oklch(0.62 0.1 78 / 0.35),
     0 0 28px -8px oklch(0.72 0.12 82 / 0.2);
   --shadow-soft: 0 10px 32px -12px oklch(0.22 0.06 275 / 0.22);
   --shadow-flame: 0 0 24px oklch(0.72 0.14 82 / 0.45);
@@ -203,8 +202,7 @@
     transparent 50%
   );
   --shadow-mystical:
-    0 16px 52px -14px oklch(0.08 0.06 268 / 0.65),
-    0 0 0 1px oklch(0.72 0.1 82 / 0.18),
+    0 16px 52px -14px oklch(0.08 0.06 268 / 0.65), 0 0 0 1px oklch(0.72 0.1 82 / 0.18),
     0 0 36px -10px oklch(0.72 0.12 82 / 0.28);
   --shadow-soft: 0 12px 36px -14px oklch(0.05 0.04 268 / 0.55);
   --shadow-flame: 0 0 32px oklch(0.78 0.14 78 / 0.35);

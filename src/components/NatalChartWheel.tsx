@@ -8,6 +8,8 @@ interface Props {
   size?: number;
   highlightPlanet?: string;
   onPlanetClick?: (planet: string) => void;
+  /** Para capturas PNG estáveis (sem animação de entrada). */
+  reduceMotion?: boolean;
 }
 
 const ASPECT_COLOR: Record<string, string> = {
@@ -62,9 +64,9 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
 
   return (
     <motion.svg
-      initial={{ opacity: 0, scale: 0.92 }}
+      initial={reduceMotion ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.6, ease: "easeOut" }}
+      transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
       viewBox={`0 0 ${size} ${size}`}
       className="w-full h-auto max-w-[600px]"
     >

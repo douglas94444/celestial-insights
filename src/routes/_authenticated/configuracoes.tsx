@@ -74,6 +74,7 @@ function Settings() {
       house_system: "placidus" as const,
       zodiac: "tropical" as const,
       email_notifications: true,
+      moment_daily_email: false,
       transit_digest_auto: false,
       transit_digest_hour: 8,
       transit_digest_weekdays: [1, 2, 3, 4, 5] as number[],
@@ -87,6 +88,7 @@ function Settings() {
         house_system: (profile.house_system as "placidus" | "equal" | "whole_sign") ?? "placidus",
         zodiac: (profile.zodiac as "tropical" | "sidereal") ?? "tropical",
         email_notifications: profile.email_notifications,
+        moment_daily_email: profile.moment_daily_email ?? false,
         transit_digest_auto: profile.transit_digest_auto ?? false,
         transit_digest_hour: profile.transit_digest_hour ?? 8,
         transit_digest_weekdays:
@@ -117,6 +119,7 @@ function Settings() {
         house_system: values.house_system,
         zodiac: values.zodiac,
         email_notifications: values.email_notifications,
+        moment_daily_email: values.moment_daily_email,
         transit_digest_auto: values.transit_digest_auto,
         transit_digest_hour: values.transit_digest_hour,
         transit_digest_weekdays: values.transit_digest_weekdays,
@@ -328,6 +331,27 @@ function Settings() {
                             «Email hoje»). O servidor precisa da variável{" "}
                             <code className="text-xs">RESEND_API_KEY</code> e, recomendado,{" "}
                             <code className="text-xs">RESEND_FROM_EMAIL</code>.
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={prefForm.control}
+                    name="moment_daily_email"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Lembrete «Momento de hoje»</FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            Email curto com sorte/cor do dia e link para <strong>Momento</strong>.
+                            Usa a mesma hora e dias da semana que o digest de trânsitos abaixo.
+                            Defina <code className="text-xs">APP_PUBLIC_URL</code> no servidor para
+                            um link clicável (ex.: https://seu-dominio.com).
                           </p>
                         </div>
                         <FormControl>

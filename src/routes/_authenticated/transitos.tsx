@@ -445,6 +445,7 @@ function TransitosPage() {
                       variant="secondary"
                       size="sm"
                       disabled={transitAiMutation.isPending}
+                      aria-label="Pedir explicação em linguagem simples para o dia seleccionado"
                       onClick={() => transitAiMutation.mutate()}
                     >
                       {transitAiMutation.isPending ? (

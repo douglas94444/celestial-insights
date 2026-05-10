@@ -11,9 +11,7 @@ import {
 
 describe("chartIdSchema", () => {
   it("aceita UUID", () => {
-    expect(
-      chartIdSchema.safeParse("550e8400-e29b-41d4-a716-446655440000").success,
-    ).toBe(true);
+    expect(chartIdSchema.safeParse("550e8400-e29b-41d4-a716-446655440000").success).toBe(true);
   });
 
   it("rejeita texto não UUID", () => {
@@ -71,9 +69,9 @@ describe("synastryNarrativeInputSchema", () => {
 describe("cronTransitDigestSchema", () => {
   it("exige secret com comprimento mínimo", () => {
     expect(cronTransitDigestSchema.safeParse({ cronSecret: "short" }).success).toBe(false);
-    expect(
-      cronTransitDigestSchema.safeParse({ cronSecret: "at-least-16-chars!" }).success,
-    ).toBe(true);
+    expect(cronTransitDigestSchema.safeParse({ cronSecret: "at-least-16-chars!" }).success).toBe(
+      true,
+    );
   });
 });
 

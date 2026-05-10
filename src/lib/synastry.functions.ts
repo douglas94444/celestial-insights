@@ -41,7 +41,12 @@ export const calculateAndSaveSynastryFn = createServerFn({ method: "POST" })
       const payload1 = chartRowToChartData(chart1);
       const payload2 = chartRowToChartData(chart2);
 
-      const analysis = analyzeSynastry(payload1.planets, payload2.planets, chart1.name, chart2.name);
+      const analysis = analyzeSynastry(
+        payload1.planets,
+        payload2.planets,
+        chart1.name,
+        chart2.name,
+      );
 
       const compatibility_data = {
         chart1Name: chart1.name,

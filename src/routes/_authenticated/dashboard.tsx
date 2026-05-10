@@ -1,13 +1,20 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { Plus, Stars, Sparkles, CalendarRange } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { Loader2, Plus, Stars, Sparkles, CalendarRange } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { HOROSCOPE_DAILY } from "@/data/interpretations";
+import {
+  excerptInterpretation,
+  HOROSCOPE_ASC_MICRO,
+  HOROSCOPE_DAILY,
+  HOROSCOPE_MOON_SKY,
+  MOON_IN_SIGN,
+} from "@/data/interpretations";
 import type { SignName } from "@/lib/astrology/zodiac";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
 import {
@@ -20,16 +27,22 @@ import {
 } from "@/lib/astrology/calculate";
 import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
 import { UpgradeMapModal } from "@/components/UpgradeMapModal";
-import { analyzeTransitDay } from "@/lib/astrology/transits";
+import { addDays, format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { analyzeTransitDay, analyzeTransitRange } from "@/lib/astrology/transits";
+import { generateTransitDayNarrativeFn } from "@/lib/ai-interpretation.functions";
+import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
+import { withSupabaseAuth } from "@/lib/server-fn-client";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
 function Dashboard() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [dashTransitAi, setDashTransitAi] = useState<string | null>(null);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
@@ -96,16 +109,56 @@ function Dashboard() {
       : null;
 
   const sunSign = planets.find((p) => p.key === "sun")?.sign as SignName | undefined;
+  const moonSign = planets.find((p) => p.key === "moon")?.sign as SignName | undefined;
+  const ascSign = houses[0]?.sign as SignName | undefined;
 
   const todayStr = useMemo(
     () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }),
     [],
   );
 
+  const weekEndStr = useMemo(() => {
+    const [y, m, d] = todayStr.split("-").map(Number);
+    const base = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    return format(addDays(base, 6), "yyyy-MM-dd");
+  }, [todayStr]);
+
   const transitToday = useMemo(() => {
     if (!primary || planets.length === 0 || houses.length === 0) return null;
     return analyzeTransitDay(todayStr, planets, houses, ascendant, chartHouseSys);
   }, [primary, planets, houses, ascendant, chartHouseSys, todayStr]);
+
+  useEffect(() => {
+    setDashTransitAi(null);
+  }, [primary?.id, todayStr]);
+
+  const dashTransitAiMutation = useMutation({
+    mutationFn: async () => {
+      if (!session || !primary) throw new Error("Sessão ou mapa necessário.");
+      return generateTransitDayNarrativeFn({
+        data: { chartId: primary.id, date: todayStr },
+        ...withSupabaseAuth(session),
+      });
+    },
+    onSuccess: (r) => {
+      setDashTransitAi(r.content);
+      if (r.cached) toast.message("Texto recuperado do cache.");
+    },
+    onError: async (e) => {
+      toast.error(await getServerFnErrorMessage(e));
+    },
+  });
+
+  const transitWeek = useMemo(() => {
+    if (!primary || planets.length === 0 || houses.length === 0) return [];
+    return analyzeTransitRange(todayStr, weekEndStr, planets, houses, ascendant, chartHouseSys);
+  }, [primary, planets, houses, ascendant, chartHouseSys, todayStr, weekEndStr]);
+
+  const moonSkyLine = useMemo(() => {
+    const s = transitToday?.transitMoonSign;
+    if (!s || !(s in HOROSCOPE_MOON_SKY)) return null;
+    return HOROSCOPE_MOON_SKY[s as SignName];
+  }, [transitToday?.transitMoonSign]);
 
   function handleNewMap() {
     if (profile?.subscription_tier === "FREE" && charts.length >= 1) {
@@ -205,6 +258,36 @@ function Dashboard() {
                 {sunSign ? HOROSCOPE_DAILY[sunSign] : "Crie seu mapa para ver o horóscopo do dia."}
               </p>
             </div>
+
+            {primary && moonSign && MOON_IN_SIGN[moonSign] ? (
+              <div className="rounded-md border border-accent/20 bg-muted/20 p-3">
+                <Badge variant="outline" className="mb-2 text-[10px] uppercase">
+                  Lua natal (autoconhecimento)
+                </Badge>
+                <p className="text-foreground/90 leading-snug">
+                  {excerptInterpretation(MOON_IN_SIGN[moonSign])}
+                </p>
+                <Link
+                  to="/mapas/$id"
+                  params={{ id: primary.id }}
+                  className="mt-2 inline-block text-xs font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Ver mapa
+                </Link>
+              </div>
+            ) : null}
+
+            {primary && ascSign && HOROSCOPE_ASC_MICRO[ascSign] ? (
+              <div className="flex flex-col gap-2">
+                <Badge variant="outline" className="w-fit text-[10px] uppercase">
+                  Ascendente · {ascSign}
+                </Badge>
+                <p className="text-xs leading-snug text-foreground/85">
+                  {HOROSCOPE_ASC_MICRO[ascSign]}
+                </p>
+              </div>
+            ) : null}
+
             {transitToday && (
               <div className="rounded-lg border border-primary/15 bg-primary/5 p-3 text-foreground">
                 <Badge variant="secondary" className="mb-2 bg-primary/15 text-primary">
@@ -214,13 +297,84 @@ function Dashboard() {
                   Lua em trânsito em {transitToday.transitMoonSign || "—"} · intensidade{" "}
                   {transitToday.intensity}/100
                 </p>
+                {moonSkyLine ? (
+                  <p className="text-xs text-muted-foreground mb-2 leading-snug">{moonSkyLine}</p>
+                ) : null}
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <Badge variant="outline" className="text-[10px]">
+                    Humor {transitToday.scores.humor}/100
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    Relações {transitToday.scores.amor}/100
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    Trabalho {transitToday.scores.trabalho}/100
+                  </Badge>
+                </div>
                 <ul className="list-disc space-y-1 pl-4 text-sm leading-snug">
                   {transitToday.narrative.slice(0, 4).map((line, i) => (
                     <li key={i}>{line}</li>
                   ))}
                 </ul>
+                {transitToday.interpretiveHints.length > 0 ? (
+                  <div className="mt-3 border-t border-primary/10 pt-3">
+                    <p className="mb-1 text-[10px] font-medium uppercase text-muted-foreground">
+                      Para reflexão
+                    </p>
+                    <ul className="list-disc space-y-1 pl-4 text-xs leading-snug text-foreground/90">
+                      {transitToday.interpretiveHints.slice(0, 3).map((line, i) => (
+                        <li key={i}>{line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                <div className="mt-3 border-t border-primary/10 pt-3 space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-xs border-primary/25"
+                    disabled={dashTransitAiMutation.isPending}
+                    onClick={() => dashTransitAiMutation.mutate()}
+                  >
+                    {dashTransitAiMutation.isPending ? (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 h-3 w-3" />
+                    )}
+                    Explicar hoje com IA
+                  </Button>
+                  {dashTransitAi ? (
+                    <article className="text-xs leading-relaxed whitespace-pre-wrap text-foreground/90 rounded-md bg-background/40 p-2 border border-primary/10">
+                      {dashTransitAi}
+                    </article>
+                  ) : null}
+                </div>
               </div>
             )}
+
+            {transitWeek.length > 0 ? (
+              <div className="border-t border-border/60 pt-3">
+                <p className="mb-2 text-[10px] font-medium uppercase text-muted-foreground">
+                  Esta semana (7 dias)
+                </p>
+                <ul className="space-y-2">
+                  {transitWeek.map((d) => (
+                    <li
+                      key={d.date}
+                      className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs text-muted-foreground"
+                    >
+                      <span className="shrink-0 font-medium text-foreground">
+                        {format(parseISO(`${d.date}T12:00:00.000Z`), "EEE dd/MM", { locale: ptBR })}
+                      </span>
+                      <span className="shrink-0">{d.intensity}/100</span>
+                      <span className="min-w-0 flex-1 leading-snug">{d.narrative[0] ?? "—"}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 

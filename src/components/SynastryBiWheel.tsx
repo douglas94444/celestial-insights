@@ -5,11 +5,11 @@ import type { ChartData } from "@/lib/astrology/calculate";
 import type { SynastryCrossAspect } from "@/lib/astrology/synastry";
 
 const ASPECT_COLOR: Record<string, string> = {
-  conjuncao: "oklch(0.78 0.16 80)",
-  oposicao: "oklch(0.55 0.22 295)",
-  trigono: "oklch(0.62 0.18 250)",
-  quadratura: "oklch(0.58 0.24 27)",
-  sextil: "oklch(0.65 0.18 145)",
+  conjuncao: "var(--chart-aspect-conjuncao)",
+  oposicao: "var(--chart-aspect-oposicao)",
+  trigono: "var(--chart-aspect-trigono)",
+  quadratura: "var(--chart-aspect-quadratura)",
+  sextil: "var(--chart-aspect-sextil)",
 };
 
 function spreadLongitudes(longitudes: { key: string; longitude: number }[]) {
@@ -77,7 +77,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
     >
       <defs>
         <radialGradient id="synGlow" cx="50%" cy="50%" r="55%">
-          <stop offset="0%" stopColor="oklch(0.68 0.18 295 / 0.14)" />
+          <stop offset="0%" stopColor="var(--chart-radial-inner)" />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
       </defs>
@@ -89,7 +89,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
         cy={cy}
         r={rSigns}
         fill="none"
-        stroke="oklch(0.60 0.10 280)"
+        stroke="var(--chart-ring-line)"
         strokeWidth="1"
       />
       <circle
@@ -97,7 +97,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
         cy={cy}
         r={rSignsInner}
         fill="none"
-        stroke="oklch(0.60 0.10 280)"
+        stroke="var(--chart-ring-line)"
         strokeWidth="1"
       />
 
@@ -112,7 +112,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
         const labelPos = polar((rSigns + rSignsInner) / 2, midLon);
         return (
           <g key={sign.name}>
-            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="oklch(0.60 0.10 280)" strokeWidth="1" />
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--chart-ring-line)" strokeWidth="1" />
             <text
               x={labelPos.x}
               y={labelPos.y}
@@ -133,7 +133,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
         cy={cy}
         r={rHousesInner}
         fill="none"
-        stroke="oklch(0.55 0.05 280 / 0.5)"
+        stroke="var(--chart-house-ring)"
         strokeWidth="1"
       />
 
@@ -155,7 +155,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
               y1={y1}
               x2={x2}
               y2={y2}
-              stroke={isAngular ? "oklch(0.52 0.22 295)" : "oklch(0.55 0.05 280 / 0.5)"}
+              stroke={isAngular ? "var(--chart-line-angular)" : "var(--chart-house-ring)"}
               strokeWidth={isAngular ? "2" : "1"}
             />
             <text
@@ -164,7 +164,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize="11"
-              fill="oklch(0.50 0.04 280)"
+              fill="var(--chart-label-muted)"
             >
               {house.number}
             </text>
@@ -172,7 +172,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
         );
       })}
 
-      <text x={cx} y={22} textAnchor="middle" fontSize="11" fill="oklch(0.52 0.22 295)">
+      <text x={cx} y={22} textAnchor="middle" fontSize="11" fill="var(--chart-line-angular)">
         Sinastria · casas do mapa exterior
       </text>
 
@@ -217,15 +217,15 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
               y1={tickStart.y}
               x2={tickEnd.x}
               y2={tickEnd.y}
-              stroke="oklch(0.55 0.10 280 / 0.35)"
+              stroke="var(--chart-tick)"
               strokeWidth="1"
             />
             <circle
               cx={pos.x}
               cy={pos.y}
               r={13}
-              fill="oklch(0.99 0.01 280)"
-              stroke="oklch(0.52 0.22 295)"
+              fill="var(--chart-planet-fill)"
+              stroke="var(--chart-planet-stroke)"
               strokeWidth="1.5"
             />
             <text
@@ -234,7 +234,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize="13"
-              fill="oklch(0.30 0.12 280)"
+              fill="var(--chart-planet-text)"
               fontWeight="600"
             >
               {planet.symbol}
@@ -256,8 +256,8 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
               cx={pos.x}
               cy={pos.y}
               r={12}
-              fill="oklch(0.97 0.03 145)"
-              stroke="oklch(0.55 0.14 160)"
+              fill="var(--chart-syn-inner-fill)"
+              stroke="var(--chart-syn-inner-stroke)"
               strokeWidth="1.8"
             />
             <text
@@ -266,7 +266,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize="12"
-              fill="oklch(0.28 0.08 160)"
+              fill="var(--chart-syn-inner-text)"
               fontWeight="700"
             >
               {planet.symbol}
@@ -287,7 +287,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
                 x={pos.x - 18}
                 y={pos.y + 4}
                 fontSize="11"
-                fill="oklch(0.52 0.22 295)"
+                fill="var(--chart-line-angular)"
                 fontWeight="700"
               >
                 ASC
@@ -297,7 +297,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
                 y={cy - 10}
                 textAnchor="middle"
                 fontSize="11"
-                fill="oklch(0.50 0.04 280)"
+                fill="var(--chart-label-muted)"
               >
                 {signFromLongitude(ascendant)}
               </text>
@@ -306,7 +306,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
                 y={cy + 12}
                 textAnchor="middle"
                 fontSize="10"
-                fill="oklch(0.55 0.05 280)"
+                fill="var(--chart-center-caption)"
               >
                 ASC {formatDegree(ascendant)}
               </text>

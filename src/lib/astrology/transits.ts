@@ -1,6 +1,7 @@
 import { eachDayOfInterval, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ASPECT_LABELS } from "@/data/chart-detail-interpretations";
+import { ASPECT_LABELS, aspectMood } from "@/data/chart-detail-interpretations";
+import { interpretiveHintsForAspects } from "@/data/transit-aspect-hints";
 import {
   computePlanetPositionsUtc,
   natalHouseForLongitude,
@@ -11,9 +12,86 @@ import {
 import { wholeSignHouse } from "@/lib/astrology/houses";
 import { computeCrossAspects } from "@/lib/astrology/synastry";
 import type { SynastryCrossAspect } from "@/lib/astrology/synastry";
-import { PLANETS } from "@/lib/astrology/zodiac";
+import { PLANETS, type PlanetKey } from "@/lib/astrology/zodiac";
 
-const PERSONAL = new Set(["sun", "moon", "mercury", "venus", "mars"]);
+const PERSONAL = new Set<PlanetKey>(["sun", "moon", "mercury", "venus", "mars"]);
+
+/** Corpos «rápidos» em trânsito (Lua até Marte + Sol). */
+export const FAST_TRANSIT_KEYS = new Set<PlanetKey>(["sun", "moon", "mercury", "venus", "mars"]);
+
+export function filterAspectsByFastTransit(aspects: SynastryCrossAspect[]): SynastryCrossAspect[] {
+  return aspects.filter((a) => FAST_TRANSIT_KEYS.has(a.planet1));
+}
+
+export function filterAspectsByPersonalNatal(
+  aspects: SynastryCrossAspect[],
+): SynastryCrossAspect[] {
+  return aspects.filter((a) => PERSONAL.has(a.planet2));
+}
+
+/** Indicadores heurísticos 15–100 por tema (reflexão, não previsão). */
+export interface TransitMoodScores {
+  humor: number;
+  amor: number;
+  trabalho: number;
+}
+
+function transitScoresFromAspects(aspects: SynastryCrossAspect[]): TransitMoodScores {
+  let humorAcc = 0;
+  let humorW = 0;
+  let amorAcc = 0;
+  let amorW = 0;
+  let trabAcc = 0;
+  let trabW = 0;
+
+  const weight = (orb: number, transitBoost: number) =>
+    Math.max(0.12, ((4 - Math.min(orb, 4)) / 4) * transitBoost);
+
+  for (const a of aspects) {
+    const mood = aspectMood(a.type);
+    const moodUnit = mood === "harmonic" ? 1 : mood === "desafiador" ? -1 : 0.2;
+    const transitBoost = PERSONAL.has(a.planet1) ? 1.35 : 1;
+
+    const wMoonMerc = weight(a.orb, transitBoost);
+    if (a.planet2 === "moon" || a.planet2 === "mercury") {
+      humorAcc += moodUnit * wMoonMerc * 11;
+      humorW += wMoonMerc;
+    }
+
+    const wAmor = weight(a.orb, transitBoost);
+    if (a.planet2 === "moon" || a.planet2 === "venus" || a.planet2 === "mars") {
+      amorAcc += moodUnit * wAmor * 11;
+      amorW += wAmor;
+    }
+
+    const wTrab = weight(
+      a.orb,
+      transitBoost * (a.planet2 === "saturn" || a.planet2 === "jupiter" ? 1.08 : 1),
+    );
+    if (
+      a.planet2 === "sun" ||
+      a.planet2 === "mercury" ||
+      a.planet2 === "mars" ||
+      a.planet2 === "saturn" ||
+      a.planet2 === "jupiter"
+    ) {
+      trabAcc += moodUnit * wTrab * 11;
+      trabW += wTrab;
+    }
+  }
+
+  const finalize = (base: number, acc: number, w: number) => {
+    if (w < 0.01) return base;
+    const v = base + (acc / w) * 7;
+    return Math.round(Math.min(100, Math.max(15, v)));
+  };
+
+  return {
+    humor: finalize(52, humorAcc, humorW),
+    amor: finalize(52, amorAcc, amorW),
+    trabalho: finalize(52, trabAcc, trabW),
+  };
+}
 
 function transitPlanetPositions(
   transitUtc: Date,
@@ -70,6 +148,8 @@ export interface TransitDayPayload {
   transitMoonSign: string;
   intensity: number;
   narrative: string[];
+  interpretiveHints: string[];
+  scores: TransitMoodScores;
 }
 
 /** Meio-dia UTC no dia civil (YYYY-MM-DD em UTC). */
@@ -101,6 +181,8 @@ export function analyzeTransitDay(
     transitMoonSign: moon?.sign ?? "",
     intensity: dayIntensity(aspects),
     narrative: narrativeLines(aspects),
+    interpretiveHints: interpretiveHintsForAspects(aspects, 8),
+    scores: transitScoresFromAspects(aspects),
   };
 }
 

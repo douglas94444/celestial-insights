@@ -19,12 +19,17 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { generateTransitDayNarrativeFn } from "@/lib/ai-interpretation.functions";
 import { calculateTransitsFn } from "@/lib/transits.functions";
 import { sendTransitDigestEmailFn } from "@/lib/email.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
-import { formatTransitDayTitle } from "@/lib/astrology/transits";
+import {
+  filterAspectsByFastTransit,
+  filterAspectsByPersonalNatal,
+  formatTransitDayTitle,
+} from "@/lib/astrology/transits";
 import { ASPECT_LABELS } from "@/data/chart-detail-interpretations";
 import { PLANETS } from "@/lib/astrology/zodiac";
 import type { PlanetKey } from "@/lib/astrology/zodiac";
@@ -47,6 +52,9 @@ function TransitosPage() {
   const [rangePreset, setRangePreset] = useState<"30" | "60" | "90">("30");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [majorOnly, setMajorOnly] = useState(false);
+  const [fastTransitOnly, setFastTransitOnly] = useState(false);
+  const [natalPersonalOnly, setNatalPersonalOnly] = useState(false);
+  const [transitAiText, setTransitAiText] = useState<string | null>(null);
 
   const [startDate, endDate] = useMemo(() => {
     const end = new Date();
@@ -101,13 +109,39 @@ function TransitosPage() {
     return set;
   }, [days]);
 
+  useEffect(() => {
+    setTransitAiText(null);
+  }, [selectedKey, chartId]);
+
+  const transitAiMutation = useMutation({
+    mutationFn: async () => {
+      if (!session) throw new Error("Sessão necessária.");
+      if (!chartId || !selectedKey)
+        throw new Error("Escolha um mapa e um dia dentro do intervalo.");
+      return generateTransitDayNarrativeFn({
+        data: { chartId, date: selectedKey },
+        ...withSupabaseAuth(session),
+      });
+    },
+    onSuccess: (r) => {
+      setTransitAiText(r.content);
+      if (r.cached) toast.message("Texto recuperado do cache.");
+    },
+    onError: async (e) => {
+      toast.error(await getServerFnErrorMessage(e));
+    },
+  });
+
   const filteredAspects = useMemo(() => {
     if (!selectedPayload) return [];
-    if (!majorOnly) return selectedPayload.aspects;
-    return selectedPayload.aspects.filter(
-      (a) => PERSONAL.includes(a.planet1) || PERSONAL.includes(a.planet2),
-    );
-  }, [selectedPayload, majorOnly]);
+    let list = selectedPayload.aspects;
+    if (majorOnly) {
+      list = list.filter((a) => PERSONAL.includes(a.planet1) || PERSONAL.includes(a.planet2));
+    }
+    if (fastTransitOnly) list = filterAspectsByFastTransit(list);
+    if (natalPersonalOnly) list = filterAspectsByPersonalNatal(list);
+    return list;
+  }, [selectedPayload, majorOnly, fastTransitOnly, natalPersonalOnly]);
 
   async function exportPdf() {
     if (!transitsQuery.data || days.length === 0) {
@@ -339,6 +373,34 @@ function TransitosPage() {
                     >
                       Só aspectos com planetas pessoais
                     </Button>
+                    <Button
+                      variant={fastTransitOnly ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-8"
+                      onClick={() => setFastTransitOnly(!fastTransitOnly)}
+                    >
+                      Só trânsitos rápidos (Sol–Marte)
+                    </Button>
+                    <Button
+                      variant={natalPersonalOnly ? "secondary" : "ghost"}
+                      size="sm"
+                      className="h-8"
+                      onClick={() => setNatalPersonalOnly(!natalPersonalOnly)}
+                    >
+                      Só pontos natais pessoais
+                    </Button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline" className="text-[10px]">
+                      Humor {selectedPayload.scores.humor}/100
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      Relações {selectedPayload.scores.amor}/100
+                    </Badge>
+                    <Badge variant="outline" className="text-[10px]">
+                      Trabalho {selectedPayload.scores.trabalho}/100
+                    </Badge>
                   </div>
 
                   <div className="rounded-lg bg-muted/40 p-4 space-y-2">
@@ -350,6 +412,48 @@ function TransitosPage() {
                         <li key={i}>{line}</li>
                       ))}
                     </ul>
+                  </div>
+
+                  {selectedPayload.interpretiveHints.length > 0 ? (
+                    <div className="rounded-lg border border-primary/15 bg-primary/5 p-4 space-y-2">
+                      <p className="text-xs font-medium uppercase text-muted-foreground">
+                        Sugestões para reflexão
+                      </p>
+                      <ul className="list-disc pl-4 text-sm space-y-1 text-foreground/90">
+                        {selectedPayload.interpretiveHints.slice(0, 4).map((line, i) => (
+                          <li key={i}>{line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-lg border border-muted bg-muted/20 p-4 space-y-3">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">
+                      Linguagem simples (IA)
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Complementa a leitura rápida acima; em caso de erro, continue a usar as listas
+                      estáticas.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={transitAiMutation.isPending}
+                      onClick={() => transitAiMutation.mutate()}
+                    >
+                      {transitAiMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-2 h-4 w-4" />
+                      )}
+                      Explicar este dia em linguagem simples
+                    </Button>
+                    {transitAiText ? (
+                      <article className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 border-t border-border/60 pt-3">
+                        {transitAiText}
+                      </article>
+                    ) : null}
                   </div>
 
                   <div>

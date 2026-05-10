@@ -46,15 +46,17 @@ function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden pt-32 pb-24">
-        <div className="absolute inset-0 bg-cosmic opacity-[0.04]" />
-        <div className="absolute inset-0 starfield opacity-30" />
-        <div className="container relative mx-auto px-4 text-center">
+      <section className="relative overflow-hidden pt-32 pb-24 texture-grain">
+        <div className="pointer-events-none absolute inset-0 bg-cosmic opacity-[0.07]" />
+        <div className="pointer-events-none absolute inset-0 bg-shell-glow" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-glow opacity-[0.85]" />
+        <div className="pointer-events-none absolute inset-0 starfield opacity-[0.22]" />
+        <div className="container relative z-[1] mx-auto px-4 text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">
             <Sparkles className="h-3 w-3" />
             Astrologia moderna em português
           </div>
-          <h1 className="mt-6 font-display text-5xl font-bold tracking-tight md:text-7xl">
+          <h1 className="mt-6 font-display text-5xl font-bold md:text-7xl md:leading-[1.08]">
             Descubra seu <span className="text-gradient-mystical">mapa astral</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">

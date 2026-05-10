@@ -22,6 +22,7 @@ import type {
   SynastryCrossAspect,
 } from "@/lib/astrology/synastry";
 import { chartRowToChartData } from "@/lib/chart-from-row";
+import { generateSynastryNarrativeFn } from "@/lib/ai-interpretation.functions";
 import { calculateAndSaveSynastryFn } from "@/lib/synastry.functions";
 import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
@@ -78,7 +79,9 @@ function CompatibilidadePage() {
     overlayChart: ChartData;
     score: number;
     savedAt?: string;
+    synastryId?: string;
   } | null>(null);
+  const [synastryAiText, setSynastryAiText] = useState<string | null>(null);
 
   const { data: charts = [], isLoading: chartsLoading } = useQuery({
     queryKey: ["charts-list"],
@@ -113,6 +116,29 @@ function CompatibilidadePage() {
     setChart2Id(charts[1]!.id);
   }, [charts]);
 
+  useEffect(() => {
+    setSynastryAiText(null);
+  }, [activeView?.synastryId]);
+
+  const synastryAiMutation = useMutation({
+    mutationFn: async () => {
+      if (!session) throw new Error("Sessão necessária.");
+      const sid = activeView?.synastryId;
+      if (!sid) throw new Error("Sinastria não identificada.");
+      return generateSynastryNarrativeFn({
+        data: { synastryId: sid },
+        ...withSupabaseAuth(session),
+      });
+    },
+    onSuccess: (r) => {
+      setSynastryAiText(r.content);
+      if (r.cached) toast.message("Texto recuperado do cache.");
+    },
+    onError: async (e) => {
+      toast.error(await getServerFnErrorMessage(e));
+    },
+  });
+
   const calcMutation = useMutation({
     mutationFn: async () => {
       if (!session) throw new Error("Sessão necessária.");
@@ -129,6 +155,7 @@ function CompatibilidadePage() {
         overlayChart: res.overlayChart,
         score: res.synastry.compatibility_score,
         savedAt: res.synastry.created_at,
+        synastryId: res.synastry.id,
       });
       toast.success("Sinastria calculada e guardada.");
     },
@@ -159,6 +186,7 @@ function CompatibilidadePage() {
         overlayChart,
         score: row.compatibility_score,
         savedAt: row.created_at,
+        synastryId: row.id,
       });
     } catch {
       toast.error("Dados de mapa incompletos.");
@@ -301,6 +329,39 @@ function CompatibilidadePage() {
                 )}
               </CardContent>
             </Card>
+
+            {activeView.synastryId ? (
+              <Card className="border-primary/15">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Análise narrativa (IA)</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Opcional — não substitui os destaques numéricos nem uma leitura humana.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="w-full"
+                    disabled={synastryAiMutation.isPending}
+                    onClick={() => synastryAiMutation.mutate()}
+                  >
+                    {synastryAiMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 h-4 w-4" />
+                    )}
+                    Gerar análise narrativa
+                  </Button>
+                  {synastryAiText ? (
+                    <article className="rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                      {synastryAiText}
+                    </article>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ) : null}
 
             <div className="grid gap-3 sm:grid-cols-2">
               {AREA_META.map(({ key, title, hint }) => (

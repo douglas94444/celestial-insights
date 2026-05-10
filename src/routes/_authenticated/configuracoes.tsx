@@ -74,6 +74,9 @@ function Settings() {
       house_system: "placidus" as const,
       zodiac: "tropical" as const,
       email_notifications: true,
+      transit_digest_auto: false,
+      transit_digest_hour: 8,
+      transit_digest_weekdays: [1, 2, 3, 4, 5] as number[],
     },
   });
 
@@ -84,6 +87,13 @@ function Settings() {
         house_system: (profile.house_system as "placidus" | "equal" | "whole_sign") ?? "placidus",
         zodiac: (profile.zodiac as "tropical" | "sidereal") ?? "tropical",
         email_notifications: profile.email_notifications,
+        transit_digest_auto: profile.transit_digest_auto ?? false,
+        transit_digest_hour: profile.transit_digest_hour ?? 8,
+        transit_digest_weekdays:
+          Array.isArray(profile.transit_digest_weekdays) &&
+          profile.transit_digest_weekdays.length > 0
+            ? [...profile.transit_digest_weekdays].sort((a, b) => a - b)
+            : [1, 2, 3, 4, 5],
       });
     }
   }, [profile, nameForm, prefForm]);
@@ -107,6 +117,9 @@ function Settings() {
         house_system: values.house_system,
         zodiac: values.zodiac,
         email_notifications: values.email_notifications,
+        transit_digest_auto: values.transit_digest_auto,
+        transit_digest_hour: values.transit_digest_hour,
+        transit_digest_weekdays: values.transit_digest_weekdays,
       })
       .eq("id", user!.id);
     if (error) toast.error(error.message);
@@ -323,6 +336,93 @@ function Settings() {
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={prefForm.control}
+                    name="transit_digest_auto"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">
+                            Digest diário automático de trânsitos
+                          </FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            Quando ativo, um job no servidor (cron com segredo{" "}
+                            <code className="text-xs">TRANSIT_DIGEST_CRON_SECRET</code>) pode enviar
+                            o resumo do dia no horário abaixo — fuso America/Sao_Paulo. Requer{" "}
+                            <code className="text-xs">SUPABASE_SERVICE_ROLE_KEY</code> no servidor.
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={prefForm.control}
+                    name="transit_digest_hour"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Hora preferida do digest (São Paulo)</FormLabel>
+                        <Select
+                          onValueChange={(v) => field.onChange(Number(v))}
+                          value={String(field.value)}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="max-h-[220px]">
+                            {Array.from({ length: 24 }, (_, h) => (
+                              <SelectItem key={h} value={String(h)}>
+                                {String(h).padStart(2, "0")}:00
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={prefForm.control}
+                    name="transit_digest_weekdays"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Dias da semana (digest automático)</FormLabel>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          0 = domingo … 6 = sábado (mesmo critério do calendário local).
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((lab, idx) => {
+                            const on = field.value.includes(idx);
+                            return (
+                              <Button
+                                key={lab}
+                                type="button"
+                                size="sm"
+                                variant={on ? "secondary" : "outline"}
+                                onClick={() => {
+                                  const next = on
+                                    ? field.value.filter((n: number) => n !== idx)
+                                    : [...field.value, idx].sort((a, b) => a - b);
+                                  field.onChange(next.length ? next : [idx]);
+                                }}
+                              >
+                                {lab}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <Button type="submit" className="bg-mystical text-white">
                     Salvar preferências
                   </Button>

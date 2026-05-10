@@ -5,14 +5,17 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { hasSupabaseSessionCookie } from "@/lib/supabase-auth-server";
 
 export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async () => {
-    if (typeof window === "undefined") return;
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      throw redirect({ to: "/auth" });
+    if (typeof window !== "undefined") {
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) throw redirect({ to: "/auth" });
+      return;
     }
+    const ok = await hasSupabaseSessionCookie();
+    if (!ok) throw redirect({ to: "/auth" });
   },
   component: AuthenticatedLayout,
 });
@@ -44,7 +47,7 @@ function AuthenticatedLayout() {
             <SidebarTrigger />
             <ThemeToggle />
           </header>
-          <main className="flex-1 overflow-auto">
+          <main className="relative flex-1 overflow-auto bg-shell-glow texture-grain">
             <Outlet />
           </main>
         </div>

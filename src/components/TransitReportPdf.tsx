@@ -40,8 +40,14 @@ export function TransitReportPdf({ chartName, startDate, endDate, days }: Props)
           <View key={day.date} wrap={false} style={{ marginBottom: 14 }}>
             <Text style={styles.h2}>{formatTransitDayTitle(day.date)}</Text>
             <Text style={styles.row}>
-              Lua (trânsito): {day.transitMoonSign || "—"} · Intensidade: {day.intensity}/100
+              Lua (trânsito): {day.transitMoonSign || "—"} · Intensidade: {day.intensity}/100 ·
+              Humor {day.scores.humor} · Relações {day.scores.amor} · Trabalho {day.scores.trabalho}
             </Text>
+            {day.interpretiveHints.slice(0, 3).map((line, i) => (
+              <Text key={`h-${i}`} style={styles.row}>
+                ◇ {line}
+              </Text>
+            ))}
             {day.narrative.slice(0, 4).map((line, i) => (
               <Text key={i} style={styles.row}>
                 • {line}

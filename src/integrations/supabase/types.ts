@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -76,6 +76,69 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      interpretation_ai_cache: {
+        Row: {
+          id: string
+          user_id: string
+          kind: Database["public"]["Enums"]["interpretation_ai_kind"]
+          fingerprint: string
+          chart_id: string | null
+          synastry_id: string | null
+          transit_date: string | null
+          prompt_version: string
+          model: string
+          content: string
+          tokens_in: number | null
+          tokens_out: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          kind: Database["public"]["Enums"]["interpretation_ai_kind"]
+          fingerprint: string
+          chart_id?: string | null
+          synastry_id?: string | null
+          transit_date?: string | null
+          prompt_version?: string
+          model: string
+          content: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          kind?: Database["public"]["Enums"]["interpretation_ai_kind"]
+          fingerprint?: string
+          chart_id?: string | null
+          synastry_id?: string | null
+          transit_date?: string | null
+          prompt_version?: string
+          model?: string
+          content?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interpretation_ai_cache_chart_id_fkey"
+            columns: ["chart_id"]
+            isOneToOne: false
+            referencedRelation: "charts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interpretation_ai_cache_synastry_id_fkey"
+            columns: ["synastry_id"]
+            isOneToOne: false
+            referencedRelation: "synastries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -197,6 +260,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      interpretation_ai_kind: "natal_summary" | "natal_planet" | "synastry" | "transit_day"
       subscription_tier: "FREE" | "PREMIUM"
     }
     CompositeTypes: {
@@ -326,6 +390,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      interpretation_ai_kind: ["natal_summary", "natal_planet", "synastry", "transit_day"],
       subscription_tier: ["FREE", "PREMIUM"],
     },
   },

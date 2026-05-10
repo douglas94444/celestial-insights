@@ -80,6 +80,74 @@ export const ASC_IN_SIGN: SignText = {
     "Ascendente em Peixes: você se apresenta como sonhador(a), gentil e fluido(a). Sua persona é a do(a) místico(a). A vida pede que você cultive arte, fé e compaixão.",
 };
 
+/** Trecho inicial do texto interpretativo (frases completas até ~maxChars). */
+export function excerptInterpretation(fullText: string, maxChars = 280): string {
+  const t = fullText.trim();
+  if (t.length <= maxChars) return t;
+  const parts = t.split(/(?<=[.!?])\s+/).filter(Boolean);
+  let out = "";
+  for (const p of parts) {
+    const next = out ? `${out} ${p}` : p;
+    if (next.length <= maxChars) out = next;
+    else break;
+  }
+  if (!out) return `${t.slice(0, Math.max(1, maxChars - 1)).trim()}…`;
+  return out.endsWith("…") ? out : `${out.replace(/\.*$/, "")}…`;
+}
+
+/** Clima coletivo breve conforme o signo da Lua em trânsito no céu do dia. */
+export const HOROSCOPE_MOON_SKY: Record<SignName, string> = {
+  Áries:
+    "Lua no céu em Áries acelera reações e pede honestidade nas emoções — bom para começos afetivos com clareza.",
+  Touro:
+    "Lua em Touro convida ao conforto e à constância; priorize corpo, casa e prazeres simples hoje.",
+  Gêmeos:
+    "Lua em Gêmeos favorece conversas e troca de ideias; humor pode mudar rápido — flexibilize.",
+  Câncer:
+    "Lua em Câncer amplia sensibilidade e vínculos; lar e família ganham peso no ambiente coletivo.",
+  Leão: "Lua em Leão pede calor e reconhecimento gentil; criatividade e afeto público ganham destaque.",
+  Virgem:
+    "Lua em Virgem favorece organização e cuidado prático; detalhes importam para o bem-estar.",
+  Libra:
+    "Lua em Libra suaviza relações e pede equilíbrio; diplomacia resolve mais que confronto direto.",
+  Escorpião:
+    "Lua em Escorpião intensifica o que está oculto; profundidade emocional e verdades íntimas saltam.",
+  Sagitário:
+    "Lua em Sagitário expande o ânimo e a sede de significado; humor mais leve e idealista no ar.",
+  Capricórnio:
+    "Lua em Capricórnio valoriza dever, estrutura e maturidade afetiva; responsabilidade é tema.",
+  Aquário:
+    "Lua em Aquário distancia um pouco o drama e valoriza amizade e causas; espaço emocional pedido.",
+  Peixes:
+    "Lua em Peixes dissolve fronteiras — empatia, arte e intuição ficam mais acessíveis a todos.",
+};
+
+/** Uma linha curta sobre o filtro do Ascendente (persona). */
+export const HOROSCOPE_ASC_MICRO: Record<SignName, string> = {
+  Áries:
+    "Seu Ascendente em Áries imprime dinamismo na primeira impressão — você entra em cena com coragem.",
+  Touro:
+    "Ascendente em Touro passa solidez e calma sensorial; sua presença acalma e convida confiança.",
+  Gêmeos:
+    "Ascendente em Gêmeos mostra curiosidade e leveza logo de cara — comunicação é sua vitrine.",
+  Câncer:
+    "Ascendente em Câncer revela acolhimento e cautela; você protege o próprio espaço afetivo.",
+  Leão: "Ascendente em Leão adiciona calor e presença cênica — generosidade marca sua entrada.",
+  Virgem:
+    "Ascendente em Virgem sugere atenção aos detalhes e utilidade; você parece confiável e discreto(a).",
+  Libra: "Ascendente em Libra passa charme e busca harmonia; você negocia antes de impor.",
+  Escorpião:
+    "Ascendente em Escorpião carrega magnetismo e mistério — menos palavras, mais intensidade.",
+  Sagitário:
+    "Ascendente em Sagitário transmite abertura e entusiasmo; seu sorriso parece convidar à aventura.",
+  Capricórnio:
+    "Ascendente em Capricórnio imprime seriedade e competência; você parece quem resolve.",
+  Aquário:
+    "Ascendente em Aquário destaca originalidade e independência; você não passa despercebido(a).",
+  Peixes:
+    "Ascendente em Peixes suaviza traços e sugere sensibilidade; sua entrada é fluida e empática.",
+};
+
 export const HOROSCOPE_DAILY: Record<SignName, string> = {
   Áries:
     "Hoje sua energia pede ação consciente. Comece algo novo, mas escolha bem onde investir seu fogo — atalhos podem custar caro. Boa hora para conversas francas.",

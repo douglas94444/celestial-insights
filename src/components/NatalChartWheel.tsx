@@ -11,11 +11,11 @@ interface Props {
 }
 
 const ASPECT_COLOR: Record<string, string> = {
-  conjuncao: "oklch(0.78 0.16 80)",
-  oposicao: "oklch(0.55 0.22 295)",
-  trigono: "oklch(0.62 0.18 250)",
-  quadratura: "oklch(0.58 0.24 27)",
-  sextil: "oklch(0.65 0.18 145)",
+  conjuncao: "var(--chart-aspect-conjuncao)",
+  oposicao: "var(--chart-aspect-oposicao)",
+  trigono: "var(--chart-aspect-trigono)",
+  quadratura: "var(--chart-aspect-quadratura)",
+  sextil: "var(--chart-aspect-sextil)",
 };
 
 export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetClick }: Props) {
@@ -70,7 +70,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
     >
       <defs>
         <radialGradient id="bgGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="oklch(0.68 0.20 295 / 0.18)" />
+          <stop offset="0%" stopColor="var(--chart-radial-inner)" />
           <stop offset="100%" stopColor="transparent" />
         </radialGradient>
       </defs>
@@ -83,7 +83,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
         cy={cy}
         r={rSigns}
         fill="none"
-        stroke="oklch(0.60 0.10 280)"
+        stroke="var(--chart-ring-line)"
         strokeWidth="1"
       />
       <circle
@@ -91,7 +91,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
         cy={cy}
         r={rSignsInner}
         fill="none"
-        stroke="oklch(0.60 0.10 280)"
+        stroke="var(--chart-ring-line)"
         strokeWidth="1"
       />
 
@@ -109,7 +109,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
         const labelPos = polar((rSigns + rSignsInner) / 2, midLon);
         return (
           <g key={sign.name}>
-            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="oklch(0.60 0.10 280)" strokeWidth="1" />
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="var(--chart-ring-line)" strokeWidth="1" />
             <text
               x={labelPos.x}
               y={labelPos.y}
@@ -131,7 +131,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
         cy={cy}
         r={rHousesInner}
         fill="none"
-        stroke="oklch(0.55 0.05 280 / 0.5)"
+        stroke="var(--chart-house-ring)"
         strokeWidth="1"
       />
 
@@ -154,7 +154,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
               y1={y1}
               x2={x2}
               y2={y2}
-              stroke={isAngular ? "oklch(0.52 0.22 295)" : "oklch(0.55 0.05 280 / 0.5)"}
+              stroke={isAngular ? "var(--chart-line-angular)" : "var(--chart-house-ring)"}
               strokeWidth={isAngular ? "2" : "1"}
             />
             <text
@@ -163,7 +163,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize="11"
-              fill="oklch(0.50 0.04 280)"
+              fill="var(--chart-label-muted)"
             >
               {house.number}
             </text>
@@ -215,15 +215,15 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
               y1={tickStart.y}
               x2={tickEnd.x}
               y2={tickEnd.y}
-              stroke="oklch(0.55 0.10 280 / 0.4)"
+              stroke="var(--chart-tick)"
               strokeWidth="1"
             />
             <circle
               cx={pos.x}
               cy={pos.y}
               r={isHl ? 16 : 13}
-              fill="oklch(0.99 0.01 280)"
-              stroke={isHl ? "oklch(0.78 0.16 80)" : "oklch(0.52 0.22 295)"}
+              fill="var(--chart-planet-fill)"
+              stroke={isHl ? "var(--chart-highlight-stroke)" : "var(--chart-planet-stroke)"}
               strokeWidth={isHl ? "2.5" : "1.5"}
             />
             <text
@@ -232,7 +232,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
               textAnchor="middle"
               dominantBaseline="middle"
               fontSize="14"
-              fill="oklch(0.30 0.12 280)"
+              fill="var(--chart-planet-text)"
               fontWeight="600"
             >
               {planet.symbol}
@@ -255,12 +255,18 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
                 x={pos.x - 16}
                 y={pos.y + 4}
                 fontSize="11"
-                fill="oklch(0.52 0.22 295)"
+                fill="var(--chart-line-angular)"
                 fontWeight="700"
               >
                 ASC
               </text>
-              <text x={cx} y={cy - 8} textAnchor="middle" fontSize="11" fill="oklch(0.50 0.04 280)">
+              <text
+                x={cx}
+                y={cy - 8}
+                textAnchor="middle"
+                fontSize="11"
+                fill="var(--chart-label-muted)"
+              >
                 {signFromLongitude(ascendant)}
               </text>
               <text
@@ -268,7 +274,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
                 y={cy + 10}
                 textAnchor="middle"
                 fontSize="10"
-                fill="oklch(0.55 0.05 280)"
+                fill="var(--chart-center-caption)"
               >
                 ASC {formatDegree(ascendant)}
               </text>

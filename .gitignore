@@ -33,3 +33,7 @@ dist-ssr
 
 # Supabase CLI
 supabase/.temp/
+
+# Playwright
+test-results/
+playwright-report/

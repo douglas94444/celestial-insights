@@ -1,10 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ArrowLeft, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,7 +20,7 @@ import { NatalChartWheel } from "@/components/NatalChartWheel";
 import { computeAngles, type HouseSystemId } from "@/lib/astrology/calculate";
 import { HOUSE_SYSTEM_LABELS } from "@/lib/astrology/houses";
 import type { ChartData, HousePosition, PlanetPosition, Aspect } from "@/lib/astrology/calculate";
-import { signFromLongitude, formatDegree, PLANETS } from "@/lib/astrology/zodiac";
+import { signFromLongitude, formatDegree, PLANETS, type PlanetKey } from "@/lib/astrology/zodiac";
 import { SUN_IN_SIGN, MOON_IN_SIGN, ASC_IN_SIGN } from "@/data/interpretations";
 import {
   ASPECT_LABELS,
@@ -30,6 +31,10 @@ import {
 import type { SignName } from "@/lib/astrology/zodiac";
 import type { AspectType } from "@/lib/astrology/calculate";
 import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
+import {
+  generateNatalExecutiveSummaryFn,
+  generateNatalPlanetInsightFn,
+} from "@/lib/ai-interpretation.functions";
 import { recalculateChartFn } from "@/lib/charts.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
@@ -50,7 +55,7 @@ function ChartView() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("house_system")
+        .select("house_system, subscription_tier")
         .eq("id", user!.id)
         .single();
       if (error) throw error;
@@ -62,6 +67,10 @@ function ChartView() {
   const [aspectFilter, setAspectFilter] = useState<"todos" | "harmonicos" | "desafiadores">(
     "todos",
   );
+  const [aiExecOpen, setAiExecOpen] = useState(false);
+  const [aiExecutiveText, setAiExecutiveText] = useState<string | null>(null);
+  const [aiPlanetTexts, setAiPlanetTexts] = useState<Partial<Record<PlanetKey, string>>>({});
+  const [aiPlanetLoading, setAiPlanetLoading] = useState<PlanetKey | null>(null);
 
   const { data: chart, isLoading } = useQuery({
     queryKey: ["chart", id],
@@ -108,6 +117,42 @@ function ChartView() {
   const needsRecalcHouseMismatch = !!chart && !!profile && storedHouseSystem !== profileHouseSystem;
 
   const needsRecalc = needsRecalcPlanets || needsRecalcHouseMismatch;
+
+  const aiExecutiveMutation = useMutation({
+    mutationFn: async () => {
+      if (!session) throw new Error("Sessão necessária.");
+      return generateNatalExecutiveSummaryFn({
+        data: { chartId: id },
+        ...withSupabaseAuth(session),
+      });
+    },
+    onSuccess: (r) => {
+      setAiExecutiveText(r.content);
+      if (r.cached) toast.message("Texto recuperado do cache.");
+    },
+    onError: async (e) => {
+      toast.error(await getServerFnErrorMessage(e));
+    },
+  });
+
+  const aiPlanetMutation = useMutation({
+    mutationFn: async (planetKey: PlanetKey) => {
+      if (!session) throw new Error("Sessão necessária.");
+      return generateNatalPlanetInsightFn({
+        data: { chartId: id, planetKey },
+        ...withSupabaseAuth(session),
+      });
+    },
+    onMutate: (planetKey) => setAiPlanetLoading(planetKey),
+    onSettled: () => setAiPlanetLoading(null),
+    onSuccess: (r, planetKey) => {
+      setAiPlanetTexts((prev) => ({ ...prev, [planetKey]: r.content }));
+      if (r.cached) toast.message("Texto recuperado do cache.");
+    },
+    onError: async (e) => {
+      toast.error(await getServerFnErrorMessage(e));
+    },
+  });
 
   const recalcMutation = useMutation({
     mutationFn: async () => {
@@ -221,6 +266,57 @@ function ChartView() {
         </div>
       )}
 
+      <Collapsible open={aiExecOpen} onOpenChange={setAiExecOpen} className="mb-6">
+        <Card className="border-primary/20 bg-muted/15">
+          <CardContent className="p-4">
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2 text-left font-display text-lg font-semibold"
+              >
+                <span className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Interpretação integrada (IA)
+                </span>
+                <ChevronDown
+                  className={`h-5 w-5 shrink-0 transition-transform ${aiExecOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4 space-y-3">
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Camada opcional que complementa os textos fixos desta página. Se o serviço de IA
+                falhar, continue a usar as interpretações estáticas.{" "}
+                {profile?.subscription_tier === "FREE" ? (
+                  <span>
+                    No plano gratuito aplicam-se limites mensais de gerações novas (consulte a
+                    documentação do ambiente).
+                  </span>
+                ) : null}
+              </p>
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={aiExecutiveMutation.isPending}
+                onClick={() => aiExecutiveMutation.mutate()}
+              >
+                {aiExecutiveMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                Gerar resumo executivo
+              </Button>
+              {aiExecutiveText ? (
+                <article className="rounded-lg border bg-card p-4 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                  {aiExecutiveText}
+                </article>
+              ) : null}
+            </CollapsibleContent>
+          </CardContent>
+        </Card>
+      </Collapsible>
+
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardContent className="p-4">
@@ -295,7 +391,7 @@ function ChartView() {
                 return (
                   <Card key={p.key}>
                     <CardContent className="p-4">
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
                         <h3 className="font-display text-base font-semibold">
                           <span className="mr-1.5">{p.symbol}</span>
                           {p.name} em {p.sign}{" "}
@@ -304,10 +400,30 @@ function ChartView() {
                             {p.retrograde ? " · R" : ""}
                           </span>
                         </h3>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 text-xs h-8"
+                          disabled={aiPlanetLoading === p.key}
+                          onClick={() => aiPlanetMutation.mutate(p.key)}
+                        >
+                          {aiPlanetLoading === p.key ? (
+                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                          ) : (
+                            <Sparkles className="mr-1 h-3 w-3" />
+                          )}
+                          Aprofundar com IA
+                        </Button>
                       </div>
                       <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
                         {planetInSignInterpretation(p.key, p.sign as SignName)}
                       </p>
+                      {aiPlanetTexts[p.key] ? (
+                        <article className="mt-3 rounded-md border border-primary/15 bg-primary/5 p-3 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                          {aiPlanetTexts[p.key]}
+                        </article>
+                      ) : null}
                     </CardContent>
                   </Card>
                 );

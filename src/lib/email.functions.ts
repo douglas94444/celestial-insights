@@ -1,20 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { chartRowToChartData } from "@/lib/chart-from-row";
+import { ASPECT_LABELS } from "@/data/chart-detail-interpretations";
 import type { HouseSystemId } from "@/lib/astrology/calculate";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import { analyzeTransitDay, formatTransitDayTitle } from "@/lib/astrology/transits";
-import { ASPECT_LABELS } from "@/data/chart-detail-interpretations";
 import { PLANETS } from "@/lib/astrology/zodiac";
-
-function jsonError(status: number, code: string, message: string): Response {
-  return new Response(JSON.stringify({ code, message }), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
+import { chartRowToChartData } from "@/lib/chart-from-row";
+import { cronTransitDigestSchema, sendTransitDigestInputSchema } from "@/lib/schemas/server-fns";
+import { jsonError, secretsMatchConstantTime, throwValidationResponse } from "@/lib/server-fn-http";
+import { timedServerFn } from "@/lib/server-fn-observe";
 
 const SP_TZ = "America/Sao_Paulo";
 
@@ -106,90 +101,77 @@ async function sendViaResend(params: {
   }
 }
 
-const sendTransitDigestInputSchema = z.object({
-  chartId: z.string().uuid(),
-  /** YYYY-MM-DD; default hoje UTC+offset não aplicado — use data local no cliente */
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional(),
-});
-
 /** Envia um resumo de trânsitos por email (Resend). Requer RESEND_API_KEY e RESEND_FROM_EMAIL opcional. */
 export const sendTransitDigestEmailFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => {
     const parsed = sendTransitDigestInputSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new Error(parsed.error.flatten().formErrors.join(", ") || "Dados inválidos");
-    }
+    if (!parsed.success) throwValidationResponse(parsed.error);
     return parsed.data;
   })
-  .handler(async ({ data, context }) => {
-    const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.RESEND_FROM_EMAIL ?? "AstroMap <onboarding@resend.dev>";
+  .handler(
+    timedServerFn("sendTransitDigestEmailFn", async ({ data, context }) => {
+      const apiKey = process.env.RESEND_API_KEY;
+      const from = process.env.RESEND_FROM_EMAIL ?? "AstroMap <onboarding@resend.dev>";
 
-    if (!apiKey) {
-      throw jsonError(
-        503,
-        "EMAIL_DISABLED",
-        "Envio de email não está configurado. Defina RESEND_API_KEY no ambiente do servidor.",
-      );
-    }
+      if (!apiKey) {
+        throw jsonError(
+          503,
+          "EMAIL_DISABLED",
+          "Envio de email não está configurado. Defina RESEND_API_KEY no ambiente do servidor.",
+        );
+      }
 
-    const supabase = context.supabase;
-    const userId = context.userId;
+      const supabase = context.supabase;
+      const userId = context.userId;
 
-    const [{ data: profile, error: profileErr }, { data: authUser, error: authErr }] =
-      await Promise.all([
-        supabase.from("profiles").select("email_notifications").eq("id", userId).single(),
-        supabase.auth.getUser(),
-      ]);
+      const [{ data: profile, error: profileErr }, { data: authUser, error: authErr }] =
+        await Promise.all([
+          supabase.from("profiles").select("email_notifications").eq("id", userId).single(),
+          supabase.auth.getUser(),
+        ]);
 
-    if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-    if (!profile?.email_notifications) {
-      throw jsonError(
-        400,
-        "OPT_OUT",
-        "Ative «Receber atualizações por email» nas Preferências para enviar o resumo.",
-      );
-    }
-    if (authErr || !authUser.user?.email) {
-      throw jsonError(400, "NO_EMAIL", "Não foi possível obter o email da sua conta.");
-    }
+      if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
+      if (!profile?.email_notifications) {
+        throw jsonError(
+          400,
+          "OPT_OUT",
+          "Ative «Receber atualizações por email» nas Preferências para enviar o resumo.",
+        );
+      }
+      if (authErr || !authUser.user?.email) {
+        throw jsonError(400, "NO_EMAIL", "Não foi possível obter o email da sua conta.");
+      }
 
-    const { data: chart, error: chartErr } = await supabase
-      .from("charts")
-      .select("*")
-      .eq("id", data.chartId)
-      .eq("user_id", userId)
-      .single();
+      const { data: chart, error: chartErr } = await supabase
+        .from("charts")
+        .select("*")
+        .eq("id", data.chartId)
+        .eq("user_id", userId)
+        .single();
 
-    if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
+      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
 
-    const dateStr =
-      data.date ?? new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
+      const dateStr =
+        data.date ?? new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
 
-    const cd = chartRowToChartData(chart);
-    const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
-    const day = analyzeTransitDay(dateStr, cd.planets, cd.houses, cd.ascendant, houseSystem);
+      const cd = chartRowToChartData(chart);
+      const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
+      const day = analyzeTransitDay(dateStr, cd.planets, cd.houses, cd.ascendant, houseSystem);
 
-    const html = buildTransitDigestHtml(chart.name, day);
+      const html = buildTransitDigestHtml(chart.name, day);
 
-    await sendViaResend({
-      apiKey,
-      from,
-      to: authUser.user.email,
-      subject: `Trânsitos ${day.date} — ${chart.name}`,
-      html,
-    });
+      await sendViaResend({
+        apiKey,
+        from,
+        to: authUser.user.email,
+        subject: `Trânsitos ${day.date} — ${chart.name}`,
+        html,
+      });
 
-    return { ok: true as const, to: authUser.user.email, date: day.date };
-  });
-
-const cronTransitDigestSchema = z.object({
-  cronSecret: z.string().min(16),
-});
+      return { ok: true as const, to: authUser.user.email, date: day.date };
+    }),
+  );
 
 /**
  * Digest automático: utilizadores com `transit_digest_auto` e horário/dias coincidentes (fus São Paulo).
@@ -199,98 +181,100 @@ const cronTransitDigestSchema = z.object({
 export const processTransitDigestCronFn = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => {
     const parsed = cronTransitDigestSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new Error(parsed.error.flatten().formErrors.join(", ") || "Payload inválido");
-    }
+    if (!parsed.success) throwValidationResponse(parsed.error);
     return parsed.data;
   })
-  .handler(async ({ data }) => {
-    const expected = process.env.TRANSIT_DIGEST_CRON_SECRET;
-    if (!expected || data.cronSecret !== expected) {
-      throw jsonError(401, "UNAUTHORIZED", "Credencial de cron inválida ou não configurada.");
-    }
-
-    const apiKey = process.env.RESEND_API_KEY;
-    const from = process.env.RESEND_FROM_EMAIL ?? "AstroMap <onboarding@resend.dev>";
-    if (!apiKey) {
-      throw jsonError(
-        503,
-        "EMAIL_DISABLED",
-        "RESEND_API_KEY não configurada — não é possível enviar digest.",
-      );
-    }
-
-    const { dateStr, hour, weekday } = saoPauloDigestContext();
-
-    const { data: profiles, error: profErr } = await supabaseAdmin
-      .from("profiles")
-      .select("id, transit_digest_hour, transit_digest_weekdays, email_notifications")
-      .eq("transit_digest_auto", true)
-      .eq("email_notifications", true);
-
-    if (profErr) throw jsonError(500, "PROFILES", profErr.message);
-
-    let sent = 0;
-    let skipped = 0;
-
-    for (const row of profiles ?? []) {
-      if (row.transit_digest_hour !== hour) {
-        skipped++;
-        continue;
-      }
-      const days = row.transit_digest_weekdays ?? [];
-      if (!days.includes(weekday)) {
-        skipped++;
-        continue;
+  .handler(
+    timedServerFn("processTransitDigestCronFn", async ({ data }) => {
+      const expected = process.env.TRANSIT_DIGEST_CRON_SECRET;
+      if (!expected || !secretsMatchConstantTime(String(data.cronSecret), String(expected))) {
+        throw jsonError(401, "UNAUTHORIZED", "Credencial de cron inválida ou não configurada.");
       }
 
-      const { data: chartRows } = await supabaseAdmin
-        .from("charts")
-        .select("*")
-        .eq("user_id", row.id)
-        .order("is_primary", { ascending: false })
-        .limit(1);
-
-      const chart = chartRows?.[0];
-      if (!chart) {
-        skipped++;
-        continue;
+      const apiKey = process.env.RESEND_API_KEY;
+      const from = process.env.RESEND_FROM_EMAIL ?? "AstroMap <onboarding@resend.dev>";
+      if (!apiKey) {
+        throw jsonError(
+          503,
+          "EMAIL_DISABLED",
+          "RESEND_API_KEY não configurada — não é possível enviar digest.",
+        );
       }
 
-      const { data: authRow, error: authErr } = await supabaseAdmin.auth.admin.getUserById(row.id);
-      const email = authRow?.user?.email;
-      if (authErr || !email) {
-        skipped++;
-        continue;
+      const { dateStr, hour, weekday } = saoPauloDigestContext();
+
+      const { data: profiles, error: profErr } = await supabaseAdmin
+        .from("profiles")
+        .select("id, transit_digest_hour, transit_digest_weekdays, email_notifications")
+        .eq("transit_digest_auto", true)
+        .eq("email_notifications", true);
+
+      if (profErr) throw jsonError(500, "PROFILES", profErr.message);
+
+      let sent = 0;
+      let skipped = 0;
+
+      for (const row of profiles ?? []) {
+        if (row.transit_digest_hour !== hour) {
+          skipped++;
+          continue;
+        }
+        const days = row.transit_digest_weekdays ?? [];
+        if (!days.includes(weekday)) {
+          skipped++;
+          continue;
+        }
+
+        const { data: chartRows } = await supabaseAdmin
+          .from("charts")
+          .select("*")
+          .eq("user_id", row.id)
+          .order("is_primary", { ascending: false })
+          .limit(1);
+
+        const chart = chartRows?.[0];
+        if (!chart) {
+          skipped++;
+          continue;
+        }
+
+        const { data: authRow, error: authErr } = await supabaseAdmin.auth.admin.getUserById(
+          row.id,
+        );
+        const email = authRow?.user?.email;
+        if (authErr || !email) {
+          skipped++;
+          continue;
+        }
+
+        const cd = chartRowToChartData(chart);
+        const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
+        const day = analyzeTransitDay(dateStr, cd.planets, cd.houses, cd.ascendant, houseSystem);
+        const html = buildTransitDigestHtml(chart.name, day);
+
+        try {
+          await sendViaResend({
+            apiKey,
+            from,
+            to: email,
+            subject: `Trânsitos ${day.date} — ${chart.name}`,
+            html,
+          });
+          sent++;
+        } catch (e) {
+          console.error("[transit-digest-cron]", row.id, e);
+          skipped++;
+        }
       }
 
-      const cd = chartRowToChartData(chart);
-      const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
-      const day = analyzeTransitDay(dateStr, cd.planets, cd.houses, cd.ascendant, houseSystem);
-      const html = buildTransitDigestHtml(chart.name, day);
-
-      try {
-        await sendViaResend({
-          apiKey,
-          from,
-          to: email,
-          subject: `Trânsitos ${day.date} — ${chart.name}`,
-          html,
-        });
-        sent++;
-      } catch (e) {
-        console.error("[transit-digest-cron]", row.id, e);
-        skipped++;
-      }
-    }
-
-    return {
-      ok: true as const,
-      dateStr,
-      hour,
-      weekday,
-      sent,
-      skipped,
-      scanned: profiles?.length ?? 0,
-    };
-  });
+      return {
+        ok: true as const,
+        dateStr,
+        hour,
+        weekday,
+        sent,
+        skipped,
+        scanned: profiles?.length ?? 0,
+      };
+    }),
+  );

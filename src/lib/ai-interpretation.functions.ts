@@ -1,6 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { z } from "zod";
 import {
   AI_PROMPT_VERSION,
   buildNatalFingerprintPayload,
@@ -13,20 +12,21 @@ import {
   type SynastryInterpretInput,
 } from "@/lib/ai/chart-summary";
 import { completeChat, resolveAiProvider } from "@/lib/ai/llm-provider";
-import { analyzeTransitDay } from "@/lib/astrology/transits";
 import type { HouseSystemId } from "@/lib/astrology/calculate";
 import type { SynastryAreaScores, SynastryCrossAspect } from "@/lib/astrology/synastry";
-import { PLANETS, type PlanetKey } from "@/lib/astrology/zodiac";
+import { analyzeTransitDay } from "@/lib/astrology/transits";
+import { PLANETS } from "@/lib/astrology/zodiac";
 import { chartRowToChartData } from "@/lib/chart-from-row";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
-
-function jsonError(status: number, code: string, message: string): Response {
-  return new Response(JSON.stringify({ code, message }), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
+import {
+  natalExecutiveSummaryInputSchema,
+  natalPlanetInsightInputSchema,
+  synastryNarrativeInputSchema,
+  transitDayNarrativeInputSchema,
+} from "@/lib/schemas/server-fns";
+import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
+import { timedServerFn } from "@/lib/server-fn-observe";
 
 type Tier = Database["public"]["Enums"]["subscription_tier"];
 type InterpretationKind = Database["public"]["Enums"]["interpretation_ai_kind"];
@@ -153,433 +153,407 @@ async function fetchSynastryOwned(
   return (await tryPair(a, b)) ?? (await tryPair(b, a));
 }
 
-const planetKeyEnum = z.enum(PLANETS.map((p) => p.key) as [PlanetKey, ...PlanetKey[]]);
-
-const chartIdSchema = z.object({
-  chartId: z.string().uuid(),
-});
-
-const natalPlanetSchema = z.object({
-  chartId: z.string().uuid(),
-  planetKey: planetKeyEnum,
-});
-
-const synastryNarrativeSchema = z
-  .object({
-    synastryId: z.string().uuid().optional(),
-    chart1Id: z.string().uuid().optional(),
-    chart2Id: z.string().uuid().optional(),
-  })
-  .refine((d) => Boolean(d.synastryId) || (Boolean(d.chart1Id) && Boolean(d.chart2Id)), {
-    message: "Indica synastryId ou chart1Id e chart2Id.",
-  });
-
-const transitDaySchema = z.object({
-  chartId: z.string().uuid(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-});
-
 export const generateNatalExecutiveSummaryFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => {
-    const parsed = chartIdSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new Error(parsed.error.flatten().formErrors.join(", ") || "Dados inválidos");
-    }
+    const parsed = natalExecutiveSummaryInputSchema.safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
     return parsed.data;
   })
-  .handler(async ({ data, context }) => {
-    const supabase = context.supabase;
-    const userId = context.userId;
-    const kind: InterpretationKind = "natal_summary";
+  .handler(
+    timedServerFn("generateNatalExecutiveSummaryFn", async ({ data, context }) => {
+      const supabase = context.supabase;
+      const userId = context.userId;
+      const kind: InterpretationKind = "natal_summary";
 
-    const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
-      await Promise.all([
-        supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
-        supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
-      ]);
+      const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
+        await Promise.all([
+          supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
+          supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
+        ]);
 
-    if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-    if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
+      if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
+      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
 
-    const tier = profile?.subscription_tier ?? "FREE";
-    const fpPayload = buildNatalFingerprintPayload(chart, "natal_summary");
-    const fingerprint = await sha256FingerprintHex(fpPayload);
+      const tier = profile?.subscription_tier ?? "FREE";
+      const fpPayload = buildNatalFingerprintPayload(chart, "natal_summary");
+      const fingerprint = await sha256FingerprintHex(fpPayload);
 
-    const { data: cached, error: cacheErr } = await supabase
-      .from("interpretation_ai_cache")
-      .select("content")
-      .eq("user_id", userId)
-      .eq("kind", kind)
-      .eq("fingerprint", fingerprint)
-      .maybeSingle();
-
-    if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
-    if (cached?.content) return { cached: true as const, content: cached.content };
-
-    await assertAiGenerationAllowed(supabase, userId, tier);
-
-    if (!resolveAiProvider()) {
-      throw jsonError(
-        503,
-        "LLM_NOT_CONFIGURED",
-        "Serviço de IA não configurado no servidor (chaves em falta).",
-      );
-    }
-
-    const chartData = chartRowToChartData(chart);
-    const ctx = formatNatalPromptContext(chart, chartData);
-    const userPrompt = `Com base nos dados seguintes, escreve uma interpretação integrada do mapa natal para alguém sem formação em astrologia.\n\n${ctx}`;
-
-    const t0 = Date.now();
-    let completion;
-    try {
-      completion = await completeChat(SYSTEM_ASTROLOGY_PT, userPrompt);
-    } catch (e) {
-      console.error("[ai-interpretation] natal_summary LLM", e);
-      throw jsonError(
-        503,
-        "LLM_UNAVAILABLE",
-        e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
-      );
-    }
-    console.info(
-      `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
-    );
-
-    const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
-      user_id: userId,
-      kind,
-      fingerprint,
-      chart_id: chart.id,
-      synastry_id: null,
-      transit_date: null,
-      prompt_version: AI_PROMPT_VERSION,
-      model: completion.model,
-      content: completion.text,
-      tokens_in: completion.tokensIn ?? null,
-      tokens_out: completion.tokensOut ?? null,
-    });
-
-    if (insertErr?.code === "23505") {
-      const { data: row } = await supabase
+      const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
         .select("content")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
         .maybeSingle();
-      if (row?.content) return { cached: true as const, content: row.content };
-    }
-    if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
-    return { cached: false as const, content: completion.text };
-  });
+      if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
+      if (cached?.content) return { cached: true as const, content: cached.content };
+
+      await assertAiGenerationAllowed(supabase, userId, tier);
+
+      if (!resolveAiProvider()) {
+        throw jsonError(
+          503,
+          "LLM_NOT_CONFIGURED",
+          "Serviço de IA não configurado no servidor (chaves em falta).",
+        );
+      }
+
+      const chartData = chartRowToChartData(chart);
+      const ctx = formatNatalPromptContext(chart, chartData);
+      const userPrompt = `Com base nos dados seguintes, escreve uma interpretação integrada do mapa natal para alguém sem formação em astrologia.\n\n${ctx}`;
+
+      const t0 = Date.now();
+      let completion;
+      try {
+        completion = await completeChat(SYSTEM_ASTROLOGY_PT, userPrompt);
+      } catch (e) {
+        console.error("[ai-interpretation] natal_summary LLM", e);
+        throw jsonError(
+          503,
+          "LLM_UNAVAILABLE",
+          e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
+        );
+      }
+      console.info(
+        `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
+      );
+
+      const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
+        user_id: userId,
+        kind,
+        fingerprint,
+        chart_id: chart.id,
+        synastry_id: null,
+        transit_date: null,
+        prompt_version: AI_PROMPT_VERSION,
+        model: completion.model,
+        content: completion.text,
+        tokens_in: completion.tokensIn ?? null,
+        tokens_out: completion.tokensOut ?? null,
+      });
+
+      if (insertErr?.code === "23505") {
+        const { data: row } = await supabase
+          .from("interpretation_ai_cache")
+          .select("content")
+          .eq("user_id", userId)
+          .eq("kind", kind)
+          .eq("fingerprint", fingerprint)
+          .maybeSingle();
+        if (row?.content) return { cached: true as const, content: row.content };
+      }
+      if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
+
+      return { cached: false as const, content: completion.text };
+    }),
+  );
 
 export const generateNatalPlanetInsightFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => {
-    const parsed = natalPlanetSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new Error(parsed.error.flatten().formErrors.join(", ") || "Dados inválidos");
-    }
+    const parsed = natalPlanetInsightInputSchema.safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
     return parsed.data;
   })
-  .handler(async ({ data, context }) => {
-    const supabase = context.supabase;
-    const userId = context.userId;
-    const kind: InterpretationKind = "natal_planet";
+  .handler(
+    timedServerFn("generateNatalPlanetInsightFn", async ({ data, context }) => {
+      const supabase = context.supabase;
+      const userId = context.userId;
+      const kind: InterpretationKind = "natal_planet";
 
-    const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
-      await Promise.all([
-        supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
-        supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
-      ]);
+      const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
+        await Promise.all([
+          supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
+          supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
+        ]);
 
-    if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-    if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
+      if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
+      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
 
-    const tier = profile?.subscription_tier ?? "FREE";
-    const fpPayload = buildNatalFingerprintPayload(chart, "natal_planet", data.planetKey);
-    const fingerprint = await sha256FingerprintHex(fpPayload);
+      const tier = profile?.subscription_tier ?? "FREE";
+      const fpPayload = buildNatalFingerprintPayload(chart, "natal_planet", data.planetKey);
+      const fingerprint = await sha256FingerprintHex(fpPayload);
 
-    const { data: cached, error: cacheErr } = await supabase
-      .from("interpretation_ai_cache")
-      .select("content")
-      .eq("user_id", userId)
-      .eq("kind", kind)
-      .eq("fingerprint", fingerprint)
-      .maybeSingle();
-
-    if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
-    if (cached?.content) return { cached: true as const, content: cached.content };
-
-    await assertAiGenerationAllowed(supabase, userId, tier);
-
-    if (!resolveAiProvider()) {
-      throw jsonError(
-        503,
-        "LLM_NOT_CONFIGURED",
-        "Serviço de IA não configurado no servidor (chaves em falta).",
-      );
-    }
-
-    const chartData = chartRowToChartData(chart);
-    const ctx = formatNatalPromptContext(chart, chartData);
-    const meta = PLANETS.find((p) => p.key === data.planetKey);
-    const planetLabel = meta?.name ?? data.planetKey;
-    const userPrompt = `Contexto geral do mapa:\n${ctx}\n\nAprofunda sobretudo o significado psicológico e existencial de ${planetLabel} (${data.planetKey}) neste mapa — como se articula com casas, signo e aspectos listados. Não contradigas os dados; não cries posições novas.`;
-
-    const t0 = Date.now();
-    let completion;
-    try {
-      completion = await completeChat(SYSTEM_ASTROLOGY_PT, userPrompt);
-    } catch (e) {
-      console.error("[ai-interpretation] natal_planet LLM", e);
-      throw jsonError(
-        503,
-        "LLM_UNAVAILABLE",
-        e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
-      );
-    }
-    console.info(
-      `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
-    );
-
-    const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
-      user_id: userId,
-      kind,
-      fingerprint,
-      chart_id: chart.id,
-      synastry_id: null,
-      transit_date: null,
-      prompt_version: AI_PROMPT_VERSION,
-      model: completion.model,
-      content: completion.text,
-      tokens_in: completion.tokensIn ?? null,
-      tokens_out: completion.tokensOut ?? null,
-    });
-
-    if (insertErr?.code === "23505") {
-      const { data: row } = await supabase
+      const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
         .select("content")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
         .maybeSingle();
-      if (row?.content) return { cached: true as const, content: row.content };
-    }
-    if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
-    return { cached: false as const, content: completion.text };
-  });
+      if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
+      if (cached?.content) return { cached: true as const, content: cached.content };
+
+      await assertAiGenerationAllowed(supabase, userId, tier);
+
+      if (!resolveAiProvider()) {
+        throw jsonError(
+          503,
+          "LLM_NOT_CONFIGURED",
+          "Serviço de IA não configurado no servidor (chaves em falta).",
+        );
+      }
+
+      const chartData = chartRowToChartData(chart);
+      const ctx = formatNatalPromptContext(chart, chartData);
+      const meta = PLANETS.find((p) => p.key === data.planetKey);
+      const planetLabel = meta?.name ?? data.planetKey;
+      const userPrompt = `Contexto geral do mapa:\n${ctx}\n\nAprofunda sobretudo o significado psicológico e existencial de ${planetLabel} (${data.planetKey}) neste mapa — como se articula com casas, signo e aspectos listados. Não contradigas os dados; não cries posições novas.`;
+
+      const t0 = Date.now();
+      let completion;
+      try {
+        completion = await completeChat(SYSTEM_ASTROLOGY_PT, userPrompt);
+      } catch (e) {
+        console.error("[ai-interpretation] natal_planet LLM", e);
+        throw jsonError(
+          503,
+          "LLM_UNAVAILABLE",
+          e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
+        );
+      }
+      console.info(
+        `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
+      );
+
+      const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
+        user_id: userId,
+        kind,
+        fingerprint,
+        chart_id: chart.id,
+        synastry_id: null,
+        transit_date: null,
+        prompt_version: AI_PROMPT_VERSION,
+        model: completion.model,
+        content: completion.text,
+        tokens_in: completion.tokensIn ?? null,
+        tokens_out: completion.tokensOut ?? null,
+      });
+
+      if (insertErr?.code === "23505") {
+        const { data: row } = await supabase
+          .from("interpretation_ai_cache")
+          .select("content")
+          .eq("user_id", userId)
+          .eq("kind", kind)
+          .eq("fingerprint", fingerprint)
+          .maybeSingle();
+        if (row?.content) return { cached: true as const, content: row.content };
+      }
+      if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
+
+      return { cached: false as const, content: completion.text };
+    }),
+  );
 
 export const generateSynastryNarrativeFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => {
-    const parsed = synastryNarrativeSchema.safeParse(input);
-    if (!parsed.success) {
-      throw new Error(parsed.error.flatten().formErrors.join(", ") || "Dados inválidos");
-    }
+    const parsed = synastryNarrativeInputSchema.safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
     return parsed.data;
   })
-  .handler(async ({ data, context }) => {
-    const supabase = context.supabase;
-    const userId = context.userId;
-    const kind: InterpretationKind = "synastry";
+  .handler(
+    timedServerFn("generateSynastryNarrativeFn", async ({ data, context }) => {
+      const supabase = context.supabase;
+      const userId = context.userId;
+      const kind: InterpretationKind = "synastry";
 
-    const { data: profile, error: profileErr } = await supabase
-      .from("profiles")
-      .select("subscription_tier")
-      .eq("id", userId)
-      .single();
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("subscription_tier")
+        .eq("id", userId)
+        .single();
 
-    if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-    const tier = profile?.subscription_tier ?? "FREE";
+      if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
+      const tier = profile?.subscription_tier ?? "FREE";
 
-    const row = await fetchSynastryOwned(supabase, userId, data);
-    if (!row) throw jsonError(404, "NOT_FOUND", "Sinastria não encontrada.");
+      const row = await fetchSynastryOwned(supabase, userId, data);
+      if (!row) throw jsonError(404, "NOT_FOUND", "Sinastria não encontrada.");
 
-    const parsedPayload = parseSynastryPayload(row.compatibility_data);
-    if (!parsedPayload) {
-      throw jsonError(500, "INVALID_DATA", "Dados de compatibilidade inválidos.");
-    }
+      const parsedPayload = parseSynastryPayload(row.compatibility_data);
+      if (!parsedPayload) {
+        throw jsonError(500, "INVALID_DATA", "Dados de compatibilidade inválidos.");
+      }
 
-    const fpPayload = buildSynastryFingerprintPayload(row, parsedPayload);
-    const fingerprint = await sha256FingerprintHex(fpPayload);
+      const fpPayload = buildSynastryFingerprintPayload(row, parsedPayload);
+      const fingerprint = await sha256FingerprintHex(fpPayload);
 
-    const { data: cached, error: cacheErr } = await supabase
-      .from("interpretation_ai_cache")
-      .select("content")
-      .eq("user_id", userId)
-      .eq("kind", kind)
-      .eq("fingerprint", fingerprint)
-      .maybeSingle();
-
-    if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
-    if (cached?.content) return { cached: true as const, content: cached.content };
-
-    await assertAiGenerationAllowed(supabase, userId, tier);
-
-    if (!resolveAiProvider()) {
-      throw jsonError(
-        503,
-        "LLM_NOT_CONFIGURED",
-        "Serviço de IA não configurado no servidor (chaves em falta).",
-      );
-    }
-
-    const ctx = formatSynastryPromptContext(row, parsedPayload);
-    const userPrompt = `Escreve uma narrativa de sinastria (relação entre duas pessoas) em linguagem acessível, integrando tensões e recursos. Evita julgar a relação como «boa» ou «má».\n\n${ctx}`;
-
-    const t0 = Date.now();
-    let completion;
-    try {
-      completion = await completeChat(SYSTEM_ASTROLOGY_PT, userPrompt);
-    } catch (e) {
-      console.error("[ai-interpretation] synastry LLM", e);
-      throw jsonError(
-        503,
-        "LLM_UNAVAILABLE",
-        e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
-      );
-    }
-    console.info(
-      `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
-    );
-
-    const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
-      user_id: userId,
-      kind,
-      fingerprint,
-      chart_id: null,
-      synastry_id: row.id,
-      transit_date: null,
-      prompt_version: AI_PROMPT_VERSION,
-      model: completion.model,
-      content: completion.text,
-      tokens_in: completion.tokensIn ?? null,
-      tokens_out: completion.tokensOut ?? null,
-    });
-
-    if (insertErr?.code === "23505") {
-      const { data: again } = await supabase
+      const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
         .select("content")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
         .maybeSingle();
-      if (again?.content) return { cached: true as const, content: again.content };
-    }
-    if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
-    return { cached: false as const, content: completion.text };
-  });
+      if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
+      if (cached?.content) return { cached: true as const, content: cached.content };
+
+      await assertAiGenerationAllowed(supabase, userId, tier);
+
+      if (!resolveAiProvider()) {
+        throw jsonError(
+          503,
+          "LLM_NOT_CONFIGURED",
+          "Serviço de IA não configurado no servidor (chaves em falta).",
+        );
+      }
+
+      const ctx = formatSynastryPromptContext(row, parsedPayload);
+      const userPrompt = `Escreve uma narrativa de sinastria (relação entre duas pessoas) em linguagem acessível, integrando tensões e recursos. Evita julgar a relação como «boa» ou «má».\n\n${ctx}`;
+
+      const t0 = Date.now();
+      let completion;
+      try {
+        completion = await completeChat(SYSTEM_ASTROLOGY_PT, userPrompt);
+      } catch (e) {
+        console.error("[ai-interpretation] synastry LLM", e);
+        throw jsonError(
+          503,
+          "LLM_UNAVAILABLE",
+          e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
+        );
+      }
+      console.info(
+        `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
+      );
+
+      const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
+        user_id: userId,
+        kind,
+        fingerprint,
+        chart_id: null,
+        synastry_id: row.id,
+        transit_date: null,
+        prompt_version: AI_PROMPT_VERSION,
+        model: completion.model,
+        content: completion.text,
+        tokens_in: completion.tokensIn ?? null,
+        tokens_out: completion.tokensOut ?? null,
+      });
+
+      if (insertErr?.code === "23505") {
+        const { data: again } = await supabase
+          .from("interpretation_ai_cache")
+          .select("content")
+          .eq("user_id", userId)
+          .eq("kind", kind)
+          .eq("fingerprint", fingerprint)
+          .maybeSingle();
+        if (again?.content) return { cached: true as const, content: again.content };
+      }
+      if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
+
+      return { cached: false as const, content: completion.text };
+    }),
+  );
 
 export const generateTransitDayNarrativeFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => {
-    const parsed = transitDaySchema.safeParse(input);
-    if (!parsed.success) {
-      throw new Error(parsed.error.flatten().formErrors.join(", ") || "Dados inválidos");
-    }
+    const parsed = transitDayNarrativeInputSchema.safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
     return parsed.data;
   })
-  .handler(async ({ data, context }) => {
-    const supabase = context.supabase;
-    const userId = context.userId;
-    const kind: InterpretationKind = "transit_day";
+  .handler(
+    timedServerFn("generateTransitDayNarrativeFn", async ({ data, context }) => {
+      const supabase = context.supabase;
+      const userId = context.userId;
+      const kind: InterpretationKind = "transit_day";
 
-    const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
-      await Promise.all([
-        supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
-        supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
-      ]);
+      const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
+        await Promise.all([
+          supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
+          supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
+        ]);
 
-    if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-    if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
+      if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
+      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
 
-    const tier = profile?.subscription_tier ?? "FREE";
-    const chartData = chartRowToChartData(chart);
-    const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
-    const dayPayload = analyzeTransitDay(
-      data.date,
-      chartData.planets,
-      chartData.houses,
-      chartData.ascendant,
-      houseSystem,
-    );
-
-    const fpPayload = buildTransitFingerprintPayload(chart, dayPayload);
-    const fingerprint = await sha256FingerprintHex(fpPayload);
-
-    const { data: cached, error: cacheErr } = await supabase
-      .from("interpretation_ai_cache")
-      .select("content")
-      .eq("user_id", userId)
-      .eq("kind", kind)
-      .eq("fingerprint", fingerprint)
-      .maybeSingle();
-
-    if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
-    if (cached?.content) return { cached: true as const, content: cached.content };
-
-    await assertAiGenerationAllowed(supabase, userId, tier);
-
-    if (!resolveAiProvider()) {
-      throw jsonError(
-        503,
-        "LLM_NOT_CONFIGURED",
-        "Serviço de IA não configurado no servidor (chaves em falta).",
+      const tier = profile?.subscription_tier ?? "FREE";
+      const chartData = chartRowToChartData(chart);
+      const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
+      const dayPayload = analyzeTransitDay(
+        data.date,
+        chartData.planets,
+        chartData.houses,
+        chartData.ascendant,
+        houseSystem,
       );
-    }
 
-    const ctx = formatTransitPromptContext(chart, dayPayload);
-    const userPrompt = `Explica em linguagem simples o «clima simbólico» deste dia para a pessoa deste mapa, usando apenas os trânsitos e aspectos indicados. Evita alarmismo.\n\n${ctx}`;
+      const fpPayload = buildTransitFingerprintPayload(chart, dayPayload);
+      const fingerprint = await sha256FingerprintHex(fpPayload);
 
-    const t0 = Date.now();
-    let completion;
-    try {
-      completion = await completeChat(SYSTEM_ASTROLOGY_PT, userPrompt);
-    } catch (e) {
-      console.error("[ai-interpretation] transit_day LLM", e);
-      throw jsonError(
-        503,
-        "LLM_UNAVAILABLE",
-        e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
-      );
-    }
-    console.info(
-      `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
-    );
-
-    const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
-      user_id: userId,
-      kind,
-      fingerprint,
-      chart_id: chart.id,
-      synastry_id: null,
-      transit_date: data.date,
-      prompt_version: AI_PROMPT_VERSION,
-      model: completion.model,
-      content: completion.text,
-      tokens_in: completion.tokensIn ?? null,
-      tokens_out: completion.tokensOut ?? null,
-    });
-
-    if (insertErr?.code === "23505") {
-      const { data: again } = await supabase
+      const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
         .select("content")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
         .maybeSingle();
-      if (again?.content) return { cached: true as const, content: again.content };
-    }
-    if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
-    return { cached: false as const, content: completion.text };
-  });
+      if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
+      if (cached?.content) return { cached: true as const, content: cached.content };
+
+      await assertAiGenerationAllowed(supabase, userId, tier);
+
+      if (!resolveAiProvider()) {
+        throw jsonError(
+          503,
+          "LLM_NOT_CONFIGURED",
+          "Serviço de IA não configurado no servidor (chaves em falta).",
+        );
+      }
+
+      const ctx = formatTransitPromptContext(chart, dayPayload);
+      const userPrompt = `Explica em linguagem simples o «clima simbólico» deste dia para a pessoa deste mapa, usando apenas os trânsitos e aspectos indicados. Evita alarmismo.\n\n${ctx}`;
+
+      const t0 = Date.now();
+      let completion;
+      try {
+        completion = await completeChat(SYSTEM_ASTROLOGY_PT, userPrompt);
+      } catch (e) {
+        console.error("[ai-interpretation] transit_day LLM", e);
+        throw jsonError(
+          503,
+          "LLM_UNAVAILABLE",
+          e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
+        );
+      }
+      console.info(
+        `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
+      );
+
+      const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
+        user_id: userId,
+        kind,
+        fingerprint,
+        chart_id: chart.id,
+        synastry_id: null,
+        transit_date: data.date,
+        prompt_version: AI_PROMPT_VERSION,
+        model: completion.model,
+        content: completion.text,
+        tokens_in: completion.tokensIn ?? null,
+        tokens_out: completion.tokensOut ?? null,
+      });
+
+      if (insertErr?.code === "23505") {
+        const { data: again } = await supabase
+          .from("interpretation_ai_cache")
+          .select("content")
+          .eq("user_id", userId)
+          .eq("kind", kind)
+          .eq("fingerprint", fingerprint)
+          .maybeSingle();
+        if (again?.content) return { cached: true as const, content: again.content };
+      }
+      if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
+
+      return { cached: false as const, content: completion.text };
+    }),
+  );

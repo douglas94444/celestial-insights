@@ -31,6 +31,7 @@ import { addDays, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { analyzeTransitDay, analyzeTransitRange } from "@/lib/astrology/transits";
 import { generateTransitDayNarrativeFn } from "@/lib/ai-interpretation.functions";
+import type { AiInterpretationFnResult } from "@/lib/types/server-fn-results";
 import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 
@@ -132,7 +133,7 @@ function Dashboard() {
     setDashTransitAi(null);
   }, [primary?.id, todayStr]);
 
-  const dashTransitAiMutation = useMutation({
+  const dashTransitAiMutation = useMutation<AiInterpretationFnResult, Error, void>({
     mutationFn: async () => {
       if (!session || !primary) throw new Error("Sessão ou mapa necessário.");
       return generateTransitDayNarrativeFn({

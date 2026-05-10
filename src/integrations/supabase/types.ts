@@ -77,6 +77,24 @@ export type Database = {
         }
         Relationships: []
       }
+      chart_preview_calc_events: {
+        Row: {
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       interpretation_ai_cache: {
         Row: {
           id: string
@@ -150,6 +168,9 @@ export type Database = {
           name: string | null
           stripe_customer_id: string | null
           subscription_tier: Database["public"]["Enums"]["subscription_tier"]
+          transit_digest_auto: boolean
+          transit_digest_hour: number
+          transit_digest_weekdays: number[]
           updated_at: string
           zodiac: string
         }
@@ -162,6 +183,9 @@ export type Database = {
           name?: string | null
           stripe_customer_id?: string | null
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
+          transit_digest_auto?: boolean
+          transit_digest_hour?: number
+          transit_digest_weekdays?: number[]
           updated_at?: string
           zodiac?: string
         }
@@ -174,6 +198,9 @@ export type Database = {
           name?: string | null
           stripe_customer_id?: string | null
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
+          transit_digest_auto?: boolean
+          transit_digest_hour?: number
+          transit_digest_weekdays?: number[]
           updated_at?: string
           zodiac?: string
         }

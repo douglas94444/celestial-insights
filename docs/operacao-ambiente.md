@@ -13,6 +13,17 @@ Ver [`.env.example`](../.env.example). No cliente só podem existir segredos **a
 3. Modelos opcionais: `AI_ANTHROPIC_MODEL` (ex.: `claude-sonnet-4-20250514`), `AI_OPENAI_MODEL` (ex.: `gpt-4o-mini`). Timeouts/tamanho: `AI_REQUEST_TIMEOUT_MS`, `AI_MAX_RESPONSE_CHARS`.
 4. **Premium / quotas**: `AI_INTERPRETATION_REQUIRE_PREMIUM=true` restringe novas gerações (miss de cache) a `profiles.subscription_tier === PREMIUM`. Com `false`, utilizadores FREE têm `AI_INTERPRETATION_FREE_TRIES_PER_MONTH` (predefinição 3) contagens de linhas **novas** na cache no mês civil UTC, mais limite `AI_INTERPRETATION_MAX_PER_24H_FREE` (predefinição 8). PREMIUM usa sobretudo `AI_INTERPRETATION_MAX_PER_24H_PREMIUM` (predefinição 40). Cache hits não consomem quota de LLM.
 
+### Pré-visualização astrológica (`calculateChartFn` / `chart_preview_calc_events`)
+
+1. Aplicar migração que cria `chart_preview_calc_events` (`npm run supabase:push`).
+2. Opcional: `CALCULATE_CHART_MAX_PER_USER_PER_HOUR` (inteiro positivo; predefinição **90** contagens por utilizador por hora deslizante). Cada chamada bem-sucedida regista uma linha para auditoria de quota.
+
+### Erros nas server functions
+
+Respostas JSON com `{ "code", "message" }`; falhas de validação Zod nas edges usam HTTP **400** e `code: "VALIDATION"`. O digest cron valida `cronSecret` com comparação em tempo constante (hash).
+
+Matriz auth por função: [docs/server-fn-auth-matrix.md](server-fn-auth-matrix.md).
+
 ## Supabase
 
 1. Aplicar migrações: `npm run supabase:push` (ou pipeline CI equivalente) no projeto ligado.
@@ -33,9 +44,31 @@ No GitHub Actions, configure secrets opcionais `VITE_SUPABASE_URL` e `VITE_SUPAB
 
 ## Digest automático de trânsitos (`processTransitDigestCronFn`)
 
-1. Definir no servidor: `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `TRANSIT_DIGEST_CRON_SECRET`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`.
-2. Os utilizadores ativam preferências em Configurações (`transit_digest_*`) com migração aplicada em `profiles`.
-3. Agendar um **HTTP POST** horário (cron externo, `pg_cron` + `pg_net`, ou scheduler do hosting) para o endpoint RPC da server function que expõe `processTransitDigestCronFn`.
+Os utilizadores ativam preferências em Configurações (`transit_digest_*`) com migração aplicada em `profiles`.
+
+**Escolha um único destino de cron** para não enviar o mesmo digest duas vezes (Edge Function **ou** Worker/Lovable — não ambos com o mesmo segredo/horário).
+
+### Opção A — Supabase Edge Function (recomendado no projeto ligado)
+
+Foi adicionada a função **`transit-digest-cron`** (`supabase/functions/transit-digest-cron/`). Deploy:
+
+```bash
+npx supabase functions deploy transit-digest-cron --no-verify-jwt
+```
+
+**Secrets obrigatórios da função** (Dashboard → Edge Functions → Secrets, ou CLI):
+
+```bash
+npx supabase secrets set TRANSIT_DIGEST_CRON_SECRET="..." RESEND_API_KEY="..."
+```
+
+Opcional: `RESEND_FROM_EMAIL` (predefinição no código: `AstroMap <onboarding@resend.dev>`). `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já são injectados pelo Supabase no runtime das Edge Functions.
+
+**URL do cron:**
+
+`https://<project-ref>.supabase.co/functions/v1/transit-digest-cron`
+
+(Substitua `<project-ref>` pelo ID do projeto — o mesmo do URL em `SUPABASE_URL`.)
 
 **Corpo JSON:**
 
@@ -43,7 +76,16 @@ No GitHub Actions, configure secrets opcionais `VITE_SUPABASE_URL` e `VITE_SUPAB
 { "cronSecret": "<valor de TRANSIT_DIGEST_CRON_SECRET>" }
 ```
 
+Agende um **HTTP POST** horário (GitHub Actions, cron.cloud, `pg_cron` + `pg_net`, etc.) para esta URL.
+
+### Opção B — TanStack Start / Worker / Lovable (`processTransitDigestCronFn`)
+
+1. Definir no servidor: `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY`, `TRANSIT_DIGEST_CRON_SECRET`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`.
+2. Agendar **HTTP POST** para o endpoint da server function que expõe `processTransitDigestCronFn`.
+
 **URL:** depende do deploy TanStack Start / Cloudflare / Lovable. Obtenha-a inspecionando as chamadas de rede no browser a partir de uma server function conhecida (mesmo padrão de caminho) ou pela documentação do hosting no build `dist/server`.
+
+3. **Opcional (Cloudflare):** se o POST do cron ficar exposto na Internet pública, considere uma regra WAF ou Rate Limiting por caminho/IP para reduzir tentativas de brute-force do segredo (o servidor já usa comparação em tempo constante).
 
 ## PDF de trânsitos
 

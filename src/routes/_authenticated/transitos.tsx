@@ -20,6 +20,11 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { generateTransitDayNarrativeFn } from "@/lib/ai-interpretation.functions";
+import type {
+  AiInterpretationFnResult,
+  CalculateTransitsFnResult,
+  SendTransitDigestEmailFnResult,
+} from "@/lib/types/server-fn-results";
 import { calculateTransitsFn } from "@/lib/transits.functions";
 import { sendTransitDigestEmailFn } from "@/lib/email.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
@@ -84,7 +89,7 @@ function TransitosPage() {
     }
   }, [charts, chartId]);
 
-  const transitsQuery = useQuery({
+  const transitsQuery = useQuery<CalculateTransitsFnResult>({
     queryKey: ["transits", chartId, startDate, endDate],
     queryFn: async () => {
       if (!session) throw new Error("Sessão necessária.");
@@ -113,7 +118,7 @@ function TransitosPage() {
     setTransitAiText(null);
   }, [selectedKey, chartId]);
 
-  const transitAiMutation = useMutation({
+  const transitAiMutation = useMutation<AiInterpretationFnResult, Error, void>({
     mutationFn: async () => {
       if (!session) throw new Error("Sessão necessária.");
       if (!chartId || !selectedKey)
@@ -174,7 +179,7 @@ function TransitosPage() {
     }
   }
 
-  const emailMutation = useMutation({
+  const emailMutation = useMutation<SendTransitDigestEmailFnResult, Error, void>({
     mutationFn: async () => {
       if (!session || !chartId) throw new Error("Sessão ou mapa necessário.");
       const todayLocal = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });

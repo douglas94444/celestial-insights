@@ -24,6 +24,7 @@ import { CityCombobox } from "@/components/CityCombobox";
 import type { City } from "@/lib/cities-br";
 import { birthChartInputSchema } from "@/lib/schemas/birth-chart";
 import { createChartFn } from "@/lib/charts.functions";
+import type { CreateChartFnResult } from "@/lib/types/server-fn-results";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
 import { BRAZIL_TIMEZONE_OFFSETS, formatTimezoneLabel } from "@/lib/timezone-br";
@@ -147,7 +148,7 @@ export function BirthChartForm({
     onSubmittingChange?.(true);
     try {
       const auth = withSupabaseAuth(session);
-      const result = await createChartFn({
+      const result: CreateChartFnResult = await createChartFn({
         data: payload,
         ...auth,
       });

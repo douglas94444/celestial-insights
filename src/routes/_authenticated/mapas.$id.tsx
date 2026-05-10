@@ -39,6 +39,10 @@ import { recalculateChartFn } from "@/lib/charts.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
 import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
+import type {
+  AiInterpretationFnResult,
+  RecalculateChartFnResult,
+} from "@/lib/types/server-fn-results";
 
 export const Route = createFileRoute("/_authenticated/mapas/$id")({
   component: ChartView,
@@ -118,7 +122,7 @@ function ChartView() {
 
   const needsRecalc = needsRecalcPlanets || needsRecalcHouseMismatch;
 
-  const aiExecutiveMutation = useMutation({
+  const aiExecutiveMutation = useMutation<AiInterpretationFnResult, Error, void>({
     mutationFn: async () => {
       if (!session) throw new Error("Sessão necessária.");
       return generateNatalExecutiveSummaryFn({
@@ -135,7 +139,7 @@ function ChartView() {
     },
   });
 
-  const aiPlanetMutation = useMutation({
+  const aiPlanetMutation = useMutation<AiInterpretationFnResult, Error, PlanetKey>({
     mutationFn: async (planetKey: PlanetKey) => {
       if (!session) throw new Error("Sessão necessária.");
       return generateNatalPlanetInsightFn({
@@ -154,7 +158,7 @@ function ChartView() {
     },
   });
 
-  const recalcMutation = useMutation({
+  const recalcMutation = useMutation<RecalculateChartFnResult, Error, void>({
     mutationFn: async () => {
       if (!session) throw new Error("Sessão necessária.");
       return recalculateChartFn({

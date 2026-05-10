@@ -23,6 +23,10 @@ import type {
 } from "@/lib/astrology/synastry";
 import { chartRowToChartData } from "@/lib/chart-from-row";
 import { generateSynastryNarrativeFn } from "@/lib/ai-interpretation.functions";
+import type {
+  AiInterpretationFnResult,
+  CalculateAndSaveSynastryFnResult,
+} from "@/lib/types/server-fn-results";
 import { calculateAndSaveSynastryFn } from "@/lib/synastry.functions";
 import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
@@ -120,7 +124,7 @@ function CompatibilidadePage() {
     setSynastryAiText(null);
   }, [activeView?.synastryId]);
 
-  const synastryAiMutation = useMutation({
+  const synastryAiMutation = useMutation<AiInterpretationFnResult, Error, void>({
     mutationFn: async () => {
       if (!session) throw new Error("Sessão necessária.");
       const sid = activeView?.synastryId;
@@ -139,7 +143,7 @@ function CompatibilidadePage() {
     },
   });
 
-  const calcMutation = useMutation({
+  const calcMutation = useMutation<CalculateAndSaveSynastryFnResult, Error, void>({
     mutationFn: async () => {
       if (!session) throw new Error("Sessão necessária.");
       return calculateAndSaveSynastryFn({

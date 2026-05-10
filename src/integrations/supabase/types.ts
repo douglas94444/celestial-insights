@@ -8,6 +8,24 @@ export type Database = {
   };
   public: {
     Tables: {
+      chart_preview_calc_events: {
+        Row: {
+          created_at: string;
+          id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       charts: {
         Row: {
           aspects_data: Json;
@@ -71,69 +89,51 @@ export type Database = {
         };
         Relationships: [];
       };
-      chart_preview_calc_events: {
-        Row: {
-          created_at: string;
-          id: string;
-          user_id: string;
-        };
-        Insert: {
-          created_at?: string;
-          id?: string;
-          user_id: string;
-        };
-        Update: {
-          created_at?: string;
-          id?: string;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
       interpretation_ai_cache: {
         Row: {
-          id: string;
-          user_id: string;
-          kind: Database["public"]["Enums"]["interpretation_ai_kind"];
-          fingerprint: string;
           chart_id: string | null;
-          synastry_id: string | null;
-          transit_date: string | null;
-          prompt_version: string;
-          model: string;
           content: string;
+          created_at: string;
+          fingerprint: string;
+          id: string;
+          kind: Database["public"]["Enums"]["interpretation_ai_kind"];
+          model: string;
+          prompt_version: string;
+          synastry_id: string | null;
           tokens_in: number | null;
           tokens_out: number | null;
-          created_at: string;
+          transit_date: string | null;
+          user_id: string;
         };
         Insert: {
-          id?: string;
-          user_id: string;
-          kind: Database["public"]["Enums"]["interpretation_ai_kind"];
-          fingerprint: string;
           chart_id?: string | null;
-          synastry_id?: string | null;
-          transit_date?: string | null;
-          prompt_version?: string;
-          model: string;
           content: string;
+          created_at?: string;
+          fingerprint: string;
+          id?: string;
+          kind: Database["public"]["Enums"]["interpretation_ai_kind"];
+          model: string;
+          prompt_version?: string;
+          synastry_id?: string | null;
           tokens_in?: number | null;
           tokens_out?: number | null;
-          created_at?: string;
+          transit_date?: string | null;
+          user_id: string;
         };
         Update: {
-          id?: string;
-          user_id?: string;
-          kind?: Database["public"]["Enums"]["interpretation_ai_kind"];
-          fingerprint?: string;
           chart_id?: string | null;
-          synastry_id?: string | null;
-          transit_date?: string | null;
-          prompt_version?: string;
-          model?: string;
           content?: string;
+          created_at?: string;
+          fingerprint?: string;
+          id?: string;
+          kind?: Database["public"]["Enums"]["interpretation_ai_kind"];
+          model?: string;
+          prompt_version?: string;
+          synastry_id?: string | null;
           tokens_in?: number | null;
           tokens_out?: number | null;
-          created_at?: string;
+          transit_date?: string | null;
+          user_id?: string;
         };
         Relationships: [
           {
@@ -152,32 +152,46 @@ export type Database = {
           },
         ];
       };
-      user_engagement_events: {
+      mood_logs: {
         Row: {
+          chart_id: string | null;
+          created_at: string | null;
+          emotions: string[] | null;
           id: string;
+          mood_score: number;
+          note: string | null;
           user_id: string;
-          route_key: string;
-          topic_key: string | null;
-          meta: Json;
-          created_at: string;
+          ymd: string;
         };
         Insert: {
+          chart_id?: string | null;
+          created_at?: string | null;
+          emotions?: string[] | null;
           id?: string;
+          mood_score: number;
+          note?: string | null;
           user_id: string;
-          route_key: string;
-          topic_key?: string | null;
-          meta?: Json;
-          created_at?: string;
+          ymd: string;
         };
         Update: {
+          chart_id?: string | null;
+          created_at?: string | null;
+          emotions?: string[] | null;
           id?: string;
+          mood_score?: number;
+          note?: string | null;
           user_id?: string;
-          route_key?: string;
-          topic_key?: string | null;
-          meta?: Json;
-          created_at?: string;
+          ymd?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "mood_logs_chart_id_fkey";
+            columns: ["chart_id"];
+            isOneToOne: false;
+            referencedRelation: "charts";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       profiles: {
         Row: {
@@ -290,6 +304,33 @@ export type Database = {
           },
         ];
       };
+      user_engagement_events: {
+        Row: {
+          created_at: string;
+          id: string;
+          meta: Json;
+          route_key: string;
+          topic_key: string | null;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          meta?: Json;
+          route_key: string;
+          topic_key?: string | null;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          meta?: Json;
+          route_key?: string;
+          topic_key?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       user_roles: {
         Row: {
           created_at: string;
@@ -333,7 +374,8 @@ export type Database = {
         | "transit_day"
         | "morning_deep"
         | "natal_essence"
-        | "synastry_deep";
+        | "synastry_deep"
+        | "composite";
       subscription_tier: "FREE" | "PREMIUM";
     };
     CompositeTypes: {
@@ -469,6 +511,7 @@ export const Constants = {
         "morning_deep",
         "natal_essence",
         "synastry_deep",
+        "composite",
       ],
       subscription_tier: ["FREE", "PREMIUM"],
     },

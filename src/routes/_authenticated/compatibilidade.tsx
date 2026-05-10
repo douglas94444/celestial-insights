@@ -2,10 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Heart, Loader2, Sparkles } from "lucide-react";
+import { ChevronDown, Heart, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CompositeChartWheel } from "@/components/CompositeChartWheel";
 import {
   Select,
   SelectContent,
@@ -17,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AiCacheAgeBadgeFromResult } from "@/components/AiCacheAgeBadge";
 import { SynastryBiWheel } from "@/components/SynastryBiWheel";
 import { supabase } from "@/integrations/supabase/client";
-import type { ChartData } from "@/lib/astrology/calculate";
+import type { AspectType, ChartData } from "@/lib/astrology/calculate";
 import type {
   SynastryAnalysis,
   SynastryAreaScores,
@@ -25,12 +30,14 @@ import type {
 } from "@/lib/astrology/synastry";
 import { chartRowToChartData } from "@/lib/chart-from-row";
 import {
+  generateCompositeNarrativeFn,
   generateSynastryDeepNarrativeFn,
   generateSynastryNarrativeFn,
 } from "@/lib/ai-interpretation.functions";
 import type {
   AiInterpretationFnResult,
   CalculateAndSaveSynastryFnResult,
+  CalculateCompositeFnResult,
   SynastryDeepNarrativeFnResult,
 } from "@/lib/types/server-fn-results";
 import type { SynastryDeepOutput } from "@/lib/schemas/personalization-ai";
@@ -40,11 +47,15 @@ import {
   insertEngagementEventDeduped,
   recordAiEngagement,
 } from "@/lib/engagement";
+import { calculateCompositeFn } from "@/lib/composite.functions";
 import { calculateAndSaveSynastryFn } from "@/lib/synastry.functions";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
 import { useChartsListQuery } from "@/hooks/use-charts-list";
+import { PLANETS } from "@/lib/astrology/zodiac";
+import type { PlanetKey } from "@/lib/astrology/zodiac";
+import { ASPECT_LABELS, aspectMood } from "@/data/chart-detail-interpretations";
 
 export const Route = createFileRoute("/_authenticated/compatibilidade")({
   component: CompatibilidadePage,
@@ -81,6 +92,23 @@ function parseStoredPayload(raw: unknown): StoredCompatibilityPayload | null {
 
 const COMPAT_HISTORY_PAGE_SIZE = 50;
 
+function synastryScorePresentation(score: number) {
+  const v = Math.min(100, Math.max(0, score));
+  if (v < 40)
+    return { label: "Baixa" as const, labelClass: "text-red-600 dark:text-red-400", value: v };
+  if (v < 70)
+    return {
+      label: "Moderada" as const,
+      labelClass: "text-amber-600 dark:text-amber-400",
+      value: v,
+    };
+  return { label: "Alta" as const, labelClass: "text-green-600 dark:text-green-400", value: v };
+}
+
+function planetDisplayName(key: PlanetKey) {
+  return PLANETS.find((p) => p.key === key)?.name ?? key;
+}
+
 const AREA_META: { key: keyof SynastryAreaScores; title: string; hint: string }[] = [
   { key: "love", title: "Amor & atração", hint: "Sol, Lua, Vênus, Marte entre os mapas" },
   { key: "friendship", title: "Amizade & conversa", hint: "Lua, Mercúrio, Júpiter" },
@@ -103,6 +131,8 @@ function CompatibilidadePage() {
   } | null>(null);
   const [synastryAiText, setSynastryAiText] = useState<string | null>(null);
   const [synastryDeep, setSynastryDeep] = useState<SynastryDeepOutput | null>(null);
+  const [compositeAiText, setCompositeAiText] = useState<string | null>(null);
+  const [compatSubview, setCompatSubview] = useState<"sinastria" | "composto">("sinastria");
   const [historyVisibleCount, setHistoryVisibleCount] = useState(COMPAT_HISTORY_PAGE_SIZE);
 
   const {
@@ -153,6 +183,14 @@ function CompatibilidadePage() {
   }, [activeView?.synastryId]);
 
   useEffect(() => {
+    setCompositeAiText(null);
+  }, [chart1Id, chart2Id]);
+
+  useEffect(() => {
+    if (!chart1Id || !chart2Id || chart1Id === chart2Id) setCompatSubview("sinastria");
+  }, [chart1Id, chart2Id]);
+
+  useEffect(() => {
     if (!activeView?.synastryId || !user?.id) return;
     insertEngagementEventDeduped(supabase, user.id, {
       route_key: ENGAGEMENT_ROUTES.compatibilidade,
@@ -173,6 +211,44 @@ function CompatibilidadePage() {
     },
     onSuccess: (r) => {
       setSynastryAiText(r.content);
+      recordAiEngagement(supabase, user?.id, {
+        route_key: ENGAGEMENT_ROUTES.compatibilidade,
+        topic_key: ENGAGEMENT_TOPICS.ai_synastry_narrative,
+        cached: r.cached,
+      });
+      if (r.cached) toast.message("Texto recuperado do cache.");
+    },
+    onError: (e) => void toastServerFnError(e),
+  });
+
+  const compositeQuery = useQuery<CalculateCompositeFnResult>({
+    queryKey: ["composite-chart", chart1Id, chart2Id],
+    queryFn: async () => {
+      if (!session) throw new Error("Sessão necessária.");
+      return calculateCompositeFn({
+        data: { chart1Id, chart2Id },
+        ...withSupabaseAuth(session),
+      });
+    },
+    enabled:
+      !!session &&
+      !!chart1Id &&
+      !!chart2Id &&
+      chart1Id !== chart2Id &&
+      compatSubview === "composto",
+    staleTime: 120_000,
+  });
+
+  const compositeAiMutation = useMutation<AiInterpretationFnResult, Error, void>({
+    mutationFn: async () => {
+      if (!session) throw new Error("Sessão necessária.");
+      return generateCompositeNarrativeFn({
+        data: { chart1Id, chart2Id },
+        ...withSupabaseAuth(session),
+      });
+    },
+    onSuccess: (r) => {
+      setCompositeAiText(r.content);
       recordAiEngagement(supabase, user?.id, {
         route_key: ENGAGEMENT_ROUTES.compatibilidade,
         topic_key: ENGAGEMENT_TOPICS.ai_synastry_narrative,
@@ -424,159 +500,314 @@ function CompatibilidadePage() {
         </Alert>
       ) : null}
 
-      {activeView && (
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="space-y-4">
-            <div className="-mx-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:overflow-visible">
-              <SynastryBiWheel
-                baseChart={activeView.baseChart}
-                overlayChart={activeView.overlayChart}
-                synastryAspects={activeView.analysis.aspects}
-              />
-            </div>
-            <p className="text-center text-xs text-muted-foreground">
-              Círculos claros com contorno lilás: primeiro mapa · Círculos esverdeados: segundo mapa
-              · Linhas: aspectos entre os dois.
-            </p>
-          </div>
+      {chart1Id && chart2Id && chart1Id !== chart2Id ? (
+        <Tabs
+          value={compatSubview}
+          onValueChange={(v) => setCompatSubview(v as "sinastria" | "composto")}
+          className="w-full"
+        >
+          <TabsList className="mb-4 grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="sinastria">Sinastria</TabsTrigger>
+            <TabsTrigger value="composto">Mapa composto</TabsTrigger>
+          </TabsList>
 
-          <div className="space-y-4">
-            <Card className="border-primary/25 bg-primary/5">
-              <CardContent className="pt-6 text-center">
-                <p className="text-sm text-muted-foreground">Compatibilidade geral (heurística)</p>
-                <p className="font-display text-5xl font-bold text-primary mt-1">
-                  {activeView.score}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">de 100</p>
-                {activeView.savedAt && (
-                  <p className="text-[11px] text-muted-foreground mt-3">
-                    Registo: {new Date(activeView.savedAt).toLocaleString("pt-BR")}
+          <TabsContent value="sinastria" className="mt-0 space-y-4">
+            {activeView ? (
+              <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+                <div className="space-y-4">
+                  <div className="-mx-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:overflow-visible">
+                    <SynastryBiWheel
+                      baseChart={activeView.baseChart}
+                      overlayChart={activeView.overlayChart}
+                      synastryAspects={activeView.analysis.aspects}
+                    />
+                  </div>
+                  <p className="text-center text-xs text-muted-foreground">
+                    Círculos claros com contorno lilás: primeiro mapa · Círculos esverdeados:
+                    segundo mapa · Linhas: aspectos entre os dois.
                   </p>
-                )}
-              </CardContent>
-            </Card>
+                </div>
 
-            {activeView.synastryId ? (
-              <Card className="border-primary/15">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold">Análise narrativa (IA)</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Opcional — não substitui os destaques numéricos nem uma leitura humana.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="w-full"
-                    disabled={synastryAiMutation.isPending}
-                    onClick={() => synastryAiMutation.mutate()}
-                  >
-                    {synastryAiMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="mr-2 h-4 w-4" />
-                    )}
-                    Gerar análise narrativa
-                  </Button>
-                  {synastryAiText ? (
-                    <article className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed whitespace-pre-wrap">
-                      <AiCacheAgeBadgeFromResult result={synastryAiMutation.data} />
-                      {synastryAiText}
-                    </article>
-                  ) : null}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    disabled={synastryDeepMutation.isPending}
-                    onClick={() => synastryDeepMutation.mutate()}
-                  >
-                    {synastryDeepMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="mr-2 h-4 w-4" />
-                    )}
-                    Análise profunda (JSON)
-                  </Button>
-                  {synastryDeep ? (
-                    <article className="max-h-[520px] overflow-y-auto rounded-lg border border-primary/15 bg-background/40 p-3 text-xs leading-relaxed space-y-3">
-                      <AiCacheAgeBadgeFromResult result={synastryDeepMutation.data} />
-                      <p className="text-[11px] font-medium uppercase text-muted-foreground">
-                        Sinastria profunda
+                <div className="space-y-4">
+                  <Card className="border-primary/25 bg-primary/5">
+                    <CardContent className="pt-6 text-center space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Compatibilidade geral (heurística)
                       </p>
-                      <p className="text-muted-foreground">{synastryDeep.composite_disclaimer}</p>
-                      <section>
-                        <h4 className="font-semibold text-sm">Visão geral</h4>
-                        <p>{synastryDeep.overview}</p>
-                      </section>
-                      <section>
-                        <h4 className="font-semibold text-sm">Dinâmica emocional</h4>
-                        <p>{synastryDeep.emotional_dynamics}</p>
-                      </section>
-                      <section>
-                        <h4 className="font-semibold text-sm">Comunicação</h4>
-                        <p>{synastryDeep.communication_styles}</p>
-                      </section>
-                      <section>
-                        <h4 className="font-semibold text-sm">Intimidade & atração</h4>
-                        <p>{synastryDeep.intimacy_attraction}</p>
-                      </section>
-                      <section>
-                        <h4 className="font-semibold text-sm">Conflito & reparação</h4>
-                        <p>{synastryDeep.conflict_repair}</p>
-                      </section>
-                      <section>
-                        <h4 className="font-semibold text-sm">Ritmo quotidiano</h4>
-                        <p>{synastryDeep.daily_rhythm}</p>
-                      </section>
-                      <section>
-                        <h4 className="font-semibold text-sm">Crescimento a longo prazo</h4>
-                        <p>{synastryDeep.long_term_growth}</p>
-                      </section>
-                      <section>
-                        <h4 className="font-semibold text-sm">Síntese</h4>
-                        <p>{synastryDeep.integration_summary}</p>
-                      </section>
-                    </article>
-                  ) : null}
-                </CardContent>
-              </Card>
-            ) : null}
+                      <p className="font-display text-5xl font-bold text-primary mt-1">
+                        {activeView.score}
+                      </p>
+                      {(() => {
+                        const band = synastryScorePresentation(activeView.score);
+                        return (
+                          <>
+                            <Progress value={band.value} className="h-2 mx-auto max-w-[200px]" />
+                            <p className={`text-xs font-medium ${band.labelClass}`}>{band.label}</p>
+                          </>
+                        );
+                      })()}
+                      <p className="text-xs text-muted-foreground mt-1">de 100</p>
+                      {activeView.savedAt && (
+                        <p className="text-[11px] text-muted-foreground mt-3">
+                          Registo: {new Date(activeView.savedAt).toLocaleString("pt-BR")}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              {AREA_META.map(({ key, title, hint }) => (
-                <Card key={key}>
+                  {activeView.synastryId ? (
+                    <Card className="border-primary/15">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-semibold">
+                          Análise narrativa (IA)
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Opcional — não substitui os destaques numéricos nem uma leitura humana.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="w-full"
+                          disabled={synastryAiMutation.isPending}
+                          onClick={() => synastryAiMutation.mutate()}
+                        >
+                          {synastryAiMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="mr-2 h-4 w-4" />
+                          )}
+                          Gerar análise narrativa
+                        </Button>
+                        {synastryAiText ? (
+                          <article className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                            <AiCacheAgeBadgeFromResult result={synastryAiMutation.data} />
+                            {synastryAiText}
+                          </article>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          disabled={synastryDeepMutation.isPending}
+                          onClick={() => synastryDeepMutation.mutate()}
+                        >
+                          {synastryDeepMutation.isPending ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Sparkles className="mr-2 h-4 w-4" />
+                          )}
+                          Análise profunda (JSON)
+                        </Button>
+                        {synastryDeep ? (
+                          <article className="max-h-[520px] overflow-y-auto rounded-lg border border-primary/15 bg-background/40 p-3 text-xs leading-relaxed space-y-3">
+                            <AiCacheAgeBadgeFromResult result={synastryDeepMutation.data} />
+                            <p className="text-[11px] font-medium uppercase text-muted-foreground">
+                              Sinastria profunda
+                            </p>
+                            <p className="text-muted-foreground">
+                              {synastryDeep.composite_disclaimer}
+                            </p>
+                            <section>
+                              <h4 className="font-semibold text-sm">Visão geral</h4>
+                              <p>{synastryDeep.overview}</p>
+                            </section>
+                            <section>
+                              <h4 className="font-semibold text-sm">Dinâmica emocional</h4>
+                              <p>{synastryDeep.emotional_dynamics}</p>
+                            </section>
+                            <section>
+                              <h4 className="font-semibold text-sm">Comunicação</h4>
+                              <p>{synastryDeep.communication_styles}</p>
+                            </section>
+                            <section>
+                              <h4 className="font-semibold text-sm">Intimidade & atração</h4>
+                              <p>{synastryDeep.intimacy_attraction}</p>
+                            </section>
+                            <section>
+                              <h4 className="font-semibold text-sm">Conflito & reparação</h4>
+                              <p>{synastryDeep.conflict_repair}</p>
+                            </section>
+                            <section>
+                              <h4 className="font-semibold text-sm">Ritmo quotidiano</h4>
+                              <p>{synastryDeep.daily_rhythm}</p>
+                            </section>
+                            <section>
+                              <h4 className="font-semibold text-sm">Crescimento a longo prazo</h4>
+                              <p>{synastryDeep.long_term_growth}</p>
+                            </section>
+                            <section>
+                              <h4 className="font-semibold text-sm">Síntese</h4>
+                              <p>{synastryDeep.integration_summary}</p>
+                            </section>
+                          </article>
+                        ) : null}
+                      </CardContent>
+                    </Card>
+                  ) : null}
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {AREA_META.map(({ key, title, hint }) => {
+                      const areaScore = activeView.analysis.areas[key];
+                      const band = synastryScorePresentation(areaScore);
+                      return (
+                        <Card key={key}>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-2">
+                            <p className="font-display text-3xl font-bold">{areaScore}</p>
+                            <Progress value={band.value} className="h-2" />
+                            <p className={`text-xs font-medium ${band.labelClass}`}>{band.label}</p>
+                            <p className="text-[11px] text-muted-foreground mt-2 leading-snug">
+                              {hint}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">
+                        Destaques (orbe mais fechado primeiro)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="text-sm space-y-2 text-foreground/85 list-disc pl-4">
+                        {activeView.analysis.highlights.map((line, i) => (
+                          <li key={i}>{line}</li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+
+                  <Collapsible className="rounded-lg border bg-card">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 p-4 text-left font-semibold text-sm hover:bg-muted/40 transition-colors [&[data-state=open]>svg]:rotate-180">
+                      Todos os aspectos cruzados
+                      <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="border-t divide-y divide-border max-h-[min(60vh,480px)] overflow-y-auto px-0 pb-3">
+                        {activeView.analysis.aspects.length === 0 ? (
+                          <p className="p-4 text-sm text-muted-foreground">
+                            Nenhum aspecto na lista.
+                          </p>
+                        ) : (
+                          [...activeView.analysis.aspects]
+                            .sort((a, b) => a.orb - b.orb)
+                            .map((a, idx) => {
+                              const mood = aspectMood(a.type);
+                              const label =
+                                ASPECT_LABELS[a.type as AspectType] ??
+                                String(a.type).replace(/_/g, " ");
+                              return (
+                                <div
+                                  key={`${a.planet1}-${a.planet2}-${a.type}-${idx}`}
+                                  className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"
+                                >
+                                  <span>
+                                    <span className="font-medium">
+                                      {planetDisplayName(a.planet1)}
+                                    </span>
+                                    {" — "}
+                                    <span className="font-medium">
+                                      {planetDisplayName(a.planet2)}
+                                    </span>
+                                    {" · "}
+                                    <span className="text-muted-foreground">{label}</span>
+                                    {" · órbe "}
+                                    <span className="tabular-nums">{a.orb}°</span>
+                                  </span>
+                                  <Badge
+                                    variant="secondary"
+                                    className={
+                                      mood === "harmonic"
+                                        ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200"
+                                        : mood === "desafiador"
+                                          ? "bg-amber-500/15 text-amber-900 dark:text-amber-100"
+                                          : ""
+                                    }
+                                  >
+                                    {mood === "harmonic"
+                                      ? "harmônico"
+                                      : mood === "desafiador"
+                                        ? "desafiador"
+                                        : "neutro"}
+                                  </Badge>
+                                </div>
+                              );
+                            })
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
+              </div>
+            ) : (
+              <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground leading-relaxed">
+                Use «Calcular e guardar» acima para gerar a sinastria e ver o biwheel, pontuações e
+                listas de aspectos cruzados.
+              </p>
+            )}
+          </TabsContent>
+
+          <TabsContent value="composto" className="mt-0 space-y-6">
+            {compositeQuery.isLoading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin shrink-0" /> A calcular mapa composto…
+              </div>
+            ) : compositeQuery.isError ? (
+              <p className="text-sm text-destructive">
+                {(compositeQuery.error as Error)?.message ?? "Erro ao calcular o composto."}
+              </p>
+            ) : compositeQuery.data ? (
+              <div className="space-y-6">
+                <div className="-mx-1 flex justify-center overflow-x-auto px-1 pb-1 sm:mx-0 sm:overflow-visible">
+                  <CompositeChartWheel data={compositeQuery.data.composite} size={520} />
+                </div>
+                <p className="mx-auto max-w-xl text-center text-xs text-muted-foreground">
+                  Mapa composto por midpoint entre «{compositeQuery.data.chart1Name}» e «
+                  {compositeQuery.data.chart2Name}» (RAMC médio para casas — leitura simbólica).
+                </p>
+                <Card className="border-primary/15">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+                    <CardTitle className="text-sm font-semibold">
+                      Interpretação do composto (IA)
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <p className="font-display text-3xl font-bold">
-                      {activeView.analysis.areas[key]}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-2 leading-snug">{hint}</p>
+                  <CardContent className="space-y-3">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={compositeAiMutation.isPending}
+                      onClick={() => compositeAiMutation.mutate()}
+                    >
+                      {compositeAiMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-2 h-4 w-4" />
+                      )}
+                      Gerar texto do mapa composto
+                    </Button>
+                    {compositeAiText ? (
+                      <article className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                        <AiCacheAgeBadgeFromResult result={compositeAiMutation.data} />
+                        {compositeAiText}
+                      </article>
+                    ) : null}
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Destaques (orbe mais fechado primeiro)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="text-sm space-y-2 text-foreground/85 list-disc pl-4">
-                  {activeView.analysis.highlights.map((line, i) => (
-                    <li key={i}>{line}</li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
+              </div>
+            ) : null}
+          </TabsContent>
+        </Tabs>
+      ) : null}
 
       {!historyError && (
         <Card className="mt-10">

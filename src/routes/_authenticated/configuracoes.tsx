@@ -511,8 +511,8 @@ function Settings() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="NONE">Prefiro não indicar</SelectItem>
-                              <SelectItem value="M">Mulher</SelectItem>
-                              <SelectItem value="F">Homem</SelectItem>
+                              <SelectItem value="M">Homem</SelectItem>
+                              <SelectItem value="F">Mulher</SelectItem>
                               <SelectItem value="NB">Não-binário</SelectItem>
                               <SelectItem value="OTHER">Outro</SelectItem>
                             </SelectContent>

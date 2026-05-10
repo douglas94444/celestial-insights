@@ -164,7 +164,7 @@ export function computePlanetPositionsUtc(date: Date): Omit<PlanetPosition, "hou
   });
 }
 
-function computeAspects(planets: PlanetPosition[]): Aspect[] {
+export function computeAspects(planets: PlanetPosition[]): Aspect[] {
   const aspects: Aspect[] = [];
   for (let i = 0; i < planets.length; i++) {
     for (let j = i + 1; j < planets.length; j++) {
@@ -213,6 +213,31 @@ export function computeAngles(input: CalculateInput): { ascendant: number; midhe
   const ramc = norm360(gstDegrees(date) + input.longitude);
   const hr = computeHouses(ramc, input.latitude, obliquity(date), input.houseSystem ?? "placidus");
   return { ascendant: hr.ascendant, midheaven: hr.midheaven };
+}
+
+/** RAMC médio na longitude eclíptica + médias para construir casas do mapa composto (midpoint). */
+export function compositeAnglesInputs(
+  inputA: CalculateInput,
+  inputB: CalculateInput,
+): {
+  ramcMid: number;
+  oblMean: number;
+  latMean: number;
+} {
+  function midLon(u: number, v: number): number {
+    const diff = Math.abs(u - v);
+    const m = diff > 180 ? ((u + v + 360) / 2) % 360 : (u + v) / 2;
+    return norm360(m);
+  }
+  const da = utcBirthInstant(inputA);
+  const db = utcBirthInstant(inputB);
+  const ramcA = norm360(gstDegrees(da) + inputA.longitude);
+  const ramcB = norm360(gstDegrees(db) + inputB.longitude);
+  return {
+    ramcMid: midLon(ramcA, ramcB),
+    oblMean: (obliquity(da) + obliquity(db)) / 2,
+    latMean: (inputA.latitude + inputB.latitude) / 2,
+  };
 }
 
 export function calculateChart(input: CalculateInput): ChartData {

@@ -13,6 +13,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AiCacheAgeBadge, AiCacheAgeBadgeFromResult } from "@/components/AiCacheAgeBadge";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { ShareableMomentCard } from "@/components/ShareableMomentCard";
+import { MoodWidget } from "@/components/MoodWidget";
 import { useDailyMoment } from "@/hooks/use-daily-moment";
 import {
   touchMomentStreak,
@@ -328,7 +329,7 @@ function MomentoPage() {
     setExporting(true);
     try {
       const blob = await captureMomentShareCardPng(cardRef.current);
-      const filename = `astro-moment-${todayStr}.png`;
+      const filename = `astro-moment-${viewYmd}.png`;
       const shared = await sharePngIfPossible(blob, filename, "Meu momento com o céu — AstroMap");
       if (!shared) await downloadBlob(blob, filename);
       toast.success(shared ? "Partilhado" : "Imagem guardada");
@@ -344,7 +345,7 @@ function MomentoPage() {
     setExporting(true);
     try {
       const blob = await captureMomentShareCardPng(cardRef.current);
-      await downloadBlob(blob, `astro-moment-${todayStr}.png`);
+      await downloadBlob(blob, `astro-moment-${viewYmd}.png`);
       toast.success("Imagem guardada");
     } catch {
       toast.error("Falha ao guardar a imagem.");
@@ -417,6 +418,12 @@ function MomentoPage() {
         <h1 className="mt-2 font-display text-3xl font-bold md:text-4xl">Momento com o céu</h1>
         <p className="mt-2 text-sm capitalize text-muted-foreground/90">{titledDate}</p>
       </header>
+
+      {primary?.id ? (
+        <div className="mb-8">
+          <MoodWidget chartId={primary.id} todayStr={todayStr} viewYmd={viewYmd} />
+        </div>
+      ) : null}
 
       {historyList.length > 0 ? (
         <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
@@ -584,9 +591,8 @@ function MomentoPage() {
           </div>
         ) : null}
         <p className="text-center text-xs text-muted-foreground/90">
-          {isTodayView
-            ? "Pré-visualização — exportação em alta resolução (1080×1350)."
-            : "Pré-visualização mostra o mapa de hoje; use o texto guardado acima como referência ou volte a «Hoje» para exportar o cartão actual."}
+          Pré-visualização do dia selecionado — exportação em alta resolução (1080×1350). Legenda e
+          trânsitos em tempo real seguem apenas o dia de hoje.
         </p>
 
         <div className="flex justify-center overflow-x-auto pb-8 pt-2">
@@ -686,7 +692,7 @@ function MomentoPage() {
           <Button
             type="button"
             className="bg-mystical text-white hover:opacity-90"
-            disabled={exporting || !isTodayView}
+            disabled={exporting}
             aria-label="Guardar imagem do cartão Momento no dispositivo"
             onClick={handleDownload}
           >
@@ -700,7 +706,7 @@ function MomentoPage() {
           <Button
             type="button"
             variant="outline"
-            disabled={exporting || !isTodayView}
+            disabled={exporting}
             aria-label="Partilhar ou guardar o cartão Momento como imagem"
             onClick={handleShare}
           >

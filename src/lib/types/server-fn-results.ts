@@ -1,5 +1,6 @@
 import type { ChartData } from "@/lib/astrology/calculate";
 import type { SynastryAnalysis } from "@/lib/astrology/synastry";
+import type { AnnualForecast } from "@/lib/astrology/annual-forecast";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import type { ChartRow } from "@/lib/chart-from-row";
 import type { Database } from "@/integrations/supabase/types";
@@ -52,9 +53,39 @@ export type CalculateTransitsFnResult = {
   days: TransitDayPayload[];
 };
 
+export type GenerateAnnualForecastFnResult = {
+  chartId: string;
+  chartName: string;
+  year: number;
+  months: AnnualForecast;
+};
+
 /** Resultado de `calculateChartFn` (pré-visualização pura). */
 export type CalculateChartFnResult = ChartData;
 
 export type SendTransitDigestEmailFnResult = { ok: true; to: string; date: string };
 
 export type DeleteAccountFnResult = { ok: true };
+
+export type MoodHistoryEntryFn = {
+  ymd: string;
+  mood_score: number;
+  emotions: string[];
+  note: string | null;
+};
+
+export type GetMoodHistoryFnResult = {
+  entries: MoodHistoryEntryFn[];
+  intensityByYmd: Record<string, number>;
+  correlationNote: string | null;
+};
+
+export type UpsertMoodFnResult = { ok: true };
+
+export type CalculateCompositeFnResult = {
+  chart1Id: string;
+  chart2Id: string;
+  chart1Name: string;
+  chart2Name: string;
+  composite: ChartData;
+};

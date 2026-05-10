@@ -16,11 +16,11 @@
     "test:e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "supabase:login": "supabase login",
-    "supabase:link": "supabase link --project-ref fxcoxnqqjgvqfukasfjb",
-    "supabase:push": "supabase db push",
-    "supabase:functions:deploy": "supabase functions deploy transit-digest-cron --no-verify-jwt",
-    "supabase:types": "supabase gen types --linked --schema public > src/integrations/supabase/types.ts"
+    "supabase:login": "npx --yes supabase login",
+    "supabase:link": "npx --yes supabase link --project-ref fxcoxnqqjgvqfukasfjb",
+    "supabase:push": "npx --yes supabase db push",
+    "supabase:functions:deploy": "npx --yes supabase functions deploy transit-digest-cron --no-verify-jwt",
+    "supabase:types": "npx --yes supabase gen types typescript --linked --schema public > src/integrations/supabase/types.ts"
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",

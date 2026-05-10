@@ -20,11 +20,13 @@ import {
 } from "@/lib/ai/chart-summary";
 import { extractFirstJsonObject } from "@/lib/ai/json-response";
 import { completeChat, resolveAiProvider } from "@/lib/ai/llm-provider";
-import type { HouseSystemId } from "@/lib/astrology/calculate";
+import type { ChartData, HouseSystemId } from "@/lib/astrology/calculate";
+import { computeCompositeChart } from "@/lib/astrology/composite";
 import type { SynastryAreaScores, SynastryCrossAspect } from "@/lib/astrology/synastry";
 import { analyzeTransitDay } from "@/lib/astrology/transits";
 import { PLANETS } from "@/lib/astrology/zodiac";
 import { chartRowToChartData } from "@/lib/chart-from-row";
+import { birthInputFromChartRow } from "@/lib/composite.functions";
 import { deriveChartPatterns } from "@/lib/chart-patterns";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
@@ -43,6 +45,7 @@ import {
   natalEssenceInputSchema,
   natalExecutiveSummaryInputSchema,
   natalPlanetInsightInputSchema,
+  saveSynastryInputSchema,
   synastryDeepNarrativeInputSchema,
   synastryNarrativeInputSchema,
   transitDayNarrativeInputSchema,
@@ -84,6 +87,36 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
 }
 
 type ChartsRow = Database["public"]["Tables"]["charts"]["Row"];
+
+const COMPOSITE_PROMPT_VERSION = "cp-v1";
+
+function roundDegComposite(n: number, dec: number): number {
+  const p = 10 ** dec;
+  return Math.round(n * p) / p;
+}
+
+async function fingerprintCompositeChart(
+  chartA: ChartsRow,
+  chartB: ChartsRow,
+  composite: ChartData,
+): Promise<string> {
+  const planets = [...composite.planets]
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map((p) => ({
+      k: p.key,
+      λ: roundDegComposite(p.longitude, 4),
+      h: p.house,
+    }));
+  const payload = {
+    pv: COMPOSITE_PROMPT_VERSION,
+    chartIds: [chartA.id, chartB.id].sort(),
+    updatedAt: [chartA.updated_at, chartB.updated_at].sort(),
+    asc: roundDegComposite(composite.ascendant, 4),
+    mc: roundDegComposite(composite.midheaven, 4),
+    planets,
+  };
+  return sha256FingerprintHex(payload);
+}
 
 /** Mapa garantidamente do utilizador (`404` se não existir ou não pertencer ao user). */
 async function fetchChartOwnedByUser(
@@ -1119,5 +1152,148 @@ export const generateSynastryDeepNarrativeFn = createServerFn({ method: "POST" }
       if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
       return { cached: false as const, deep };
+    }),
+  );
+
+export const generateCompositeNarrativeFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    const parsed = saveSynastryInputSchema.safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
+    return parsed.data;
+  })
+  .handler(
+    timedServerFn("generateCompositeNarrativeFn", async ({ data, context }) => {
+      const supabase = context.supabase;
+      const userId = context.userId;
+      const kind: InterpretationKind = "composite";
+
+      if (data.chart1Id === data.chart2Id) {
+        throw jsonError(400, "SAME", "Escolha dois mapas diferentes.");
+      }
+
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select("subscription_tier")
+        .eq("id", userId)
+        .single();
+      if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
+      const tier = profile?.subscription_tier ?? "FREE";
+
+      const { data: rows, error: chartsErr } = await supabase
+        .from("charts")
+        .select("*")
+        .eq("user_id", userId)
+        .in("id", [data.chart1Id, data.chart2Id]);
+
+      if (chartsErr || !rows || rows.length !== 2) {
+        throw jsonError(404, "NOT_FOUND", "Um ou ambos os mapas não foram encontrados.");
+      }
+
+      const chartA = rows.find((r) => r.id === data.chart1Id)!;
+      const chartB = rows.find((r) => r.id === data.chart2Id)!;
+
+      const dataA = chartRowToChartData(chartA);
+      const dataB = chartRowToChartData(chartB);
+      const birthA = birthInputFromChartRow(chartA);
+      const birthB = birthInputFromChartRow(chartB);
+      const houseSystem = chartA.house_system as HouseSystemId;
+
+      const composite = computeCompositeChart(dataA, dataB, birthA, birthB, houseSystem);
+
+      const fingerprint = await fingerprintCompositeChart(chartA, chartB, composite);
+
+      const { data: cached, error: cacheErr } = await supabase
+        .from("interpretation_ai_cache")
+        .select("content, created_at")
+        .eq("user_id", userId)
+        .eq("kind", kind)
+        .eq("fingerprint", fingerprint)
+        .maybeSingle();
+
+      if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
+      if (cached?.content) {
+        return {
+          cached: true as const,
+          content: cached.content,
+          cached_at: cached.created_at ?? null,
+        };
+      }
+
+      await assertAiGenerationAllowed(supabase, userId, tier);
+
+      if (!resolveAiProvider()) {
+        throw jsonError(
+          503,
+          "LLM_NOT_CONFIGURED",
+          "Serviço de IA não configurado no servidor (chaves em falta).",
+        );
+      }
+
+      const sortedPlanets = [...composite.planets].sort((a, b) => a.key.localeCompare(b.key));
+      const planetLines = sortedPlanets
+        .map(
+          (p) =>
+            `- ${p.name} (${p.key}): ${p.sign}, casa ${p.house}, longitude ${roundDegComposite(p.longitude, 2)}°`,
+        )
+        .join("\n");
+      const aspLines = composite.aspects
+        .slice()
+        .sort((a, b) => a.orb - b.orb)
+        .slice(0, 14)
+        .map((a) => `- ${a.planet1} ${a.type} ${a.planet2} (órbe ${a.orb}°)`)
+        .join("\n");
+
+      const userPrompt = `Gera uma interpretação do mapa composto entre "${chartA.name}" e "${chartB.name}" — relacionamento como terceira entidade simbólica (midpoint de posições e médias para casas).\n\nPlanetas e pontos compostos:\n${planetLines}\n\nAscendente composto ~ ${roundDegComposite(composite.ascendant, 2)}° · MC ~ ${roundDegComposite(composite.midheaven, 2)}°\n\nAspectos principais:\n${aspLines}\n\nEscreve para um público em PT-BR que já viu sinastria; foca na dinámica do «nós» como campo partilhado, propósito comum e tensões criativas. Não contradigas os dados listados.`;
+
+      const t0 = Date.now();
+      let completion;
+      try {
+        completion = await completeChat(SYSTEM_ASTROLOGY_PT, userPrompt);
+      } catch (e) {
+        console.error("[ai-interpretation] composite LLM", e);
+        throw jsonError(
+          503,
+          "LLM_UNAVAILABLE",
+          e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
+        );
+      }
+      console.info(
+        `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
+      );
+
+      const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
+        user_id: userId,
+        kind,
+        fingerprint,
+        chart_id: chartA.id,
+        synastry_id: null,
+        transit_date: null,
+        prompt_version: COMPOSITE_PROMPT_VERSION,
+        model: completion.model,
+        content: completion.text,
+        tokens_in: completion.tokensIn ?? null,
+        tokens_out: completion.tokensOut ?? null,
+      });
+
+      if (insertErr?.code === "23505") {
+        const { data: row } = await supabase
+          .from("interpretation_ai_cache")
+          .select("content, created_at")
+          .eq("user_id", userId)
+          .eq("kind", kind)
+          .eq("fingerprint", fingerprint)
+          .maybeSingle();
+        if (row?.content) {
+          return {
+            cached: true as const,
+            content: row.content,
+            cached_at: row.created_at ?? null,
+          };
+        }
+      }
+      if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
+
+      return { cached: false as const, content: completion.text };
     }),
   );

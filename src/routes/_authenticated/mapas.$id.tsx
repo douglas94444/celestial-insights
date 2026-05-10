@@ -30,7 +30,13 @@ import {
   aspectMood,
   HOUSE_MEANINGS,
   planetInSignInterpretation,
+  planetInHouseInterpretation,
 } from "@/data/chart-detail-interpretations";
+import {
+  deriveChartPatterns,
+  planetKeysLabelPt,
+  SPECIAL_GEOMETRY_BLURBS,
+} from "@/lib/chart-patterns";
 import type { SignName } from "@/lib/astrology/zodiac";
 import type { AspectType } from "@/lib/astrology/calculate";
 import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
@@ -152,6 +158,19 @@ function ChartView() {
   const needsRecalcHouseMismatch = !!chart && !!profile && storedHouseSystem !== profileHouseSystem;
 
   const needsRecalc = needsRecalcPlanets || needsRecalcHouseMismatch;
+
+  const chartPatterns = useMemo(() => {
+    if (!parsedChart) return null;
+    const asc = parsedChart.houses[0]?.cusp ?? angles.ascendant;
+    const cd: ChartData = {
+      ascendant: asc,
+      midheaven: angles.midheaven,
+      planets: parsedChart.planets,
+      houses: parsedChart.houses,
+      aspects: parsedChart.aspects,
+    };
+    return deriveChartPatterns(cd);
+  }, [parsedChart, angles.ascendant, angles.midheaven]);
 
   const aiExecutiveMutation = useMutation<AiInterpretationFnResult, Error, void>({
     mutationFn: async () => {
@@ -449,6 +468,66 @@ function ChartView() {
                   <p className="mt-2 text-sm text-foreground/80">{ASC_IN_SIGN[ascSign]}</p>
                 </CardContent>
               </Card>
+
+              {chartPatterns &&
+                (chartPatterns.grand_trines.length > 0 ||
+                  chartPatterns.t_squares.length > 0 ||
+                  chartPatterns.grand_crosses.length > 0 ||
+                  chartPatterns.yods.length > 0) && (
+                  <Card className="border-primary/20 bg-primary/5">
+                    <CardContent className="p-5 space-y-4">
+                      <h3 className="font-display text-lg font-semibold">
+                        Configurações especiais
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Padrões geométricos entre planetas (orbes do cálculo natal). Leitura
+                        simbólica, não determinística.
+                      </p>
+                      <ul className="space-y-4 text-sm">
+                        {chartPatterns.grand_trines.map((g, idx) => (
+                          <li key={`gt-${idx}-${g.planets.join("-")}`}>
+                            <p className="font-medium">Grande trígono ({g.element})</p>
+                            <p className="text-muted-foreground">{planetKeysLabelPt(g.planets)}</p>
+                            <p className="mt-1 text-foreground/85">
+                              {SPECIAL_GEOMETRY_BLURBS.grand_trine}
+                            </p>
+                          </li>
+                        ))}
+                        {chartPatterns.t_squares.map((t, idx) => (
+                          <li key={`ts-${idx}-${t.apex}-${t.opposition.join("-")}`}>
+                            <p className="font-medium">T-quadrado</p>
+                            <p className="text-muted-foreground">
+                              Vértice {planetKeysLabelPt([t.apex])} · oposição{" "}
+                              {planetKeysLabelPt([t.opposition[0], t.opposition[1]])}
+                            </p>
+                            <p className="mt-1 text-foreground/85">
+                              {SPECIAL_GEOMETRY_BLURBS.t_square}
+                            </p>
+                          </li>
+                        ))}
+                        {chartPatterns.grand_crosses.map((gc, idx) => (
+                          <li key={`gc-${idx}-${gc.planets.join("-")}`}>
+                            <p className="font-medium">Grande cruz</p>
+                            <p className="text-muted-foreground">{planetKeysLabelPt(gc.planets)}</p>
+                            <p className="mt-1 text-foreground/85">
+                              {SPECIAL_GEOMETRY_BLURBS.grand_cross}
+                            </p>
+                          </li>
+                        ))}
+                        {chartPatterns.yods.map((y, idx) => (
+                          <li key={`yod-${idx}-${y.apex}-${y.sextile.join("-")}`}>
+                            <p className="font-medium">Yod (Dedo de Deus)</p>
+                            <p className="text-muted-foreground">
+                              Vértice {planetKeysLabelPt([y.apex])} · base em sextil{" "}
+                              {planetKeysLabelPt([y.sextile[0], y.sextile[1]])}
+                            </p>
+                            <p className="mt-1 text-foreground/85">{SPECIAL_GEOMETRY_BLURBS.yod}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
             </TabsContent>
 
             <TabsContent
@@ -465,9 +544,16 @@ function ChartView() {
                         <h3 className="font-display text-base font-semibold">
                           <span className="mr-1.5">{p.symbol}</span>
                           {p.name} em {p.sign}{" "}
-                          <span className="text-muted-foreground text-sm font-normal">
+                          <span className="text-muted-foreground text-sm font-normal inline-flex flex-wrap items-center gap-1">
                             · {formatDegree(p.longitude)} · Casa {p.house}
-                            {p.retrograde ? " · R" : ""}
+                            {p.retrograde ? (
+                              <Badge
+                                variant="outline"
+                                className="text-amber-600 border-amber-400 text-[10px] px-1 py-0 font-normal"
+                              >
+                                ℞
+                              </Badge>
+                            ) : null}
                           </span>
                         </h3>
                         <Button
@@ -535,10 +621,19 @@ function ChartView() {
                               <span className="font-medium">
                                 {p.symbol} {p.name}
                               </span>{" "}
-                              em {p.sign} ({formatDegree(p.longitude)}){p.retrograde ? " R" : ""} —{" "}
+                              em {p.sign} ({formatDegree(p.longitude)}){" "}
+                              {p.retrograde ? (
+                                <Badge
+                                  variant="outline"
+                                  className="align-middle text-amber-600 border-amber-400 text-[10px] px-1 py-0 font-normal"
+                                >
+                                  ℞
+                                </Badge>
+                              ) : null}{" "}
+                              —{" "}
                               <span className="text-muted-foreground">
-                                colore esta área com o tema de {p.name.toLowerCase()} em{" "}
-                                {p.sign.toLowerCase()}.
+                                {planetInHouseInterpretation(p.key, house.number) ||
+                                  `${p.name} em ${p.sign} colore esta área com sua energia arquetípica.`}
                               </span>
                             </li>
                           ))}

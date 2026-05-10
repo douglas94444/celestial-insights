@@ -30,6 +30,8 @@ import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
 import { BRAZIL_TIMEZONE_OFFSETS, formatTimezoneLabel } from "@/lib/timezone-br";
 import type { Session } from "@supabase/supabase-js";
 import { toast } from "sonner";
+import { Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const formSchema = z
   .object({
@@ -209,7 +211,23 @@ export function BirthChartForm({
             name="birthTime"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Hora</FormLabel>
+                <div className="flex items-center gap-1.5">
+                  <FormLabel className="m-0">Hora</FormLabel>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <Info className="h-3.5 w-3.5" aria-label="Sobre precisão da hora" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[260px] text-xs">
+                        ±4 minutos de diferença equivalem a ~1° no Ascendente. Hora aproximada é
+                        aceitável.
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <FormControl>
                   <Input type="time" disabled={unknownTime} {...field} />
                 </FormControl>

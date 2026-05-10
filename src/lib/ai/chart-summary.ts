@@ -32,6 +32,21 @@ export function patternsFingerprintCompact(
     life_purpose: patterns.life_purpose,
     main_challenges: patterns.main_challenges,
     natural_talents: patterns.natural_talents,
+    grand_trines: patterns.grand_trines.map((g) => ({
+      planets: [...g.planets].sort(),
+      element: g.element,
+    })),
+    t_squares: patterns.t_squares.map((t) => ({
+      apex: t.apex,
+      opposition: [...t.opposition].sort(),
+    })),
+    grand_crosses: patterns.grand_crosses.map((g) => ({
+      planets: [...g.planets].sort(),
+    })),
+    yods: patterns.yods.map((y) => ({
+      apex: y.apex,
+      sextile: [...y.sextile].sort(),
+    })),
   };
 }
 

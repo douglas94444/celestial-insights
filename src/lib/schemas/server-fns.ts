@@ -17,6 +17,31 @@ export const calculateTransitsInputSchema = z.object({
 
 export type CalculateTransitsInput = z.infer<typeof calculateTransitsInputSchema>;
 
+export const annualForecastInputSchema = z.object({
+  chartId: chartIdSchema,
+  year: z.number().int().min(1900).max(2100),
+});
+
+export type AnnualForecastInput = z.infer<typeof annualForecastInputSchema>;
+
+export const upsertMoodInputSchema = z.object({
+  chartId: chartIdSchema.nullish(),
+  ymd: dateYmdSchema,
+  moodScore: z.number().int().min(1).max(10),
+  emotions: z.array(z.string().max(40)).max(12),
+  note: z.string().max(2000).optional(),
+});
+
+export type UpsertMoodInput = z.infer<typeof upsertMoodInputSchema>;
+
+export const getMoodHistoryInputSchema = z.object({
+  chartId: chartIdSchema,
+  startYmd: dateYmdSchema,
+  endYmd: dateYmdSchema,
+});
+
+export type GetMoodHistoryInput = z.infer<typeof getMoodHistoryInputSchema>;
+
 export const recalculateChartInputSchema = z.object({
   chartId: chartIdSchema,
 });

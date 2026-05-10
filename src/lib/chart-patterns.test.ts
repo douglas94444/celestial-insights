@@ -3,6 +3,7 @@ import type { Aspect, ChartData, HousePosition, PlanetPosition } from "@/lib/ast
 import type { PlanetKey } from "@/lib/astrology/zodiac";
 import {
   deriveChartPatterns,
+  detectGrandTrines,
   dominantElementFromChart,
   dominantModalityFromChart,
   findStelliums,
@@ -89,5 +90,56 @@ describe("chart-patterns", () => {
     const p = deriveChartPatterns(data);
     expect(p.main_challenges.some((l) => l.includes("sun"))).toBe(true);
     expect(dominantElementFromChart(planets)).toBe("AR");
+  });
+
+  it("detecta grande trígono equilátero (Sol · Júpiter · Saturno)", () => {
+    const planets: PlanetPosition[] = [
+      mkPlanet({ key: "sun", sign: "Áries", house: 1, longitude: 10 }),
+      mkPlanet({ key: "jupiter", sign: "Leão", house: 5, longitude: 130 }),
+      mkPlanet({ key: "saturn", sign: "Sagitário", house: 9, longitude: 250 }),
+    ];
+    const aspects: Aspect[] = [
+      {
+        planet1: "sun",
+        planet2: "jupiter",
+        type: "trigono",
+        exactAngle: 120,
+        orb: 0,
+      },
+      {
+        planet1: "sun",
+        planet2: "saturn",
+        type: "trigono",
+        exactAngle: 120,
+        orb: 0,
+      },
+      {
+        planet1: "jupiter",
+        planet2: "saturn",
+        type: "trigono",
+        exactAngle: 120,
+        orb: 0,
+      },
+    ];
+    const gt = detectGrandTrines(aspects, planets);
+    expect(gt.length).toBeGreaterThanOrEqual(1);
+    expect([...gt[0]!.planets].sort().join(",")).toBe(
+      ["jupiter", "saturn", "sun"].sort().join(","),
+    );
+
+    const houses: HousePosition[] = Array.from({ length: 12 }, (_, i) => ({
+      number: i + 1,
+      cusp: i * 30,
+      sign: "Áries",
+    }));
+    const data: ChartData = {
+      ascendant: 0,
+      midheaven: 270,
+      planets,
+      houses,
+      aspects,
+    };
+    const p = deriveChartPatterns(data);
+    expect(p.grand_trines.length).toBeGreaterThanOrEqual(1);
   });
 });

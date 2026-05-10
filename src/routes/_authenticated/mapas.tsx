@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Eye, MoreVertical, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Eye, MoreVertical, Pencil, Plus, Sparkles, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -22,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useChartsListQuery } from "@/hooks/use-charts-list";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated/mapas")({
   component: MapasList,
@@ -29,6 +31,7 @@ export const Route = createFileRoute("/_authenticated/mapas")({
 
 function MapasList() {
   const qc = useQueryClient();
+  const { user } = useAuth();
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -53,6 +56,28 @@ function MapasList() {
       qc.invalidateQueries({ queryKey: ["charts-list"] });
       qc.invalidateQueries({ queryKey: ["charts"] });
       setRenameOpen(false);
+    }
+  }
+
+  async function makePrimaryChart(chartId: string) {
+    if (!user?.id) return;
+    const { error: e1 } = await supabase
+      .from("charts")
+      .update({ is_primary: false })
+      .eq("user_id", user.id);
+    if (e1) {
+      toast.error(e1.message);
+      return;
+    }
+    const { error: e2 } = await supabase
+      .from("charts")
+      .update({ is_primary: true })
+      .eq("id", chartId);
+    if (e2) toast.error(e2.message);
+    else {
+      toast.success("Mapa definido como primário");
+      qc.invalidateQueries({ queryKey: ["charts-list"] });
+      qc.invalidateQueries({ queryKey: ["charts"] });
     }
   }
 
@@ -134,7 +159,14 @@ function MapasList() {
                     params={{ id: c.id }}
                     className="flex-1 p-4 hover:bg-muted/40 transition-colors"
                   >
-                    <p className="font-medium">{c.name}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{c.name}</p>
+                      {c.is_primary ? (
+                        <Badge variant="secondary" className="text-[10px] font-normal">
+                          Primário
+                        </Badge>
+                      ) : null}
+                    </div>
                     <p className="text-xs text-muted-foreground">
                       {new Date(c.birth_date).toLocaleDateString("pt-BR")} · {c.birth_place}
                     </p>
@@ -160,6 +192,14 @@ function MapasList() {
                           <Eye className="h-4 w-4" /> Ver
                         </Link>
                       </DropdownMenuItem>
+                      {!c.is_primary ? (
+                        <DropdownMenuItem
+                          className="flex cursor-pointer items-center gap-2"
+                          onClick={() => void makePrimaryChart(c.id)}
+                        >
+                          <Star className="h-4 w-4" /> Tornar primário
+                        </DropdownMenuItem>
+                      ) : null}
                       <DropdownMenuItem
                         className="flex cursor-pointer items-center gap-2"
                         onClick={() => openRename(c)}

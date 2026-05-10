@@ -14,16 +14,184 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      charts: {
+        Row: {
+          aspects_data: Json
+          birth_date: string
+          birth_place: string
+          birth_time: string
+          birth_time_known: boolean
+          created_at: string
+          houses_data: Json
+          id: string
+          is_primary: boolean
+          latitude: number
+          longitude: number
+          name: string
+          planets_data: Json
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aspects_data?: Json
+          birth_date: string
+          birth_place: string
+          birth_time?: string
+          birth_time_known?: boolean
+          created_at?: string
+          houses_data?: Json
+          id?: string
+          is_primary?: boolean
+          latitude: number
+          longitude: number
+          name: string
+          planets_data?: Json
+          timezone: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aspects_data?: Json
+          birth_date?: string
+          birth_place?: string
+          birth_time?: string
+          birth_time_known?: boolean
+          created_at?: string
+          houses_data?: Json
+          id?: string
+          is_primary?: boolean
+          latitude?: number
+          longitude?: number
+          name?: string
+          planets_data?: Json
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email_notifications: boolean
+          house_system: string
+          id: string
+          name: string | null
+          stripe_customer_id: string | null
+          subscription_tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string
+          zodiac: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email_notifications?: boolean
+          house_system?: string
+          id: string
+          name?: string | null
+          stripe_customer_id?: string | null
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+          zodiac?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email_notifications?: boolean
+          house_system?: string
+          id?: string
+          name?: string | null
+          stripe_customer_id?: string | null
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
+          updated_at?: string
+          zodiac?: string
+        }
+        Relationships: []
+      }
+      synastries: {
+        Row: {
+          chart1_id: string
+          chart2_id: string
+          compatibility_data: Json
+          compatibility_score: number
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          chart1_id: string
+          chart2_id: string
+          compatibility_data?: Json
+          compatibility_score?: number
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          chart1_id?: string
+          chart2_id?: string
+          compatibility_data?: Json
+          compatibility_score?: number
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "synastries_chart1_id_fkey"
+            columns: ["chart1_id"]
+            isOneToOne: false
+            referencedRelation: "charts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "synastries_chart2_id_fkey"
+            columns: ["chart2_id"]
+            isOneToOne: false
+            referencedRelation: "charts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      subscription_tier: "FREE" | "PREMIUM"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +318,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      subscription_tier: ["FREE", "PREMIUM"],
+    },
   },
 } as const

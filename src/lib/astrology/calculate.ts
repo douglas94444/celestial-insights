@@ -1,5 +1,13 @@
 import * as Astronomy from "astronomy-engine";
+import {
+  chironGeocentricLongitude,
+  meanNorthNodeLongitude,
+  meanSouthNodeLongitude,
+} from "./extra-bodies";
+import { computeHouses, wholeSignHouse, type HouseSystemId } from "./houses";
 import { PLANETS, signFromLongitude, signIndexFromLongitude, type PlanetKey } from "./zodiac";
+
+export type { HouseSystemId } from "./houses";
 
 export interface PlanetPosition {
   key: PlanetKey;
@@ -45,7 +53,7 @@ const ASPECT_DEFS: { type: AspectType; angle: number; orb: number }[] = [
   { type: "sextil", angle: 60, orb: 4 },
 ];
 
-const BODY_MAP: Record<PlanetKey, Astronomy.Body> = {
+const BODY_MAP: Partial<Record<PlanetKey, Astronomy.Body>> = {
   sun: Astronomy.Body.Sun,
   moon: Astronomy.Body.Moon,
   mercury: Astronomy.Body.Mercury,
@@ -58,12 +66,6 @@ const BODY_MAP: Record<PlanetKey, Astronomy.Body> = {
   pluto: Astronomy.Body.Pluto,
 };
 
-function deg2rad(d: number) {
-  return (d * Math.PI) / 180;
-}
-function rad2deg(r: number) {
-  return (r * 180) / Math.PI;
-}
 function norm360(d: number) {
   return ((d % 360) + 360) % 360;
 }
@@ -92,6 +94,15 @@ function isRetrograde(body: Astronomy.Body, date: Date): boolean {
   return diff < 0;
 }
 
+function isRetrogradeLongitude(lonFn: (d: Date) => number, date: Date): boolean {
+  const t1 = new Date(date.getTime() - 24 * 3600 * 1000);
+  const t2 = new Date(date.getTime() + 24 * 3600 * 1000);
+  let diff = lonFn(t2) - lonFn(t1);
+  if (diff > 180) diff -= 360;
+  if (diff < -180) diff += 360;
+  return diff < 0;
+}
+
 /** Mean obliquity of the ecliptic at a given date (degrees). */
 function obliquity(date: Date): number {
   const T = (date.getTime() / 86400000 - 10957.5) / 36525; // Julian centuries from J2000
@@ -106,55 +117,8 @@ function gstDegrees(date: Date): number {
   return norm360(t * 15);
 }
 
-/** Compute Ascendant (ecliptic longitude in degrees). */
-function computeAscendant(date: Date, latitude: number, longitude: number): number {
-  const gst = gstDegrees(date);
-  const lst = norm360(gst + longitude); // local sidereal time in degrees
-  const ramc = deg2rad(lst);
-  const eps = deg2rad(obliquity(date));
-  const lat = deg2rad(latitude);
-
-  const num = -Math.cos(ramc);
-  const den = Math.sin(ramc) * Math.cos(eps) + Math.tan(lat) * Math.sin(eps);
-  let asc = rad2deg(Math.atan2(num, den));
-  asc = norm360(asc);
-  // Ensure ascendant is on the eastern horizon
-  // Convention: should be near LST + 90 in some way; flip if needed
-  return asc;
-}
-
-/** Compute Midheaven (MC) - ecliptic longitude of LST projected to ecliptic. */
-function computeMidheaven(date: Date, longitude: number): number {
-  const gst = gstDegrees(date);
-  const lst = norm360(gst + longitude);
-  const ramc = deg2rad(lst);
-  const eps = deg2rad(obliquity(date));
-  let mc = rad2deg(Math.atan2(Math.tan(ramc), Math.cos(eps)));
-  // Atan2 gives [-180, 180]; need to put in same hemisphere as RAMC
-  mc = norm360(mc);
-  // Adjust quadrant: MC longitude should be within 90° of RAMC
-  const diff = norm360(mc - lst);
-  if (diff > 90 && diff < 270) {
-    mc = norm360(mc + 180);
-  }
-  return mc;
-}
-
-/** Equal house cusps starting from Ascendant. */
-function equalHouses(ascendant: number): HousePosition[] {
-  const houses: HousePosition[] = [];
-  for (let i = 0; i < 12; i++) {
-    const cusp = norm360(ascendant + i * 30);
-    houses.push({
-      number: i + 1,
-      cusp,
-      sign: signFromLongitude(cusp),
-    });
-  }
-  return houses;
-}
-
-function houseOfPlanet(longitude: number, houses: HousePosition[]): number {
+/** Casa natal (cúspides) onde cai uma longitude eclíptica. */
+export function natalHouseForLongitude(longitude: number, houses: HousePosition[]): number {
   const lon = norm360(longitude);
   for (let i = 0; i < 12; i++) {
     const start = houses[i].cusp;
@@ -166,6 +130,38 @@ function houseOfPlanet(longitude: number, houses: HousePosition[]): number {
     if (offset >= 0 && offset < span) return i + 1;
   }
   return 1;
+}
+
+/** Posições planetárias geocêntricas num instante UTC (sem casas). Útil para trânsitos. */
+export function computePlanetPositionsUtc(date: Date): Omit<PlanetPosition, "house">[] {
+  return PLANETS.map((p) => {
+    const body = BODY_MAP[p.key];
+    let lon: number;
+    let retro: boolean;
+    if (body !== undefined) {
+      lon = eclipticLongitude(body, date);
+      retro = isRetrograde(body, date);
+    } else if (p.key === "chiron") {
+      lon = chironGeocentricLongitude(date);
+      retro = isRetrogradeLongitude(chironGeocentricLongitude, date);
+    } else if (p.key === "north_node") {
+      lon = meanNorthNodeLongitude(date);
+      retro = isRetrogradeLongitude(meanNorthNodeLongitude, date);
+    } else {
+      lon = meanSouthNodeLongitude(date);
+      retro = isRetrogradeLongitude(meanSouthNodeLongitude, date);
+    }
+    return {
+      key: p.key,
+      name: p.name,
+      symbol: p.symbol,
+      longitude: lon,
+      sign: signFromLongitude(lon),
+      signIndex: signIndexFromLongitude(lon),
+      degreeInSign: lon % 30,
+      retrograde: retro,
+    };
+  });
 }
 
 function computeAspects(planets: PlanetPosition[]): Aspect[] {
@@ -200,36 +196,48 @@ export interface CalculateInput {
   latitude: number;
   longitude: number;
   timezoneOffset: number; // minutes east of UTC at the moment of birth
+  /** Default no servidor: placidus (perfil do utilizador ou coluna do mapa). */
+  houseSystem?: HouseSystemId;
+}
+
+/** Instant UTC do nascimento a partir da hora local + offset fixo (histórico). */
+export function utcBirthInstant(input: CalculateInput): Date {
+  const [y, mo, d] = input.birthDate.split("-").map(Number);
+  const [h, mi] = input.birthTime.split(":").map(Number);
+  return new Date(Date.UTC(y, mo - 1, d, h, mi) - input.timezoneOffset * 60_000);
+}
+
+/** Meio do Céu (MC) e Ascendente — alinhado ao sistema de casas escolhido. */
+export function computeAngles(input: CalculateInput): { ascendant: number; midheaven: number } {
+  const date = utcBirthInstant(input);
+  const ramc = norm360(gstDegrees(date) + input.longitude);
+  const hr = computeHouses(ramc, input.latitude, obliquity(date), input.houseSystem ?? "placidus");
+  return { ascendant: hr.ascendant, midheaven: hr.midheaven };
 }
 
 export function calculateChart(input: CalculateInput): ChartData {
-  // Build a UTC Date object from the local birth time + tz offset.
-  const [y, mo, d] = input.birthDate.split("-").map(Number);
-  const [h, mi] = input.birthTime.split(":").map(Number);
-  // Local time -> UTC
-  const utcMs = Date.UTC(y, mo - 1, d, h, mi) - input.timezoneOffset * 60_000;
-  const date = new Date(utcMs);
+  const date = utcBirthInstant(input);
+  const sys = input.houseSystem ?? "placidus";
+  const ramc = norm360(gstDegrees(date) + input.longitude);
+  const obl = obliquity(date);
+  const hr = computeHouses(ramc, input.latitude, obl, sys);
 
-  const ascendant = computeAscendant(date, input.latitude, input.longitude);
-  const midheaven = computeMidheaven(date, input.longitude);
-  const houses = equalHouses(ascendant);
+  const ascendant = hr.ascendant;
+  const midheaven = hr.midheaven;
+  const houses: HousePosition[] = hr.houses.map((h) => ({
+    number: h.number,
+    cusp: h.cusp,
+    sign: signFromLongitude(h.cusp),
+  }));
 
-  const planets: PlanetPosition[] = PLANETS.map((p) => {
-    const body = BODY_MAP[p.key];
-    const lon = eclipticLongitude(body, date);
-    const retro = isRetrograde(body, date);
-    return {
-      key: p.key,
-      name: p.name,
-      symbol: p.symbol,
-      longitude: lon,
-      sign: signFromLongitude(lon),
-      signIndex: signIndexFromLongitude(lon),
-      degreeInSign: lon % 30,
-      house: houseOfPlanet(lon, houses),
-      retrograde: retro,
-    };
-  });
+  const bare = computePlanetPositionsUtc(date);
+  const planets: PlanetPosition[] = bare.map((p) => ({
+    ...p,
+    house:
+      sys === "whole_sign"
+        ? wholeSignHouse(p.longitude, ascendant)
+        : natalHouseForLongitude(p.longitude, houses),
+  }));
 
   const aspects = computeAspects(planets);
 

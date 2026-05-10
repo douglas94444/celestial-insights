@@ -311,7 +311,10 @@ function Settings() {
                         <div className="space-y-0.5">
                           <FormLabel className="text-base">Notificações por email</FormLabel>
                           <p className="text-sm text-muted-foreground">
-                            Preparado para avisos de trânsitos (Fase 4).
+                            Permite enviar resumos de trânsitos a partir da página Trânsitos (botão
+                            «Email hoje»). O servidor precisa da variável{" "}
+                            <code className="text-xs">RESEND_API_KEY</code> e, recomendado,{" "}
+                            <code className="text-xs">RESEND_FROM_EMAIL</code>.
                           </p>
                         </div>
                         <FormControl>

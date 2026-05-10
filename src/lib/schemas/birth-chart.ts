@@ -3,6 +3,8 @@ import { z } from "zod";
 /** Offset em minutos a leste de UTC (ex.: -180 = UTC−3). */
 export const timezoneOffsetMinutesSchema = z.number().int().min(-660).max(840);
 
+export const houseSystemIdSchema = z.enum(["placidus", "equal", "whole_sign"]);
+
 export const birthChartInputSchema = z.object({
   name: z.string().trim().min(1, "Nome é obrigatório").max(120),
   birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
@@ -27,6 +29,7 @@ export const calculateChartPayloadSchema = z.object({
   latitude: birthChartInputSchema.shape.latitude,
   longitude: birthChartInputSchema.shape.longitude,
   timezoneOffsetMinutes: timezoneOffsetMinutesSchema,
+  houseSystem: houseSystemIdSchema.optional(),
 });
 
 export type CalculateChartPayload = z.infer<typeof calculateChartPayloadSchema>;

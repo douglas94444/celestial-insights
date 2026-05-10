@@ -26,6 +26,9 @@ export const PLANETS = [
   { key: "uranus", name: "Urano", symbol: "♅" },
   { key: "neptune", name: "Netuno", symbol: "♆" },
   { key: "pluto", name: "Plutão", symbol: "♇" },
+  { key: "chiron", name: "Quiron", symbol: "⚷" },
+  { key: "north_node", name: "Nodo Norte", symbol: "☊" },
+  { key: "south_node", name: "Nodo Sul", symbol: "☋" },
 ] as const;
 
 export type PlanetKey = (typeof PLANETS)[number]["key"];

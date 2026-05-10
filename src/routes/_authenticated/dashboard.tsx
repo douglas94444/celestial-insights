@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Plus, Stars, Sparkles, Lock } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Stars, Sparkles, CalendarRange } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +10,17 @@ import { useAuth } from "@/hooks/use-auth";
 import { HOROSCOPE_DAILY } from "@/data/interpretations";
 import type { SignName } from "@/lib/astrology/zodiac";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
-import type { Aspect, ChartData, HousePosition, PlanetPosition } from "@/lib/astrology/calculate";
+import {
+  computeAngles,
+  type Aspect,
+  type ChartData,
+  type HousePosition,
+  type HouseSystemId,
+  type PlanetPosition,
+} from "@/lib/astrology/calculate";
+import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
 import { UpgradeMapModal } from "@/components/UpgradeMapModal";
+import { analyzeTransitDay } from "@/lib/astrology/transits";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -50,21 +59,53 @@ function Dashboard() {
   });
 
   const primary = charts.find((c) => c.is_primary) ?? charts[0];
-  const planets = (primary?.planets_data as PlanetPosition[] | null) ?? [];
-  const houses = (primary?.houses_data as HousePosition[] | null) ?? [];
+  const planets = useMemo(
+    () => (primary?.planets_data as PlanetPosition[] | null) ?? [],
+    [primary?.planets_data],
+  );
+  const houses = useMemo(
+    () => (primary?.houses_data as HousePosition[] | null) ?? [],
+    [primary?.houses_data],
+  );
   const aspects = (primary?.aspects_data as Aspect[] | null) ?? [];
-  const ascendant = houses[0]?.cusp ?? 0;
-  const wheelData: ChartData | null = primary
-    ? {
-        ascendant,
-        midheaven: 0,
-        planets,
-        houses,
-        aspects,
-      }
+  const tzOff =
+    primary?.timezone_offset_minutes ??
+    parseTimezoneLabelToMinutes(primary?.timezone ?? "") ??
+    -180;
+  const chartHouseSys = (primary?.house_system as HouseSystemId | undefined) ?? "placidus";
+  const angles = primary
+    ? computeAngles({
+        birthDate: primary.birth_date,
+        birthTime: primary.birth_time,
+        latitude: primary.latitude,
+        longitude: primary.longitude,
+        timezoneOffset: tzOff,
+        houseSystem: chartHouseSys,
+      })
     : null;
+  const ascendant = houses[0]?.cusp ?? angles?.ascendant ?? 0;
+  const wheelData: ChartData | null =
+    primary && angles
+      ? {
+          ascendant,
+          midheaven: angles.midheaven,
+          planets,
+          houses,
+          aspects,
+        }
+      : null;
 
   const sunSign = planets.find((p) => p.key === "sun")?.sign as SignName | undefined;
+
+  const todayStr = useMemo(
+    () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }),
+    [],
+  );
+
+  const transitToday = useMemo(() => {
+    if (!primary || planets.length === 0 || houses.length === 0) return null;
+    return analyzeTransitDay(todayStr, planets, houses, ascendant, chartHouseSys);
+  }, [primary, planets, houses, ascendant, chartHouseSys, todayStr]);
 
   function handleNewMap() {
     if (profile?.subscription_tier === "FREE" && charts.length >= 1) {
@@ -153,24 +194,52 @@ function Dashboard() {
 
         <Card className="ring-1 ring-accent/10 shadow-soft">
           <CardHeader>
-            <CardTitle>Horóscopo Hoje</CardTitle>
+            <CardTitle>Horóscopo hoje</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {sunSign ? HOROSCOPE_DAILY[sunSign] : "Crie seu mapa para ver o horóscopo do dia."}
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <div>
+              <Badge variant="outline" className="mb-2 text-[10px] uppercase">
+                Signo solar (geral)
+              </Badge>
+              <p>
+                {sunSign ? HOROSCOPE_DAILY[sunSign] : "Crie seu mapa para ver o horóscopo do dia."}
+              </p>
+            </div>
+            {transitToday && (
+              <div className="rounded-lg border border-primary/15 bg-primary/5 p-3 text-foreground">
+                <Badge variant="secondary" className="mb-2 bg-primary/15 text-primary">
+                  Personalizado · trânsitos × seu mapa
+                </Badge>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Lua em trânsito em {transitToday.transitMoonSign || "—"} · intensidade{" "}
+                  {transitToday.intensity}/100
+                </p>
+                <ul className="list-disc space-y-1 pl-4 text-sm leading-snug">
+                  {transitToday.narrative.slice(0, 4).map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-3 border-dashed ring-1 ring-border/80">
+        <Card className="md:col-span-3 border border-accent/20 shadow-soft">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Lock className="h-4 w-4 text-muted-foreground" /> Próximos Trânsitos
-              <Badge variant="secondary" className="bg-accent/25 text-accent-foreground">
-                PREMIUM
-              </Badge>
+              <CalendarRange className="h-5 w-5 text-primary" /> Trânsitos & calendário
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Em breve: receba análises dos planetas em movimento sobre seu mapa natal.
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              Veja uma janela de datas, marque dias intensos, filtre aspectos e exporte PDF. Envie
+              um resumo por email quando o servidor tiver Resend configurado.
+            </p>
+            <Button asChild className="bg-mystical text-white hover:opacity-90">
+              <Link to="/transitos">
+                <Sparkles className="mr-1 h-4 w-4" /> Abrir trânsitos
+              </Link>
+            </Button>
           </CardContent>
         </Card>
       </div>

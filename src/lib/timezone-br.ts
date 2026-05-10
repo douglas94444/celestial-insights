@@ -11,3 +11,14 @@ export function formatTimezoneLabel(offsetMinutes: number): string {
   const h = offsetMinutes / 60;
   return h > 0 ? `UTC+${h}` : `UTC${h}`;
 }
+
+/** Inverte o rótulo gerado por `formatTimezoneLabel` (mapas antigos sem offset guardado). */
+export function parseTimezoneLabelToMinutes(label: string): number | null {
+  const s = label.trim();
+  if (s === "UTC") return 0;
+  const m = s.match(/^UTC([+-]?\d+(?:\.\d+)?)$/i);
+  if (!m) return null;
+  const hours = parseFloat(m[1]);
+  if (Number.isNaN(hours)) return null;
+  return Math.round(hours * 60);
+}

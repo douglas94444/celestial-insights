@@ -27,8 +27,8 @@ type NavItem = {
 const items: NavItem[] = [
   { title: "Início", url: "/dashboard", icon: Home },
   { title: "Meus Mapas", url: "/mapas", icon: Stars },
-  { title: "Compatibilidade", url: "/premium", icon: Heart, premium: true },
-  { title: "Trânsitos", url: "/premium", icon: CalendarRange, premium: true },
+  { title: "Compatibilidade", url: "/compatibilidade", icon: Heart },
+  { title: "Trânsitos", url: "/transitos", icon: CalendarRange },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
 

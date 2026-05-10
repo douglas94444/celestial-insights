@@ -20,5 +20,6 @@ export const calculateChartFn = createServerFn({ method: "POST" })
       latitude: data.latitude,
       longitude: data.longitude,
       timezoneOffset: data.timezoneOffsetMinutes,
+      houseSystem: data.houseSystem,
     });
   });

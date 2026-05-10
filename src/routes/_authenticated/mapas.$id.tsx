@@ -1,17 +1,39 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { Trash2, ArrowLeft, Lock } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { ArrowLeft, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
-import type { ChartData, PlanetPosition, HousePosition, Aspect } from "@/lib/astrology/calculate";
-import { signFromLongitude, formatDegree } from "@/lib/astrology/zodiac";
+import { computeAngles, type HouseSystemId } from "@/lib/astrology/calculate";
+import { HOUSE_SYSTEM_LABELS } from "@/lib/astrology/houses";
+import type { ChartData, HousePosition, PlanetPosition, Aspect } from "@/lib/astrology/calculate";
+import { signFromLongitude, formatDegree, PLANETS } from "@/lib/astrology/zodiac";
 import { SUN_IN_SIGN, MOON_IN_SIGN, ASC_IN_SIGN } from "@/data/interpretations";
+import {
+  ASPECT_LABELS,
+  aspectMood,
+  HOUSE_MEANINGS,
+  planetInSignInterpretation,
+} from "@/data/chart-detail-interpretations";
 import type { SignName } from "@/lib/astrology/zodiac";
+import type { AspectType } from "@/lib/astrology/calculate";
+import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
+import { recalculateChartFn } from "@/lib/charts.functions";
+import { withSupabaseAuth } from "@/lib/server-fn-client";
+import { useAuth } from "@/hooks/use-auth";
+import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
 
 export const Route = createFileRoute("/_authenticated/mapas/$id")({
   component: ChartView,
@@ -20,6 +42,26 @@ export const Route = createFileRoute("/_authenticated/mapas/$id")({
 function ChartView() {
   const { id } = Route.useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { session, user } = useAuth();
+
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("house_system")
+        .eq("id", user!.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
+  const [aspectFilter, setAspectFilter] = useState<"todos" | "harmonicos" | "desafiadores">(
+    "todos",
+  );
 
   const { data: chart, isLoading } = useQuery({
     queryKey: ["chart", id],
@@ -30,18 +72,86 @@ function ChartView() {
     },
   });
 
+  const timezoneOffset =
+    chart?.timezone_offset_minutes ?? parseTimezoneLabelToMinutes(chart?.timezone ?? "") ?? -180;
+
+  const storedHouseSystem = (chart?.house_system as HouseSystemId | undefined) ?? "placidus";
+  const profileHouseSystem = (profile?.house_system as HouseSystemId | undefined) ?? "placidus";
+
+  const angles = useMemo(() => {
+    if (!chart) return { ascendant: 0, midheaven: 0 };
+    return computeAngles({
+      birthDate: chart.birth_date,
+      birthTime: chart.birth_time,
+      latitude: chart.latitude,
+      longitude: chart.longitude,
+      timezoneOffset,
+      houseSystem: storedHouseSystem,
+    });
+  }, [chart, timezoneOffset, storedHouseSystem]);
+
+  const planetsByHouse = useMemo(() => {
+    if (!chart || !Array.isArray(chart.planets_data)) return new Map<number, PlanetPosition[]>();
+    const list = chart.planets_data as unknown as PlanetPosition[];
+    const map = new Map<number, PlanetPosition[]>();
+    for (const p of list) {
+      const bucket = map.get(p.house) ?? [];
+      bucket.push(p);
+      map.set(p.house, bucket);
+    }
+    return map;
+  }, [chart]);
+
+  const needsRecalcPlanets =
+    !!chart && Array.isArray(chart.planets_data) && chart.planets_data.length < PLANETS.length;
+
+  const needsRecalcHouseMismatch = !!chart && !!profile && storedHouseSystem !== profileHouseSystem;
+
+  const needsRecalc = needsRecalcPlanets || needsRecalcHouseMismatch;
+
+  const recalcMutation = useMutation({
+    mutationFn: async () => {
+      if (!session) throw new Error("Sessão necessária.");
+      return recalculateChartFn({
+        data: { chartId: id },
+        ...withSupabaseAuth(session),
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["chart", id] });
+      await queryClient.invalidateQueries({ queryKey: ["charts"] });
+      toast.success("Mapa recalculado com os dados atualizados.");
+    },
+    onError: async (e) => {
+      toast.error(await getServerFnErrorMessage(e));
+    },
+  });
+
   if (isLoading) return <div className="p-6 text-muted-foreground">Carregando mapa...</div>;
   if (!chart) return <div className="p-6">Mapa não encontrado.</div>;
 
   const planets = chart.planets_data as unknown as PlanetPosition[];
   const houses = chart.houses_data as unknown as HousePosition[];
   const aspects = chart.aspects_data as unknown as Aspect[];
-  const ascendant = houses[0]?.cusp ?? 0;
-  const data: ChartData = { ascendant, midheaven: 0, planets, houses, aspects };
+  const ascendant = houses[0]?.cusp ?? angles.ascendant;
+  const data: ChartData = {
+    ascendant,
+    midheaven: angles.midheaven,
+    planets,
+    houses,
+    aspects,
+  };
 
   const sun = planets.find((p) => p.key === "sun");
   const moon = planets.find((p) => p.key === "moon");
   const ascSign = signFromLongitude(ascendant) as SignName;
+
+  const filteredAspects = aspects.filter((a) => {
+    if (aspectFilter === "todos") return true;
+    const m = aspectMood(a.type);
+    if (aspectFilter === "harmonicos") return m === "harmonic";
+    return m === "desafiador";
+  });
 
   async function handleDelete() {
     if (!confirm("Excluir este mapa?")) return;
@@ -69,40 +179,66 @@ function ChartView() {
             {chart.birth_place}
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleDelete}>
-          <Trash2 className="mr-1 h-4 w-4" /> Excluir
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {needsRecalc && (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={recalcMutation.isPending}
+              onClick={() => recalcMutation.mutate()}
+            >
+              <RefreshCw
+                className={`mr-1 h-4 w-4 ${recalcMutation.isPending ? "animate-spin" : ""}`}
+              />
+              Recalcular mapa
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={handleDelete}>
+            <Trash2 className="mr-1 h-4 w-4" /> Excluir
+          </Button>
+        </div>
       </div>
+
+      {needsRecalc && (
+        <div className="text-sm text-muted-foreground mb-4 space-y-2">
+          {needsRecalcPlanets && (
+            <p>
+              Este mapa foi salvo com uma versão anterior do cálculo. Use &quot;Recalcular
+              mapa&quot; para incluir Quiron, Nodos e aspectos atualizados.
+            </p>
+          )}
+          {needsRecalcHouseMismatch && (
+            <p>
+              O seu sistema de casas nas{" "}
+              <Link to="/configuracoes" className="text-primary underline underline-offset-2">
+                Configurações
+              </Link>{" "}
+              ({HOUSE_SYSTEM_LABELS[profileHouseSystem]}) não coincide com o deste mapa (
+              {HOUSE_SYSTEM_LABELS[storedHouseSystem]}). Recalcule para alinhar casas e planetas ao
+              perfil atual.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardContent className="p-4">
             <NatalChartWheel data={data} />
+            <p className="text-center text-xs text-muted-foreground mt-2">
+              {HOUSE_SYSTEM_LABELS[storedHouseSystem]} · Meio do Céu (MC){" "}
+              {formatDegree(angles.midheaven)} — {signFromLongitude(angles.midheaven)}
+            </p>
           </CardContent>
         </Card>
 
         <div>
           <Tabs defaultValue="essencia">
-            <TabsList>
+            <TabsList className="flex flex-wrap h-auto gap-1">
               <TabsTrigger value="essencia">Essência</TabsTrigger>
-              <TabsTrigger value="planetas">
-                Planetas{" "}
-                <Badge variant="secondary" className="ml-1 bg-accent/20 text-[10px]">
-                  PRO
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="casas">
-                Casas{" "}
-                <Badge variant="secondary" className="ml-1 bg-accent/20 text-[10px]">
-                  PRO
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="aspectos">
-                Aspectos{" "}
-                <Badge variant="secondary" className="ml-1 bg-accent/20 text-[10px]">
-                  PRO
-                </Badge>
-              </TabsTrigger>
+              <TabsTrigger value="planetas">Planetas</TabsTrigger>
+              <TabsTrigger value="casas">Casas</TabsTrigger>
+              <TabsTrigger value="aspectos">Aspectos</TabsTrigger>
             </TabsList>
 
             <TabsContent value="essencia" className="space-y-5 mt-4">
@@ -149,23 +285,167 @@ function ChartView() {
               </Card>
             </TabsContent>
 
-            {(["planetas", "casas", "aspectos"] as const).map((t) => (
-              <TabsContent key={t} value={t} className="mt-4">
-                <Card className="border-dashed">
-                  <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-                    <Lock className="h-8 w-8 text-muted-foreground" />
-                    <p className="font-medium">Conteúdo Premium</p>
-                    <p className="max-w-sm text-sm text-muted-foreground">
-                      Desbloqueie interpretações completas dos 10 planetas, 12 casas e todos os
-                      aspectos do seu mapa.
-                    </p>
-                    <Button asChild className="bg-mystical text-white">
-                      <Link to="/configuracoes">Ver planos</Link>
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            ))}
+            <TabsContent
+              value="planetas"
+              className="mt-4 space-y-3 max-h-[70vh] overflow-y-auto pr-1"
+            >
+              {PLANETS.map((meta) => {
+                const p = planets.find((x) => x.key === meta.key);
+                if (!p) return null;
+                return (
+                  <Card key={p.key}>
+                    <CardContent className="p-4">
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <h3 className="font-display text-base font-semibold">
+                          <span className="mr-1.5">{p.symbol}</span>
+                          {p.name} em {p.sign}{" "}
+                          <span className="text-muted-foreground text-sm font-normal">
+                            · {formatDegree(p.longitude)} · Casa {p.house}
+                            {p.retrograde ? " · R" : ""}
+                          </span>
+                        </h3>
+                      </div>
+                      <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
+                        {planetInSignInterpretation(p.key, p.sign as SignName)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </TabsContent>
+
+            <TabsContent value="casas" className="mt-4 space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              <p className="text-sm text-muted-foreground">
+                Sistema usado neste mapa: <strong>{HOUSE_SYSTEM_LABELS[storedHouseSystem]}</strong>.
+                Altere o padrão em{" "}
+                <Link to="/configuracoes" className="text-primary underline underline-offset-2">
+                  Configurações
+                </Link>{" "}
+                e use &quot;Recalcular mapa&quot; para aplicar outro sistema sem criar um mapa novo.
+              </p>
+              {houses.map((house) => {
+                const inHouse = planetsByHouse.get(house.number) ?? [];
+                return (
+                  <Card key={house.number}>
+                    <CardContent className="p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-display text-base font-semibold">
+                            Casa {house.number}{" "}
+                            <span className="text-muted-foreground font-normal text-sm">
+                              · cúspide em {house.sign} ({formatDegree(house.cusp)})
+                            </span>
+                          </h3>
+                          <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
+                            {HOUSE_MEANINGS[house.number]}
+                          </p>
+                        </div>
+                      </div>
+                      {inHouse.length > 0 ? (
+                        <ul className="mt-3 space-y-2 border-t border-border/60 pt-3">
+                          {inHouse.map((p) => (
+                            <li key={p.key} className="text-sm">
+                              <span className="font-medium">
+                                {p.symbol} {p.name}
+                              </span>{" "}
+                              em {p.sign} ({formatDegree(p.longitude)}){p.retrograde ? " R" : ""} —{" "}
+                              <span className="text-muted-foreground">
+                                colore esta área com o tema de {p.name.toLowerCase()} em{" "}
+                                {p.sign.toLowerCase()}.
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-3 text-sm text-muted-foreground italic">
+                          Nenhum planeta listado neste segmento (útil para áreas mais livres de
+                          ênfase planetária direta).
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </TabsContent>
+
+            <TabsContent value="aspectos" className="mt-4 space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-sm text-muted-foreground">Filtrar:</span>
+                <Select
+                  value={aspectFilter}
+                  onValueChange={(v) =>
+                    setAspectFilter(v as "todos" | "harmonicos" | "desafiadores")
+                  }
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os aspectos</SelectItem>
+                    <SelectItem value="harmonicos">Harmônicos (trígono, sextil)</SelectItem>
+                    <SelectItem value="desafiadores">
+                      Desafiadores (quadratura, oposição)
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <Badge variant="secondary" className="font-normal">
+                  {filteredAspects.length} de {aspects.length}
+                </Badge>
+              </div>
+
+              <div className="rounded-lg border border-border/80 divide-y divide-border/60 max-h-[60vh] overflow-y-auto">
+                {filteredAspects.length === 0 ? (
+                  <p className="p-4 text-sm text-muted-foreground">
+                    Nenhum aspecto neste filtro (ou lista vazia).
+                  </p>
+                ) : (
+                  filteredAspects.map((a, idx) => {
+                    const p1 = planets.find((p) => p.key === a.planet1);
+                    const p2 = planets.find((p) => p.key === a.planet2);
+                    if (!p1 || !p2) return null;
+                    const mood = aspectMood(a.type);
+                    return (
+                      <div
+                        key={`${a.planet1}-${a.planet2}-${a.type}-${idx}`}
+                        className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
+                      >
+                        <span>
+                          <span className="font-medium">
+                            {p1.symbol} {p1.name}
+                          </span>{" "}
+                          —{" "}
+                          <span className="font-medium">
+                            {p2.symbol} {p2.name}
+                          </span>
+                        </span>
+                        <span className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">{ASPECT_LABELS[a.type as AspectType]}</Badge>
+                          <span className="text-muted-foreground">
+                            órbe {a.orb}° · ângulo {a.exactAngle}°
+                          </span>
+                          <Badge
+                            variant="secondary"
+                            className={
+                              mood === "harmonic"
+                                ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200"
+                                : mood === "desafiador"
+                                  ? "bg-amber-500/15 text-amber-900 dark:text-amber-100"
+                                  : ""
+                            }
+                          >
+                            {mood === "harmonic"
+                              ? "harmônico"
+                              : mood === "desafiador"
+                                ? "desafiador"
+                                : "neutro"}
+                          </Badge>
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </TabsContent>
           </Tabs>
         </div>
       </div>

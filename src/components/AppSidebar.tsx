@@ -17,13 +17,20 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-const items = [
+type NavItem = {
+  title: string;
+  url: string;
+  icon: typeof Home;
+  premium?: boolean;
+};
+
+const items: NavItem[] = [
   { title: "Início", url: "/dashboard", icon: Home },
   { title: "Meus Mapas", url: "/mapas", icon: Stars },
   { title: "Compatibilidade", url: "/compatibilidade", icon: Heart, premium: true },
   { title: "Trânsitos", url: "/transitos", icon: CalendarRange, premium: true },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
-] as const;
+];
 
 export function AppSidebar() {
   const { state } = useSidebar();

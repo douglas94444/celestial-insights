@@ -10,7 +10,11 @@ export const Route = createFileRoute("/_authenticated/transitos")({
       <p className="mt-2 text-muted-foreground">
         Acompanhe os planetas em movimento sobre seu mapa natal.
       </p>
-      <Button asChild className="mt-6 bg-mystical text-white"><Link to="/dashboard"><Sparkles className="mr-1 h-4 w-4" /> Voltar</Link></Button>
+      <Button asChild className="mt-6 bg-mystical text-white">
+        <Link to="/dashboard">
+          <Sparkles className="mr-1 h-4 w-4" /> Voltar
+        </Link>
+      </Button>
     </div>
   ),
 });

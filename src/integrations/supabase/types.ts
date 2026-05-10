@@ -1,320 +1,312 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
+    PostgrestVersion: "14.5";
+  };
   public: {
     Tables: {
       charts: {
         Row: {
-          aspects_data: Json
-          birth_date: string
-          birth_place: string
-          birth_time: string
-          birth_time_known: boolean
-          created_at: string
-          houses_data: Json
-          id: string
-          is_primary: boolean
-          latitude: number
-          longitude: number
-          name: string
-          planets_data: Json
-          timezone: string
-          updated_at: string
-          user_id: string
-        }
+          aspects_data: Json;
+          birth_date: string;
+          birth_place: string;
+          birth_time: string;
+          birth_time_known: boolean;
+          created_at: string;
+          houses_data: Json;
+          id: string;
+          is_primary: boolean;
+          latitude: number;
+          longitude: number;
+          name: string;
+          planets_data: Json;
+          timezone: string;
+          updated_at: string;
+          user_id: string;
+        };
         Insert: {
-          aspects_data?: Json
-          birth_date: string
-          birth_place: string
-          birth_time?: string
-          birth_time_known?: boolean
-          created_at?: string
-          houses_data?: Json
-          id?: string
-          is_primary?: boolean
-          latitude: number
-          longitude: number
-          name: string
-          planets_data?: Json
-          timezone: string
-          updated_at?: string
-          user_id: string
-        }
+          aspects_data?: Json;
+          birth_date: string;
+          birth_place: string;
+          birth_time?: string;
+          birth_time_known?: boolean;
+          created_at?: string;
+          houses_data?: Json;
+          id?: string;
+          is_primary?: boolean;
+          latitude: number;
+          longitude: number;
+          name: string;
+          planets_data?: Json;
+          timezone: string;
+          updated_at?: string;
+          user_id: string;
+        };
         Update: {
-          aspects_data?: Json
-          birth_date?: string
-          birth_place?: string
-          birth_time?: string
-          birth_time_known?: boolean
-          created_at?: string
-          houses_data?: Json
-          id?: string
-          is_primary?: boolean
-          latitude?: number
-          longitude?: number
-          name?: string
-          planets_data?: Json
-          timezone?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
+          aspects_data?: Json;
+          birth_date?: string;
+          birth_place?: string;
+          birth_time?: string;
+          birth_time_known?: boolean;
+          created_at?: string;
+          houses_data?: Json;
+          id?: string;
+          is_primary?: boolean;
+          latitude?: number;
+          longitude?: number;
+          name?: string;
+          planets_data?: Json;
+          timezone?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
-          avatar_url: string | null
-          created_at: string
-          email_notifications: boolean
-          house_system: string
-          id: string
-          name: string | null
-          stripe_customer_id: string | null
-          subscription_tier: Database["public"]["Enums"]["subscription_tier"]
-          updated_at: string
-          zodiac: string
-        }
+          avatar_url: string | null;
+          created_at: string;
+          email_notifications: boolean;
+          house_system: string;
+          id: string;
+          name: string | null;
+          stripe_customer_id: string | null;
+          subscription_tier: Database["public"]["Enums"]["subscription_tier"];
+          updated_at: string;
+          zodiac: string;
+        };
         Insert: {
-          avatar_url?: string | null
-          created_at?: string
-          email_notifications?: boolean
-          house_system?: string
-          id: string
-          name?: string | null
-          stripe_customer_id?: string | null
-          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
-          updated_at?: string
-          zodiac?: string
-        }
+          avatar_url?: string | null;
+          created_at?: string;
+          email_notifications?: boolean;
+          house_system?: string;
+          id: string;
+          name?: string | null;
+          stripe_customer_id?: string | null;
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"];
+          updated_at?: string;
+          zodiac?: string;
+        };
         Update: {
-          avatar_url?: string | null
-          created_at?: string
-          email_notifications?: boolean
-          house_system?: string
-          id?: string
-          name?: string | null
-          stripe_customer_id?: string | null
-          subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
-          updated_at?: string
-          zodiac?: string
-        }
-        Relationships: []
-      }
+          avatar_url?: string | null;
+          created_at?: string;
+          email_notifications?: boolean;
+          house_system?: string;
+          id?: string;
+          name?: string | null;
+          stripe_customer_id?: string | null;
+          subscription_tier?: Database["public"]["Enums"]["subscription_tier"];
+          updated_at?: string;
+          zodiac?: string;
+        };
+        Relationships: [];
+      };
       synastries: {
         Row: {
-          chart1_id: string
-          chart2_id: string
-          compatibility_data: Json
-          compatibility_score: number
-          created_at: string
-          id: string
-          user_id: string
-        }
+          chart1_id: string;
+          chart2_id: string;
+          compatibility_data: Json;
+          compatibility_score: number;
+          created_at: string;
+          id: string;
+          user_id: string;
+        };
         Insert: {
-          chart1_id: string
-          chart2_id: string
-          compatibility_data?: Json
-          compatibility_score?: number
-          created_at?: string
-          id?: string
-          user_id: string
-        }
+          chart1_id: string;
+          chart2_id: string;
+          compatibility_data?: Json;
+          compatibility_score?: number;
+          created_at?: string;
+          id?: string;
+          user_id: string;
+        };
         Update: {
-          chart1_id?: string
-          chart2_id?: string
-          compatibility_data?: Json
-          compatibility_score?: number
-          created_at?: string
-          id?: string
-          user_id?: string
-        }
+          chart1_id?: string;
+          chart2_id?: string;
+          compatibility_data?: Json;
+          compatibility_score?: number;
+          created_at?: string;
+          id?: string;
+          user_id?: string;
+        };
         Relationships: [
           {
-            foreignKeyName: "synastries_chart1_id_fkey"
-            columns: ["chart1_id"]
-            isOneToOne: false
-            referencedRelation: "charts"
-            referencedColumns: ["id"]
+            foreignKeyName: "synastries_chart1_id_fkey";
+            columns: ["chart1_id"];
+            isOneToOne: false;
+            referencedRelation: "charts";
+            referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "synastries_chart2_id_fkey"
-            columns: ["chart2_id"]
-            isOneToOne: false
-            referencedRelation: "charts"
-            referencedColumns: ["id"]
+            foreignKeyName: "synastries_chart2_id_fkey";
+            columns: ["chart2_id"];
+            isOneToOne: false;
+            referencedRelation: "charts";
+            referencedColumns: ["id"];
           },
-        ]
-      }
+        ];
+      };
       user_roles: {
         Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
+          created_at: string;
+          id: string;
+          role: Database["public"]["Enums"]["app_role"];
+          user_id: string;
+        };
         Insert: {
-          created_at?: string
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
+          created_at?: string;
+          id?: string;
+          role: Database["public"]["Enums"]["app_role"];
+          user_id: string;
+        };
         Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
-    }
+          created_at?: string;
+          id?: string;
+          role?: Database["public"]["Enums"]["app_role"];
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+    };
     Views: {
-      [_ in never]: never
-    }
+      [_ in never]: never;
+    };
     Functions: {
       has_role: {
         Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-    }
+          _role: Database["public"]["Enums"]["app_role"];
+          _user_id: string;
+        };
+        Returns: boolean;
+      };
+    };
     Enums: {
-      app_role: "admin" | "user"
-      subscription_tier: "FREE" | "PREMIUM"
-    }
+      app_role: "admin" | "user";
+      subscription_tier: "FREE" | "PREMIUM";
+    };
     CompositeTypes: {
-      [_ in never]: never
-    }
-  }
-}
+      [_ in never]: never;
+    };
+  };
+};
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">;
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">];
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
       DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
-      Row: infer R
+      Row: infer R;
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
-        Row: infer R
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R;
       }
       ? R
       : never
-    : never
+    : never;
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Insert: infer I
+      Insert: infer I;
     }
     ? I
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Insert: infer I
+        Insert: infer I;
       }
       ? I
       : never
-    : never
+    : never;
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
-      Update: infer U
+      Update: infer U;
     }
     ? U
     : never
   : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
     ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
-        Update: infer U
+        Update: infer U;
       }
       ? U
       : never
-    : never
+    : never;
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
+    : never;
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof DatabaseWithoutInternals
+    schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof DatabaseWithoutInternals
+  schema: keyof DatabaseWithoutInternals;
 }
   ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
-    : never
+    : never;
 
 export const Constants = {
   public: {
@@ -323,4 +315,4 @@ export const Constants = {
       subscription_tier: ["FREE", "PREMIUM"],
     },
   },
-} as const
+} as const;

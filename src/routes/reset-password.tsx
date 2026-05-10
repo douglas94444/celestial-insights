@@ -16,7 +16,8 @@ function ResetPassword() {
   const [busy, setBusy] = useState(false);
 
   // If URL contains type=recovery hash, show new password form.
-  const isRecovery = typeof window !== "undefined" && window.location.hash.includes("type=recovery");
+  const isRecovery =
+    typeof window !== "undefined" && window.location.hash.includes("type=recovery");
 
   async function requestReset(e: React.FormEvent) {
     e.preventDefault();
@@ -48,7 +49,14 @@ function ResetPassword() {
           <form onSubmit={updatePassword} className="mt-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="np">Nova senha</Label>
-              <Input id="np" type="password" required minLength={6} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+              <Input
+                id="np"
+                type="password"
+                required
+                minLength={6}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
             </div>
             <Button type="submit" disabled={busy} className="w-full bg-mystical text-white">
               {busy ? "Salvando..." : "Atualizar senha"}
@@ -58,14 +66,23 @@ function ResetPassword() {
           <form onSubmit={requestReset} className="mt-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="re">Email</Label>
-              <Input id="re" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input
+                id="re"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
             <Button type="submit" disabled={busy} className="w-full bg-mystical text-white">
               {busy ? "Enviando..." : "Enviar link"}
             </Button>
           </form>
         )}
-        <Link to="/auth" className="mt-4 block text-center text-xs text-muted-foreground hover:text-primary">
+        <Link
+          to="/auth"
+          className="mt-4 block text-center text-xs text-muted-foreground hover:text-primary"
+        >
           Voltar para o login
         </Link>
       </div>

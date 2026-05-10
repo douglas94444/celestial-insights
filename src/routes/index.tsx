@@ -1,13 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Sparkles, Stars, Heart, CalendarRange, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "AstroMap — Descubra seu Mapa Astral" },
-      { name: "description", content: "Crie gratuitamente seu mapa astral completo: planetas, casas, aspectos e interpretações em português." },
+      {
+        name: "description",
+        content:
+          "Crie gratuitamente seu mapa astral completo: planetas, casas, aspectos e interpretações em português.",
+      },
     ],
   }),
   component: Landing,
@@ -49,11 +58,15 @@ function Landing() {
             Descubra seu <span className="text-gradient-mystical">mapa astral</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            Cálculos precisos, interpretações profundas e visualização interativa.
-            O céu da sua hora exata de nascimento, em um só lugar.
+            Cálculos precisos, interpretações profundas e visualização interativa. O céu da sua hora
+            exata de nascimento, em um só lugar.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-            <Button asChild size="lg" className="bg-mystical text-white shadow-mystical hover:opacity-90">
+            <Button
+              asChild
+              size="lg"
+              className="bg-mystical text-white shadow-mystical hover:opacity-90"
+            >
               <Link to="/auth">Criar meu mapa grátis</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
@@ -71,9 +84,21 @@ function Landing() {
           </h2>
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             {[
-              { icon: Stars, title: "Mapa Natal Completo", desc: "10 planetas, 12 casas, aspectos e interpretações detalhadas." },
-              { icon: Heart, title: "Sinastria", desc: "Compare dois mapas e descubra a compatibilidade entre vocês." },
-              { icon: CalendarRange, title: "Trânsitos", desc: "Saiba quando os planetas ativam pontos importantes do seu mapa." },
+              {
+                icon: Stars,
+                title: "Mapa Natal Completo",
+                desc: "10 planetas, 12 casas, aspectos e interpretações detalhadas.",
+              },
+              {
+                icon: Heart,
+                title: "Sinastria",
+                desc: "Compare dois mapas e descubra a compatibilidade entre vocês.",
+              },
+              {
+                icon: CalendarRange,
+                title: "Trânsitos",
+                desc: "Saiba quando os planetas ativam pontos importantes do seu mapa.",
+              },
             ].map((f) => (
               <div key={f.title} className="rounded-2xl border bg-card p-6 shadow-soft">
                 <div className="grid h-12 w-12 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -100,8 +125,16 @@ function Landing() {
               <p className="mt-1 text-sm text-muted-foreground">Para começar sua jornada</p>
               <p className="mt-6 font-display text-4xl font-bold">R$ 0</p>
               <ul className="mt-6 space-y-3 text-sm">
-                {["1 mapa astral salvo", "Sol, Lua e Ascendente", "Visualização interativa", "Horóscopo diário"].map((t) => (
-                  <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" />{t}</li>
+                {[
+                  "1 mapa astral salvo",
+                  "Sol, Lua e Ascendente",
+                  "Visualização interativa",
+                  "Horóscopo diário",
+                ].map((t) => (
+                  <li key={t} className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-primary" />
+                    {t}
+                  </li>
                 ))}
               </ul>
               <Button asChild className="mt-8 w-full" variant="outline">
@@ -125,7 +158,10 @@ function Landing() {
                   "Trânsitos personalizados",
                   "Download em PDF",
                 ].map((t) => (
-                  <li key={t} className="flex items-center gap-2"><Check className="h-4 w-4 text-primary" />{t}</li>
+                  <li key={t} className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-primary" />
+                    {t}
+                  </li>
                 ))}
               </ul>
               <Button asChild className="mt-8 w-full bg-mystical text-white hover:opacity-90">
@@ -139,24 +175,30 @@ function Landing() {
       {/* FAQ */}
       <section className="py-20">
         <div className="container mx-auto max-w-2xl px-4">
-          <h2 className="text-center font-display text-3xl font-bold md:text-4xl">Dúvidas frequentes</h2>
+          <h2 className="text-center font-display text-3xl font-bold md:text-4xl">
+            Dúvidas frequentes
+          </h2>
           <Accordion type="single" collapsible className="mt-8">
             <AccordionItem value="1">
               <AccordionTrigger>O que é um mapa astral?</AccordionTrigger>
               <AccordionContent>
-                É uma fotografia do céu no momento exato em que você nasceu, mostrando a posição dos planetas em relação aos signos e casas. Cada elemento revela aspectos da sua personalidade, talentos e desafios.
+                É uma fotografia do céu no momento exato em que você nasceu, mostrando a posição dos
+                planetas em relação aos signos e casas. Cada elemento revela aspectos da sua
+                personalidade, talentos e desafios.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="2">
               <AccordionTrigger>Preciso saber a hora exata?</AccordionTrigger>
               <AccordionContent>
-                A hora é importante para calcular o Ascendente e as casas. Se não souber, você ainda pode criar um mapa usando 12:00 — mas o Ascendente pode não ser preciso.
+                A hora é importante para calcular o Ascendente e as casas. Se não souber, você ainda
+                pode criar um mapa usando 12:00 — mas o Ascendente pode não ser preciso.
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="3">
               <AccordionTrigger>Meus dados são privados?</AccordionTrigger>
               <AccordionContent>
-                Sim. Apenas você acessa seus mapas, e nossos cálculos respeitam regras rígidas de privacidade.
+                Sim. Apenas você acessa seus mapas, e nossos cálculos respeitam regras rígidas de
+                privacidade.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

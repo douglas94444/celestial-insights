@@ -1,4 +1,3 @@
-
 # AstroMap — Plano em Fases
 
 SaaS de astrologia em PT-BR. Stack: TanStack Start + React + Tailwind + shadcn/ui + Lovable Cloud (Supabase) + React Query + Recharts. Cálculos com biblioteca JS real. Geocoding via lista estática BR. Stripe fica para fase posterior.
@@ -22,6 +21,7 @@ Até a Fase 5, o gating Premium existirá no schema (`subscription_tier`) e em f
 ## FASE 1 — Fundação + MVP (esta entrega)
 
 ### Objetivo
+
 Usuário se cadastra, faz onboarding, gera seu primeiro mapa astral com cálculo real, vê interpretação básica (Sol/Lua/Ascendente) com visualização circular SVG, e gerencia mapas no dashboard.
 
 ### 1.1 Lovable Cloud + Schema
@@ -81,6 +81,7 @@ Usar **astronomia** (puro JS, edge-compatible) em uma server function `calculate
 ### 1.6 Onboarding (3 passos)
 
 `/_authenticated/onboarding` com state machine simples:
+
 1. Boas-vindas + CTA
 2. Form (nome, data, hora, "não sei a hora" → 12:00, cidade via combobox)
 3. Loading com mensagens rotativas + chamada a `calculateChart` + insert em `charts` (is_primary=true) → redireciona a `/mapas/:id`
@@ -98,6 +99,7 @@ Se o usuário já tem mapa, `/onboarding` redireciona para dashboard.
 ### 1.8 Visualização do Mapa (`/mapas/:id`)
 
 Componente `<NatalChartWheel />` em SVG responsivo:
+
 - Anel externo: 12 signos com símbolos Unicode + cores
 - Anel interno: 12 casas numeradas com cúspides nos graus corretos
 - Glifos planetários posicionados por longitude
@@ -106,10 +108,12 @@ Componente `<NatalChartWheel />` em SVG responsivo:
 - Click no planeta → scroll para interpretação
 
 Tabs:
+
 - **Essência** (FREE, ativa): Sol, Lua, Ascendente com texto interpretativo
 - **Planetas / Casas / Aspectos** — visíveis com badge PREMIUM, conteúdo travado por overlay (paywall placeholder até Fase 5; em Fase 2 conteúdo completo é renderizado)
 
 Banco de interpretações: `src/data/interpretations/` com JSONs:
+
 - `sun-in-signs.json`, `moon-in-signs.json`, `asc-in-signs.json` (36 textos para Fase 1)
 - Estrutura preparada para receber os 120+120+aspectos na Fase 2
 
@@ -149,7 +153,7 @@ Hero ("Descubra seu mapa astral"), seção "O que é mapa astral", tabela Free×
 ✅ Visualização SVG do mapa  
 ✅ Interpretação Sol/Lua/Asc  
 ✅ Configurações básicas  
-✅ Landing page  
+✅ Landing page
 
 ---
 

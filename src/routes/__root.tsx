@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/hooks/use-auth";
+import { ThemeProvider } from "@/components/theme-provider";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -16,7 +17,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "AstroMap — Seu Mapa Astral Completo" },
-      { name: "description", content: "Descubra seu mapa astral, interpretações dos planetas, casas e aspectos. Astrologia moderna em português." },
+      {
+        name: "description",
+        content:
+          "Descubra seu mapa astral, interpretações dos planetas, casas e aspectos. Astrologia moderna em português.",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -35,7 +40,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold text-gradient-mystical">404</h1>
         <p className="mt-4 text-muted-foreground">Esta página não existe nas estrelas.</p>
-        <Link to="/" className="mt-6 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+        <Link
+          to="/"
+          className="mt-6 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+        >
           Voltar ao início
         </Link>
       </div>
@@ -45,8 +53,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
-      <head><HeadContent /></head>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
       <body>
         {children}
         <Scripts />
@@ -59,10 +69,12 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Outlet />
-        <Toaster />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <Outlet />
+          <Toaster />
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

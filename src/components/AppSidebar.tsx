@@ -27,8 +27,8 @@ type NavItem = {
 const items: NavItem[] = [
   { title: "Início", url: "/dashboard", icon: Home },
   { title: "Meus Mapas", url: "/mapas", icon: Stars },
-  { title: "Compatibilidade", url: "/compatibilidade", icon: Heart, premium: true },
-  { title: "Trânsitos", url: "/transitos", icon: CalendarRange, premium: true },
+  { title: "Compatibilidade", url: "/premium", icon: Heart, premium: true },
+  { title: "Trânsitos", url: "/premium", icon: CalendarRange, premium: true },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
 
@@ -46,9 +46,7 @@ export function AppSidebar() {
             <Sparkles className="h-4 w-4" />
           </div>
           {!collapsed && (
-            <span className="font-display text-lg font-semibold tracking-tight">
-              AstroMap
-            </span>
+            <span className="font-display text-lg font-semibold tracking-tight">AstroMap</span>
           )}
         </Link>
       </SidebarHeader>
@@ -64,11 +62,12 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild isActive={active}>
                       <Link to={item.url} className="flex items-center gap-2">
                         <item.icon className="h-4 w-4" />
-                        {!collapsed && (
-                          <span className="flex-1 truncate">{item.title}</span>
-                        )}
+                        {!collapsed && <span className="flex-1 truncate">{item.title}</span>}
                         {!collapsed && item.premium && (
-                          <Badge variant="secondary" className="bg-accent/20 text-accent-foreground text-[10px]">
+                          <Badge
+                            variant="secondary"
+                            className="bg-accent/20 text-accent-foreground text-[10px]"
+                          >
                             PRO
                           </Badge>
                         )}
@@ -98,9 +97,7 @@ export function AppSidebar() {
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
-            <div className="flex-1 truncate text-xs text-muted-foreground">
-              {user?.email}
-            </div>
+            <div className="flex-1 truncate text-xs text-muted-foreground">{user?.email}</div>
           )}
           <Button
             variant="ghost"

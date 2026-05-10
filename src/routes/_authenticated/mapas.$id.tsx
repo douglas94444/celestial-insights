@@ -56,14 +56,17 @@ function ChartView() {
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       <Button asChild variant="ghost" size="sm" className="mb-4">
-        <Link to="/dashboard"><ArrowLeft className="mr-1 h-4 w-4" /> Voltar</Link>
+        <Link to="/dashboard">
+          <ArrowLeft className="mr-1 h-4 w-4" /> Voltar
+        </Link>
       </Button>
 
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="font-display text-3xl font-bold">{chart.name}</h1>
           <p className="text-muted-foreground">
-            {new Date(chart.birth_date).toLocaleDateString("pt-BR")} às {chart.birth_time} · {chart.birth_place}
+            {new Date(chart.birth_date).toLocaleDateString("pt-BR")} às {chart.birth_time} ·{" "}
+            {chart.birth_place}
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={handleDelete}>
@@ -83,13 +86,22 @@ function ChartView() {
             <TabsList>
               <TabsTrigger value="essencia">Essência</TabsTrigger>
               <TabsTrigger value="planetas">
-                Planetas <Badge variant="secondary" className="ml-1 bg-accent/20 text-[10px]">PRO</Badge>
+                Planetas{" "}
+                <Badge variant="secondary" className="ml-1 bg-accent/20 text-[10px]">
+                  PRO
+                </Badge>
               </TabsTrigger>
               <TabsTrigger value="casas">
-                Casas <Badge variant="secondary" className="ml-1 bg-accent/20 text-[10px]">PRO</Badge>
+                Casas{" "}
+                <Badge variant="secondary" className="ml-1 bg-accent/20 text-[10px]">
+                  PRO
+                </Badge>
               </TabsTrigger>
               <TabsTrigger value="aspectos">
-                Aspectos <Badge variant="secondary" className="ml-1 bg-accent/20 text-[10px]">PRO</Badge>
+                Aspectos{" "}
+                <Badge variant="secondary" className="ml-1 bg-accent/20 text-[10px]">
+                  PRO
+                </Badge>
               </TabsTrigger>
             </TabsList>
 
@@ -98,9 +110,14 @@ function ChartView() {
                 <Card>
                   <CardContent className="p-5">
                     <h3 className="font-display text-lg font-semibold">
-                      ☉ Sol em {sun.sign} <span className="text-muted-foreground text-sm">· {formatDegree(sun.longitude)}</span>
+                      ☉ Sol em {sun.sign}{" "}
+                      <span className="text-muted-foreground text-sm">
+                        · {formatDegree(sun.longitude)}
+                      </span>
                     </h3>
-                    <p className="mt-2 text-sm text-foreground/80">{SUN_IN_SIGN[sun.sign as SignName]}</p>
+                    <p className="mt-2 text-sm text-foreground/80">
+                      {SUN_IN_SIGN[sun.sign as SignName]}
+                    </p>
                   </CardContent>
                 </Card>
               )}
@@ -108,16 +125,24 @@ function ChartView() {
                 <Card>
                   <CardContent className="p-5">
                     <h3 className="font-display text-lg font-semibold">
-                      ☽ Lua em {moon.sign} <span className="text-muted-foreground text-sm">· {formatDegree(moon.longitude)}</span>
+                      ☽ Lua em {moon.sign}{" "}
+                      <span className="text-muted-foreground text-sm">
+                        · {formatDegree(moon.longitude)}
+                      </span>
                     </h3>
-                    <p className="mt-2 text-sm text-foreground/80">{MOON_IN_SIGN[moon.sign as SignName]}</p>
+                    <p className="mt-2 text-sm text-foreground/80">
+                      {MOON_IN_SIGN[moon.sign as SignName]}
+                    </p>
                   </CardContent>
                 </Card>
               )}
               <Card>
                 <CardContent className="p-5">
                   <h3 className="font-display text-lg font-semibold">
-                    ↗ Ascendente em {ascSign} <span className="text-muted-foreground text-sm">· {formatDegree(ascendant)}</span>
+                    ↗ Ascendente em {ascSign}{" "}
+                    <span className="text-muted-foreground text-sm">
+                      · {formatDegree(ascendant)}
+                    </span>
                   </h3>
                   <p className="mt-2 text-sm text-foreground/80">{ASC_IN_SIGN[ascSign]}</p>
                 </CardContent>
@@ -131,9 +156,12 @@ function ChartView() {
                     <Lock className="h-8 w-8 text-muted-foreground" />
                     <p className="font-medium">Conteúdo Premium</p>
                     <p className="max-w-sm text-sm text-muted-foreground">
-                      Desbloqueie interpretações completas dos 10 planetas, 12 casas e todos os aspectos do seu mapa.
+                      Desbloqueie interpretações completas dos 10 planetas, 12 casas e todos os
+                      aspectos do seu mapa.
                     </p>
-                    <Button asChild className="bg-mystical text-white"><Link to="/configuracoes">Ver planos</Link></Button>
+                    <Button asChild className="bg-mystical text-white">
+                      <Link to="/configuracoes">Ver planos</Link>
+                    </Button>
                   </CardContent>
                 </Card>
               </TabsContent>

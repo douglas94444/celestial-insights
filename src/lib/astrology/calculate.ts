@@ -96,7 +96,7 @@ function isRetrograde(body: Astronomy.Body, date: Date): boolean {
 function obliquity(date: Date): number {
   const T = (date.getTime() / 86400000 - 10957.5) / 36525; // Julian centuries from J2000
   // IAU 2006 mean obliquity
-  const eps = 23.43929111 - (46.8150 * T + 0.00059 * T * T - 0.001813 * T * T * T) / 3600;
+  const eps = 23.43929111 - (46.815 * T + 0.00059 * T * T - 0.001813 * T * T * T) / 3600;
   return eps;
 }
 

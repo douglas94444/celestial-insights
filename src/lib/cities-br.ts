@@ -113,15 +113,27 @@ export const CITIES_BR: City[] = [
   { name: "Chapecó", state: "SC", lat: -27.0964, lon: -52.6184, tz: TZ },
   { name: "Criciúma", state: "SC", lat: -28.6772, lon: -49.3697, tz: TZ },
   { name: "Itajaí", state: "SC", lat: -26.9077, lon: -48.6618, tz: TZ },
+  { name: "Montes Claros", state: "MG", lat: -16.7282, lon: -43.8638, tz: TZ },
+  { name: "Santa Maria", state: "RS", lat: -29.6842, lon: -53.8069, tz: TZ },
+  { name: "Gravataí", state: "RS", lat: -29.9433, lon: -50.9919, tz: TZ },
+  { name: "Franco da Rocha", state: "SP", lat: -23.3287, lon: -46.7267, tz: TZ },
+  { name: "Taboão da Serra", state: "SP", lat: -23.6237, lon: -46.7918, tz: TZ },
+  { name: "Embu das Artes", state: "SP", lat: -23.6494, lon: -46.8519, tz: TZ },
+  { name: "Barueri", state: "SP", lat: -23.5112, lon: -46.8766, tz: TZ },
+  { name: "Guarujá", state: "SP", lat: -23.9935, lon: -46.2564, tz: TZ },
+  { name: "Americana", state: "SP", lat: -22.7389, lon: -47.3319, tz: TZ },
+  { name: "Teresópolis", state: "RJ", lat: -22.4167, lon: -42.9756, tz: TZ },
+  { name: "Araucária", state: "PR", lat: -25.5933, lon: -49.4103, tz: TZ },
+  { name: "Colombo", state: "PR", lat: -25.2925, lon: -49.2262, tz: TZ },
+  { name: "São José dos Pinhais", state: "PR", lat: -25.5348, lon: -49.2065, tz: TZ },
+  { name: "Jaraguá do Sul", state: "SC", lat: -26.4851, lon: -49.0665, tz: TZ },
+  { name: "Palhoça", state: "SC", lat: -27.6445, lon: -48.6677, tz: TZ },
 ];
 
 export function searchCities(query: string, limit = 10): City[] {
   const q = query.trim().toLowerCase();
   if (!q) return CITIES_BR.slice(0, limit);
-  return CITIES_BR
-    .filter((c) =>
-      c.name.toLowerCase().includes(q) ||
-      `${c.name}, ${c.state}`.toLowerCase().includes(q),
-    )
-    .slice(0, limit);
+  return CITIES_BR.filter(
+    (c) => c.name.toLowerCase().includes(q) || `${c.name}, ${c.state}`.toLowerCase().includes(q),
+  ).slice(0, limit);
 }

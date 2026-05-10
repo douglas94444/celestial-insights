@@ -1,11 +1,6 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
-import {
-  SIGNS,
-  PLANETS,
-  formatDegree,
-  signFromLongitude,
-} from "@/lib/astrology/zodiac";
+import { SIGNS, PLANETS, formatDegree, signFromLongitude } from "@/lib/astrology/zodiac";
 import type { ChartData } from "@/lib/astrology/calculate";
 
 interface Props {
@@ -40,7 +35,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
   // Ascendant at left (180° in SVG), zodiac going counter-clockwise.
   const lonToAngle = (lon: number) => {
     // shift so Asc is at left (pi rad = 180°)
-    const rel = ((lon - ascendant) % 360 + 360) % 360;
+    const rel = (((lon - ascendant) % 360) + 360) % 360;
     // Counter-clockwise from left horizon
     const angle = 180 - rel;
     return (angle * Math.PI) / 180;
@@ -83,8 +78,22 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
       <circle cx={cx} cy={cy} r={rOuter} fill="url(#bgGlow)" />
 
       {/* Sign ring */}
-      <circle cx={cx} cy={cy} r={rSigns} fill="none" stroke="oklch(0.60 0.10 280)" strokeWidth="1" />
-      <circle cx={cx} cy={cy} r={rSignsInner} fill="none" stroke="oklch(0.60 0.10 280)" strokeWidth="1" />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={rSigns}
+        fill="none"
+        stroke="oklch(0.60 0.10 280)"
+        strokeWidth="1"
+      />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={rSignsInner}
+        fill="none"
+        stroke="oklch(0.60 0.10 280)"
+        strokeWidth="1"
+      />
 
       {/* Sign sectors */}
       {SIGNS.map((sign, i) => {
@@ -117,7 +126,14 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
       })}
 
       {/* House ring */}
-      <circle cx={cx} cy={cy} r={rHousesInner} fill="none" stroke="oklch(0.55 0.05 280 / 0.5)" strokeWidth="1" />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={rHousesInner}
+        fill="none"
+        stroke="oklch(0.55 0.05 280 / 0.5)"
+        strokeWidth="1"
+      />
 
       {/* House cusps */}
       {data.houses.map((house, i) => {
@@ -173,7 +189,9 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
               stroke={ASPECT_COLOR[aspect.type]}
               strokeWidth={aspect.type === "conjuncao" ? "1.5" : "1"}
               strokeOpacity="0.5"
-              strokeDasharray={aspect.type === "quadratura" || aspect.type === "oposicao" ? "3 3" : undefined}
+              strokeDasharray={
+                aspect.type === "quadratura" || aspect.type === "oposicao" ? "3 3" : undefined
+              }
             />
           );
         })}
@@ -242,13 +260,7 @@ export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetCli
               >
                 ASC
               </text>
-              <text
-                x={cx}
-                y={cy - 8}
-                textAnchor="middle"
-                fontSize="11"
-                fill="oklch(0.50 0.04 280)"
-              >
+              <text x={cx} y={cy - 8} textAnchor="middle" fontSize="11" fill="oklch(0.50 0.04 280)">
                 {signFromLongitude(ascendant)}
               </text>
               <text

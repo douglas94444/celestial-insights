@@ -1,10 +1,19 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated")({
+  beforeLoad: async () => {
+    if (typeof window === "undefined") return;
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) {
+      throw redirect({ to: "/auth" });
+    }
+  },
   component: AuthenticatedLayout,
 });
 
@@ -14,7 +23,7 @@ function AuthenticatedLayout() {
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate({ to: "/auth" });
+      navigate({ to: "/auth", replace: true });
     }
   }, [user, loading, navigate]);
 
@@ -31,8 +40,9 @@ function AuthenticatedLayout() {
       <div className="flex min-h-screen w-full">
         <AppSidebar />
         <div className="flex flex-1 flex-col">
-          <header className="flex h-12 items-center border-b px-2">
+          <header className="flex h-12 items-center justify-between border-b px-2">
             <SidebarTrigger />
+            <ThemeToggle />
           </header>
           <main className="flex-1 overflow-auto">
             <Outlet />

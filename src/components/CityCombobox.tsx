@@ -62,7 +62,9 @@ export function CityCombobox({ value, onChange }: Props) {
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value?.name === city.name && value?.state === city.state ? "opacity-100" : "opacity-0",
+                      value?.name === city.name && value?.state === city.state
+                        ? "opacity-100"
+                        : "opacity-0",
                     )}
                   />
                   <span>

@@ -14,6 +14,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTransitosRouteImport } from './routes/_authenticated/transitos'
+import { Route as AuthenticatedPremiumRouteImport } from './routes/_authenticated/premium'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMapasRouteImport } from './routes/_authenticated/mapas'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -44,6 +45,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedTransitosRoute = AuthenticatedTransitosRouteImport.update({
   id: '/transitos',
   path: '/transitos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedPremiumRoute = AuthenticatedPremiumRouteImport.update({
+  id: '/premium',
+  path: '/premium',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/mapas': typeof AuthenticatedMapasRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/premium': typeof AuthenticatedPremiumRoute
   '/transitos': typeof AuthenticatedTransitosRoute
   '/mapas/$id': typeof AuthenticatedMapasIdRoute
   '/mapas/novo': typeof AuthenticatedMapasNovoRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/mapas': typeof AuthenticatedMapasRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
+  '/premium': typeof AuthenticatedPremiumRoute
   '/transitos': typeof AuthenticatedTransitosRoute
   '/mapas/$id': typeof AuthenticatedMapasIdRoute
   '/mapas/novo': typeof AuthenticatedMapasNovoRoute
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/mapas': typeof AuthenticatedMapasRouteWithChildren
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
+  '/_authenticated/premium': typeof AuthenticatedPremiumRoute
   '/_authenticated/transitos': typeof AuthenticatedTransitosRoute
   '/_authenticated/mapas/$id': typeof AuthenticatedMapasIdRoute
   '/_authenticated/mapas/novo': typeof AuthenticatedMapasNovoRoute
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/mapas'
     | '/onboarding'
+    | '/premium'
     | '/transitos'
     | '/mapas/$id'
     | '/mapas/novo'
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/mapas'
     | '/onboarding'
+    | '/premium'
     | '/transitos'
     | '/mapas/$id'
     | '/mapas/novo'
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/mapas'
     | '/_authenticated/onboarding'
+    | '/_authenticated/premium'
     | '/_authenticated/transitos'
     | '/_authenticated/mapas/$id'
     | '/_authenticated/mapas/novo'
@@ -210,6 +222,13 @@ declare module '@tanstack/react-router' {
       path: '/transitos'
       fullPath: '/transitos'
       preLoaderRoute: typeof AuthenticatedTransitosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/premium': {
+      id: '/_authenticated/premium'
+      path: '/premium'
+      fullPath: '/premium'
+      preLoaderRoute: typeof AuthenticatedPremiumRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/onboarding': {
@@ -283,6 +302,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedMapasRoute: typeof AuthenticatedMapasRouteWithChildren
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
+  AuthenticatedPremiumRoute: typeof AuthenticatedPremiumRoute
   AuthenticatedTransitosRoute: typeof AuthenticatedTransitosRoute
 }
 
@@ -292,6 +312,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedMapasRoute: AuthenticatedMapasRouteWithChildren,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
+  AuthenticatedPremiumRoute: AuthenticatedPremiumRoute,
   AuthenticatedTransitosRoute: AuthenticatedTransitosRoute,
 }
 
@@ -308,3 +329,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}

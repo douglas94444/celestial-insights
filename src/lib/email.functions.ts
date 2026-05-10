@@ -8,6 +8,8 @@ import { analyzeTransitDay, formatTransitDayTitle } from "@/lib/astrology/transi
 import { PLANETS, type SignName } from "@/lib/astrology/zodiac";
 import { chartRowToChartData } from "@/lib/chart-from-row";
 import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
+import { assertCronCallerIpAllowed } from "@/lib/cron-caller-guard";
+import { escapeHtml } from "@/lib/html-escape";
 import { cronTransitDigestSchema, sendTransitDigestInputSchema } from "@/lib/schemas/server-fns";
 import { jsonError, secretsMatchConstantTime, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
@@ -46,37 +48,32 @@ function planetPt(k: string) {
 export function buildTransitDigestHtml(chartName: string, day: TransitDayPayload): string {
   const title = formatTransitDayTitle(day.date);
   const aspectLines = day.aspects.slice(0, 12).map((a) => {
-    return `<li>${planetPt(a.planet1)} (trânsito) ${ASPECT_LABELS[a.type]} ${planetPt(
-      a.planet2,
-    )} natal — orbe ${a.orb}°</li>`;
+    const p1 = escapeHtml(planetPt(a.planet1));
+    const p2 = escapeHtml(planetPt(a.planet2));
+    const aspectLabel = escapeHtml(ASPECT_LABELS[a.type] ?? String(a.type));
+    const orb = escapeHtml(String(a.orb));
+    return `<li>${p1} (trânsito) ${aspectLabel} ${p2} natal — orbe ${orb}°</li>`;
   });
   const hintsBlock =
     day.interpretiveHints.length > 0
       ? `<h2>Sugestões para reflexão</h2><ul>${day.interpretiveHints
           .slice(0, 5)
-          .map((h) => `<li>${h}</li>`)
+          .map((h) => `<li>${escapeHtml(h)}</li>`)
           .join("")}</ul>`
       : "";
+  const moon = escapeHtml(day.transitMoonSign || "—");
   return `
-      <h1>Trânsitos — ${chartName}</h1>
-      <p><strong>${title}</strong></p>
-      <p>Lua em trânsito: ${day.transitMoonSign || "—"} · Intensidade do dia (indicador): ${day.intensity}/100</p>
+      <h1>Trânsitos — ${escapeHtml(chartName)}</h1>
+      <p><strong>${escapeHtml(title)}</strong></p>
+      <p>Lua em trânsito: ${moon} · Intensidade do dia (indicador): ${day.intensity}/100</p>
       <p>Sinais do dia (heurística — só reflexão): humor ${day.scores.humor}/100 · relações ${day.scores.amor}/100 · trabalho ${day.scores.trabalho}/100</p>
       <h2>Destaques</h2>
-      <ul>${day.narrative.map((n) => `<li>${n}</li>`).join("")}</ul>
+      <ul>${day.narrative.map((n) => `<li>${escapeHtml(n)}</li>`).join("")}</ul>
       ${hintsBlock}
       <h2>Aspectos trânsito × natal</h2>
       <ul>${aspectLines.join("")}</ul>
       <p style="margin-top:24px;font-size:12px;color:#666;">AstroMap · indicadores para reflexão, não substituem orientação profissional.</p>
     `;
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 export function buildMomentDailyDigestHtml(opts: {
@@ -228,6 +225,8 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
       if (!expected || !secretsMatchConstantTime(String(data.cronSecret), String(expected))) {
         throw jsonError(401, "UNAUTHORIZED", "Credencial de cron inválida ou não configurada.");
       }
+
+      assertCronCallerIpAllowed();
 
       const apiKey = process.env.RESEND_API_KEY;
       const from = process.env.RESEND_FROM_EMAIL ?? "AstroMap <onboarding@resend.dev>";

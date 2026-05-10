@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, memo } from "react";
 import type { ChartData } from "@/lib/astrology/calculate";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
 
@@ -26,7 +26,7 @@ export type ShareableMomentCardProps = {
 export const SHARE_CARD_WIDTH = 1080;
 export const SHARE_CARD_HEIGHT = 1350;
 
-export const ShareableMomentCard = forwardRef<HTMLDivElement, ShareableMomentCardProps>(
+const ShareableMomentCardInner = forwardRef<HTMLDivElement, ShareableMomentCardProps>(
   function ShareableMomentCard(
     {
       displayName,
@@ -163,3 +163,7 @@ export const ShareableMomentCard = forwardRef<HTMLDivElement, ShareableMomentCar
     );
   },
 );
+
+ShareableMomentCardInner.displayName = "ShareableMomentCard";
+
+export const ShareableMomentCard = memo(ShareableMomentCardInner);

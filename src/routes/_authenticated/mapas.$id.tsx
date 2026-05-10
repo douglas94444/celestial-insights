@@ -22,7 +22,7 @@ import { AiCacheAgeBadge } from "@/components/AiCacheAgeBadge";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
 import { computeAngles, type HouseSystemId } from "@/lib/astrology/calculate";
 import { HOUSE_SYSTEM_LABELS } from "@/lib/astrology/houses";
-import type { ChartData, HousePosition, PlanetPosition, Aspect } from "@/lib/astrology/calculate";
+import type { ChartData, PlanetPosition } from "@/lib/astrology/calculate";
 import { signFromLongitude, formatDegree, PLANETS, type PlanetKey } from "@/lib/astrology/zodiac";
 import { SUN_IN_SIGN, MOON_IN_SIGN, ASC_IN_SIGN } from "@/data/interpretations";
 import {
@@ -41,6 +41,7 @@ import {
 import { recalculateChartFn } from "@/lib/charts.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
+import { tryParseStoredChartGeometry } from "@/lib/schemas/chart-payload";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import {
   ENGAGEMENT_ROUTES,
@@ -130,20 +131,23 @@ function ChartView() {
     });
   }, [chart, timezoneOffset, storedHouseSystem]);
 
+  const parsedChart = useMemo(() => {
+    if (!chart) return null;
+    return tryParseStoredChartGeometry(chart);
+  }, [chart]);
+
   const planetsByHouse = useMemo(() => {
-    if (!chart || !Array.isArray(chart.planets_data)) return new Map<number, PlanetPosition[]>();
-    const list = chart.planets_data as unknown as PlanetPosition[];
+    if (!parsedChart) return new Map<number, PlanetPosition[]>();
     const map = new Map<number, PlanetPosition[]>();
-    for (const p of list) {
+    for (const p of parsedChart.planets) {
       const bucket = map.get(p.house) ?? [];
       bucket.push(p);
       map.set(p.house, bucket);
     }
     return map;
-  }, [chart]);
+  }, [parsedChart]);
 
-  const needsRecalcPlanets =
-    !!chart && Array.isArray(chart.planets_data) && chart.planets_data.length < PLANETS.length;
+  const needsRecalcPlanets = !!parsedChart && parsedChart.planets.length < PLANETS.length;
 
   const needsRecalcHouseMismatch = !!chart && !!profile && storedHouseSystem !== profileHouseSystem;
 
@@ -232,9 +236,21 @@ function ChartView() {
   }
   if (!chart) return <div className="p-6">Mapa não encontrado.</div>;
 
-  const planets = chart.planets_data as unknown as PlanetPosition[];
-  const houses = chart.houses_data as unknown as HousePosition[];
-  const aspects = chart.aspects_data as unknown as Aspect[];
+  if (!parsedChart) {
+    return (
+      <div className="container mx-auto max-w-5xl p-6">
+        <p className="text-destructive">
+          Os dados guardados deste mapa não são válidos. Experimente «Recalcular mapa» ou crie um
+          mapa novo.
+        </p>
+        <Button className="mt-4" variant="outline" onClick={() => recalcMutation.mutate()}>
+          Recalcular mapa
+        </Button>
+      </div>
+    );
+  }
+
+  const { planets, houses, aspects } = parsedChart;
   const ascendant = houses[0]?.cusp ?? angles.ascendant;
   const data: ChartData = {
     ascendant,

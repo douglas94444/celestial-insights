@@ -2,7 +2,7 @@ import { createServerOnlyFn } from "@tanstack/react-start";
 import type { Database } from "@/integrations/supabase/types";
 
 /**
- * Lê a sessão Supabase a partir dos cookies no pedido SSR (TanStack Start / h3).
+ * Confirma utilizador autenticado no SSR via cookies (`getUser()` valida com o Auth).
  * Só pode ser invocado no servidor — em cliente, `createServerOnlyFn` falha antes do corpo.
  */
 export const hasSupabaseSessionCookie = createServerOnlyFn(async (): Promise<boolean> => {
@@ -33,7 +33,8 @@ export const hasSupabaseSessionCookie = createServerOnlyFn(async (): Promise<boo
   });
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  return !!session;
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  return !!user && !error;
 });

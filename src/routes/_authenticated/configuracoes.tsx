@@ -45,6 +45,7 @@ import {
 } from "@/lib/schemas/profile";
 import { deleteAccountFn } from "@/lib/profile.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
+import { shrinkImageForAvatar } from "@/lib/shrink-image-for-avatar";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -175,13 +176,15 @@ function Settings() {
   }
 
   async function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (!ext || !["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
+    const raw = e.target.files?.[0];
+    if (!raw || !user) return;
+    const extRaw = raw.name.split(".").pop()?.toLowerCase();
+    if (!extRaw || !["jpg", "jpeg", "png", "webp", "gif"].includes(extRaw)) {
       toast.error("Use JPG, PNG, WebP ou GIF.");
       return;
     }
+    const file = await shrinkImageForAvatar(raw);
+    const ext = file.type === "image/gif" ? "gif" : "jpg";
     const path = `${user.id}/avatar.${ext}`;
     const { error: upErr } = await supabase.storage
       .from("avatars")
@@ -241,7 +244,15 @@ function Settings() {
             </CardHeader>
             <CardContent className="flex flex-wrap items-center gap-4">
               <Avatar className="h-20 w-20 border border-accent/30">
-                <AvatarImage src={profile?.avatar_url ?? undefined} alt="" />
+                <AvatarImage
+                  src={profile?.avatar_url ?? undefined}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  fetchPriority="low"
+                  width={80}
+                  height={80}
+                />
                 <AvatarFallback className="bg-primary/15 text-lg">
                   {(profile?.name ?? user?.email)?.[0]?.toUpperCase() ?? "?"}
                 </AvatarFallback>
@@ -257,7 +268,10 @@ function Settings() {
                 <Upload className="mr-2 h-4 w-4" /> Enviar foto
               </Button>
               <p className="text-xs text-muted-foreground w-full">
-                Armazenamento seguro no Supabase (bucket público). Máx. recomendado 5 MB.
+                JPG/PNG/WebP são otimizados no navegador (~512px) antes do envio. GIF não é
+                redimensionado. Máx. recomendado 5 MB no ficheiro original. A foto fica num URL
+                público partilhável (bucket Supabase); não use imagens que não queira que terceiros
+                possam abrir com o link.
               </p>
             </CardContent>
           </Card>

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { formatDistanceToNow, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -10,14 +11,7 @@ export type AiCachedResultLike =
   | null
   | undefined;
 
-/** Badge só quando `cached` e `cached_at` estão presentes (evita condicionais repetidos nas rotas). */
-export function AiCacheAgeBadgeFromResult({ result }: { result: AiCachedResultLike }) {
-  if (!result?.cached || !result.cached_at) return null;
-  return <AiCacheAgeBadge cachedAt={result.cached_at} />;
-}
-
-/** Mostra idade relativa do registo em cache (interpretação IA). */
-export function AiCacheAgeBadge({ cachedAt }: { cachedAt: string | null | undefined }) {
+function AiCacheAgeBadgeInner({ cachedAt }: { cachedAt: string | null | undefined }) {
   if (!cachedAt) return null;
   try {
     const d = parseISO(cachedAt);
@@ -32,3 +26,18 @@ export function AiCacheAgeBadge({ cachedAt }: { cachedAt: string | null | undefi
     return null;
   }
 }
+
+AiCacheAgeBadgeInner.displayName = "AiCacheAgeBadge";
+
+/** Mostra idade relativa do registo em cache (interpretação IA). */
+export const AiCacheAgeBadge = memo(AiCacheAgeBadgeInner);
+
+function AiCacheAgeBadgeFromResultInner({ result }: { result: AiCachedResultLike }) {
+  if (!result?.cached || !result.cached_at) return null;
+  return <AiCacheAgeBadge cachedAt={result.cached_at} />;
+}
+
+AiCacheAgeBadgeFromResultInner.displayName = "AiCacheAgeBadgeFromResult";
+
+/** Badge só quando `cached` e `cached_at` estão presentes (evita condicionais repetidos nas rotas). */
+export const AiCacheAgeBadgeFromResult = memo(AiCacheAgeBadgeFromResultInner);

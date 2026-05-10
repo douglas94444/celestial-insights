@@ -32,11 +32,7 @@ function AuthenticatedLayout() {
   }, [user, loading, navigate]);
 
   if (loading || !user) {
-    return (
-      <div className="grid min-h-screen place-items-center text-muted-foreground">
-        Carregando...
-      </div>
-    );
+    return <AuthenticatedSessionSkeleton />;
   }
 
   return (

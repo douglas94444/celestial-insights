@@ -41,6 +41,17 @@ import {
   buildPersonalizedMomentInsights,
   resolveMomentDisplayName,
 } from "@/lib/personalized-moment";
+import { tryParseStoredChartGeometry } from "@/lib/schemas/chart-payload";
+
+/** Referência estável; uso em `memo`/`useMemo` downstream sem invalidar por `[]` novo a cada render. */
+const EMPTY_PLANETS: PlanetPosition[] = [];
+const EMPTY_HOUSES: HousePosition[] = [];
+const EMPTY_ASPECTS: Aspect[] = [];
+
+/** Formatação curta para linhas da semana (ex.: dashboard); export estável fora do hook. */
+export function formatTransitWeekdayShort(dateStr: string): string {
+  return format(parseISO(`${dateStr}T12:00:00.000Z`), "EEE dd/MM", { locale: ptBR });
+}
 
 export function useDailyMoment() {
   const { user, session } = useAuth();
@@ -77,17 +88,14 @@ export function useDailyMoment() {
 
   const primary = charts.find((c) => c.is_primary) ?? charts[0];
 
-  const planets = useMemo(
-    () => (primary?.planets_data as PlanetPosition[] | null) ?? [],
-    [primary?.planets_data],
-  );
+  const parsedGeometry = useMemo(() => {
+    if (!primary) return null;
+    return tryParseStoredChartGeometry(primary);
+  }, [primary]);
 
-  const houses = useMemo(
-    () => (primary?.houses_data as HousePosition[] | null) ?? [],
-    [primary?.houses_data],
-  );
-
-  const aspects = (primary?.aspects_data as Aspect[] | null) ?? [];
+  const planets = parsedGeometry?.planets ?? EMPTY_PLANETS;
+  const houses = parsedGeometry?.houses ?? EMPTY_HOUSES;
+  const aspects = parsedGeometry?.aspects ?? EMPTY_ASPECTS;
 
   const tzOff =
     primary?.timezone_offset_minutes ??
@@ -96,29 +104,40 @@ export function useDailyMoment() {
 
   const chartHouseSys = (primary?.house_system as HouseSystemId | undefined) ?? "placidus";
 
-  const angles = primary
-    ? computeAngles({
-        birthDate: primary.birth_date,
-        birthTime: primary.birth_time,
-        latitude: primary.latitude,
-        longitude: primary.longitude,
-        timezoneOffset: tzOff,
-        houseSystem: chartHouseSys,
-      })
-    : null;
+  /* eslint-disable react-hooks/exhaustive-deps -- ângulos: campos do mapa em vez do objeto `primary` inteiro */
+  const angles = useMemo(() => {
+    if (!primary) return null;
+    return computeAngles({
+      birthDate: primary.birth_date,
+      birthTime: primary.birth_time,
+      latitude: primary.latitude,
+      longitude: primary.longitude,
+      timezoneOffset: tzOff,
+      houseSystem: chartHouseSys,
+    });
+  }, [
+    primary?.id,
+    primary?.birth_date,
+    primary?.birth_time,
+    primary?.latitude,
+    primary?.longitude,
+    tzOff,
+    chartHouseSys,
+  ]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const ascendant = houses[0]?.cusp ?? angles?.ascendant ?? 0;
 
-  const wheelData: ChartData | null =
-    primary && angles
-      ? {
-          ascendant,
-          midheaven: angles.midheaven,
-          planets,
-          houses,
-          aspects,
-        }
-      : null;
+  const wheelData = useMemo((): ChartData | null => {
+    if (!primary?.id || !angles) return null;
+    return {
+      ascendant,
+      midheaven: angles.midheaven,
+      planets,
+      houses,
+      aspects,
+    };
+  }, [primary?.id, angles, ascendant, planets, houses, aspects]);
 
   const sunSign = planets.find((p) => p.key === "sun")?.sign as SignName | undefined;
   const moonSign = planets.find((p) => p.key === "moon")?.sign as SignName | undefined;
@@ -265,7 +284,6 @@ export function useDailyMoment() {
       moonSign && moonSign in MOON_IN_SIGN ? excerptInterpretation(MOON_IN_SIGN[moonSign]) : null,
     ascMicroLine: ascSign && ascSign in HOROSCOPE_ASC_MICRO ? HOROSCOPE_ASC_MICRO[ascSign] : null,
 
-    formatWeekdayShort: (dateStr: string) =>
-      format(parseISO(`${dateStr}T12:00:00.000Z`), "EEE dd/MM", { locale: ptBR }),
+    formatWeekdayShort: formatTransitWeekdayShort,
   };
 }

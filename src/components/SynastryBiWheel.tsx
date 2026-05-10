@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { motion } from "framer-motion";
 import { SIGNS, formatDegree, signFromLongitude } from "@/lib/astrology/zodiac";
 import type { ChartData } from "@/lib/astrology/calculate";
@@ -34,7 +34,7 @@ interface Props {
   size?: number;
 }
 
-export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size = 520 }: Props) {
+function SynastryBiWheelComponent({ baseChart, overlayChart, synastryAspects, size = 520 }: Props) {
   const cx = size / 2;
   const cy = size / 2;
   const rOuter = size / 2 - 4;
@@ -317,3 +317,7 @@ export function SynastryBiWheel({ baseChart, overlayChart, synastryAspects, size
     </motion.svg>
   );
 }
+
+SynastryBiWheelComponent.displayName = "SynastryBiWheel";
+
+export const SynastryBiWheel = memo(SynastryBiWheelComponent);

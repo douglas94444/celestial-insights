@@ -1,6 +1,6 @@
 import type { PlanetKey, SignName } from "@/lib/astrology/zodiac";
 import type { AspectType } from "@/lib/astrology/calculate";
-import { ASC_IN_SIGN, MOON_IN_SIGN, SUN_IN_SIGN } from "@/data/interpretations";
+import { MOON_IN_SIGN, SUN_IN_SIGN } from "@/data/interpretations";
 
 type SignText = Record<SignName, string>;
 

@@ -1,5 +1,24 @@
+import { z } from "zod";
+
 const STORAGE_KEY = "astroMoment:history:v1";
 const MAX_ENTRIES = 30;
+
+const momentHistorySnapshotSchema = z.object({
+  visitYmd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  savedAt: z.string().optional(),
+  quoteLines: z.array(z.string()),
+  luckLine: z.string().optional(),
+  colorLabel: z.string().optional(),
+  colorHex: z.string().optional(),
+  transitFingerprint: z.string().optional(),
+  intensityBucket: z.number().finite().optional(),
+  transitSnippet: z.string().optional(),
+  aiText: z.union([z.string(), z.null()]).optional(),
+});
+
+const storedPayloadSchema = z.object({
+  entries: z.array(momentHistorySnapshotSchema),
+});
 
 export type MomentHistorySnapshot = {
   visitYmd: string;
@@ -17,37 +36,23 @@ export type MomentHistorySnapshot = {
   aiText?: string | null;
 };
 
-type StoredPayload = { entries: MomentHistorySnapshot[] };
-
 function parseStored(raw: string | null): MomentHistorySnapshot[] {
   if (!raw) return [];
   try {
-    const j = JSON.parse(raw) as StoredPayload;
-    if (!j || !Array.isArray(j.entries)) return [];
-    return j.entries
-      .filter(
-        (e) =>
-          e &&
-          typeof e.visitYmd === "string" &&
-          /^\d{4}-\d{2}-\d{2}$/.test(e.visitYmd) &&
-          Array.isArray(e.quoteLines),
-      )
-      .map((e) => ({
-        visitYmd: e.visitYmd,
-        savedAt: typeof e.savedAt === "string" ? e.savedAt : new Date().toISOString(),
-        quoteLines: e.quoteLines.filter((x) => typeof x === "string"),
-        luckLine: typeof e.luckLine === "string" ? e.luckLine : undefined,
-        colorLabel: typeof e.colorLabel === "string" ? e.colorLabel : undefined,
-        colorHex: typeof e.colorHex === "string" ? e.colorHex : undefined,
-        transitFingerprint:
-          typeof e.transitFingerprint === "string" ? e.transitFingerprint : undefined,
-        intensityBucket:
-          typeof e.intensityBucket === "number" && Number.isFinite(e.intensityBucket)
-            ? e.intensityBucket
-            : undefined,
-        transitSnippet: typeof e.transitSnippet === "string" ? e.transitSnippet : undefined,
-        aiText: typeof e.aiText === "string" || e.aiText === null ? e.aiText : undefined,
-      }));
+    const parsed = storedPayloadSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) return [];
+    return parsed.data.entries.map((e) => ({
+      visitYmd: e.visitYmd,
+      savedAt: e.savedAt ?? new Date().toISOString(),
+      quoteLines: e.quoteLines,
+      luckLine: e.luckLine,
+      colorLabel: e.colorLabel,
+      colorHex: e.colorHex,
+      transitFingerprint: e.transitFingerprint,
+      intensityBucket: e.intensityBucket,
+      transitSnippet: e.transitSnippet,
+      aiText: e.aiText,
+    }));
   } catch {
     return [];
   }

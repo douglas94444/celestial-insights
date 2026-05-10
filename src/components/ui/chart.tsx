@@ -22,6 +22,20 @@ type ChartContextProps = {
 
 const ChartContext = React.createContext<ChartContextProps | null>(null);
 
+/** Só `#RGB`/hex ou `var(--token)` — evita injecção via valores vindos de `config`. */
+function sanitizeChartCssColor(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const s = raw.trim();
+  if (/^#[0-9A-Fa-f]{3,8}$/.test(s)) return s;
+  if (/^var\(--[a-zA-Z0-9_-]+\)$/.test(s)) return s;
+  return undefined;
+}
+
+/** Chaves de série nos charts só para nomes CSS seguros (`--color-{key}`). */
+function sanitizeChartSeriesKey(key: string): string | null {
+  return /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(key) ? key : null;
+}
+
 function useChart() {
   const context = React.useContext(ChartContext);
 
@@ -77,8 +91,11 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
 ${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
+    const safeKey = sanitizeChartSeriesKey(key);
+    if (!safeKey) return null;
     const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color;
-    return color ? `  --color-${key}: ${color};` : null;
+    const safeColor = sanitizeChartCssColor(color);
+    return safeColor ? `  --color-${safeKey}: ${safeColor};` : null;
   })
   .join("\n")}
 }

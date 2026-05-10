@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Heart, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,8 @@ function parseStoredPayload(raw: unknown): StoredCompatibilityPayload | null {
   };
 }
 
+const COMPAT_HISTORY_PAGE_SIZE = 50;
+
 const AREA_META: { key: keyof SynastryAreaScores; title: string; hint: string }[] = [
   { key: "love", title: "Amor & atração", hint: "Sol, Lua, Vênus, Marte entre os mapas" },
   { key: "friendship", title: "Amizade & conversa", hint: "Lua, Mercúrio, Júpiter" },
@@ -101,6 +103,7 @@ function CompatibilidadePage() {
   } | null>(null);
   const [synastryAiText, setSynastryAiText] = useState<string | null>(null);
   const [synastryDeep, setSynastryDeep] = useState<SynastryDeepOutput | null>(null);
+  const [historyVisibleCount, setHistoryVisibleCount] = useState(COMPAT_HISTORY_PAGE_SIZE);
 
   const {
     data: charts = [],
@@ -121,11 +124,20 @@ function CompatibilidadePage() {
         .from("synastries")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(12);
+        .limit(120);
       if (error) throw error;
       return data;
     },
   });
+
+  useEffect(() => {
+    setHistoryVisibleCount(COMPAT_HISTORY_PAGE_SIZE);
+  }, [history]);
+
+  const visibleHistory = useMemo(
+    () => history.slice(0, historyVisibleCount),
+    [history, historyVisibleCount],
+  );
 
   const seededDefaults = useRef(false);
   useEffect(() => {
@@ -216,34 +228,48 @@ function CompatibilidadePage() {
     onError: (e) => void toastServerFnError(e),
   });
 
-  function loadFromHistory(row: (typeof history)[0]) {
-    const payload = parseStoredPayload(row.compatibility_data);
-    const c1 = charts.find((c) => c.id === row.chart1_id);
-    const c2 = charts.find((c) => c.id === row.chart2_id);
-    if (!payload || !c1 || !c2) {
-      toast.error("Não foi possível carregar esta sinastria.");
-      return;
-    }
-    try {
-      const baseChart = chartRowToChartData(c1);
-      const overlayChart = chartRowToChartData(c2);
-      setActiveView({
-        analysis: {
-          aspects: payload.aspects,
-          overallScore: row.compatibility_score,
-          areas: payload.areas,
-          highlights: payload.highlights,
-        },
-        baseChart,
-        overlayChart,
-        score: row.compatibility_score,
-        savedAt: row.created_at,
-        synastryId: row.id,
-      });
-    } catch {
-      toast.error("Dados de mapa incompletos.");
-    }
-  }
+  const loadFromHistory = useCallback(
+    (row: (typeof history)[number]) => {
+      const payload = parseStoredPayload(row.compatibility_data);
+      const c1 = charts.find((c) => c.id === row.chart1_id);
+      const c2 = charts.find((c) => c.id === row.chart2_id);
+      if (!payload || !c1 || !c2) {
+        toast.error("Não foi possível carregar esta sinastria.");
+        return;
+      }
+      try {
+        const baseChart = chartRowToChartData(c1);
+        const overlayChart = chartRowToChartData(c2);
+        setActiveView({
+          analysis: {
+            aspects: payload.aspects,
+            overallScore: row.compatibility_score,
+            areas: payload.areas,
+            highlights: payload.highlights,
+          },
+          baseChart,
+          overlayChart,
+          score: row.compatibility_score,
+          savedAt: row.created_at,
+          synastryId: row.id,
+        });
+      } catch {
+        toast.error("Dados de mapa incompletos.");
+      }
+    },
+    [charts],
+  );
+
+  const handleHistoryRowActivate = useCallback(
+    (e: React.MouseEvent<HTMLButtonElement>) => {
+      const rowId = e.currentTarget.dataset.rowId;
+      if (!rowId) return;
+      const row = history.find((r) => String(r.id) === rowId);
+      if (!row) return;
+      loadFromHistory(row);
+    },
+    [history, loadFromHistory],
+  );
 
   const canSynastry = charts.length >= 2;
 
@@ -568,29 +594,46 @@ function CompatibilidadePage() {
                 primeira entrada no histórico.
               </p>
             ) : (
-              history.map((row) => {
-                const p = parseStoredPayload(row.compatibility_data);
-                return (
-                  <button
-                    key={row.id}
+              <>
+                {visibleHistory.map((row) => {
+                  const p = parseStoredPayload(row.compatibility_data);
+                  return (
+                    <button
+                      key={row.id}
+                      type="button"
+                      data-row-id={String(row.id)}
+                      className="w-full text-left rounded-lg border px-4 py-3 text-sm hover:bg-muted/60 transition-colors"
+                      onClick={handleHistoryRowActivate}
+                    >
+                      <span className="font-medium">
+                        {p?.chart1Name ?? "Mapa"} × {p?.chart2Name ?? "Mapa"}
+                      </span>
+                      <span className="text-muted-foreground"> · </span>
+                      <span className="text-primary font-semibold">
+                        {row.compatibility_score}/100
+                      </span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {new Date(row.created_at).toLocaleDateString("pt-BR")}
+                      </span>
+                    </button>
+                  );
+                })}
+                {history.length > historyVisibleCount ? (
+                  <Button
                     type="button"
-                    className="w-full text-left rounded-lg border px-4 py-3 text-sm hover:bg-muted/60 transition-colors"
-                    onClick={() => loadFromHistory(row)}
+                    variant="outline"
+                    className="mt-1 w-full"
+                    onClick={() =>
+                      setHistoryVisibleCount((n) =>
+                        Math.min(n + COMPAT_HISTORY_PAGE_SIZE, history.length),
+                      )
+                    }
                   >
-                    <span className="font-medium">
-                      {p?.chart1Name ?? "Mapa"} × {p?.chart2Name ?? "Mapa"}
-                    </span>
-                    <span className="text-muted-foreground"> · </span>
-                    <span className="text-primary font-semibold">
-                      {row.compatibility_score}/100
-                    </span>
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {new Date(row.created_at).toLocaleDateString("pt-BR")}
-                    </span>
-                  </button>
-                );
-              })
+                    Carregar mais ({history.length - historyVisibleCount} restantes)
+                  </Button>
+                ) : null}
+              </>
             )}
           </CardContent>
         </Card>

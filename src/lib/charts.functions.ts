@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Json } from "@/integrations/supabase/types";
 import type { HouseSystemId } from "@/lib/astrology/calculate";
 import { calculateChart } from "@/lib/astrology/calculate";
 import { birthChartInputSchema } from "@/lib/schemas/birth-chart";
+import { chartGeometryToSupabaseJson } from "@/lib/schemas/chart-payload";
 import { recalculateChartInputSchema } from "@/lib/schemas/server-fns";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
@@ -59,6 +59,12 @@ export const createChartFn = createServerFn({ method: "POST" })
         houseSystem,
       });
 
+      const geometryJson = chartGeometryToSupabaseJson({
+        planets: computed.planets,
+        houses: computed.houses,
+        aspects: computed.aspects,
+      });
+
       const wantPrimary = data.setPrimary ?? existing === 0;
 
       if (wantPrimary) {
@@ -79,9 +85,7 @@ export const createChartFn = createServerFn({ method: "POST" })
           timezone: data.timezone,
           timezone_offset_minutes: data.timezoneOffsetMinutes,
           house_system: houseSystem,
-          planets_data: computed.planets as unknown as Json,
-          houses_data: computed.houses as unknown as Json,
-          aspects_data: computed.aspects as unknown as Json,
+          ...geometryJson,
           is_primary: wantPrimary,
         })
         .select()
@@ -132,12 +136,16 @@ export const recalculateChartFn = createServerFn({ method: "POST" })
         houseSystem,
       });
 
+      const geometryJson = chartGeometryToSupabaseJson({
+        planets: computed.planets,
+        houses: computed.houses,
+        aspects: computed.aspects,
+      });
+
       const { data: updated, error: updateErr } = await supabase
         .from("charts")
         .update({
-          planets_data: computed.planets as unknown as Json,
-          houses_data: computed.houses as unknown as Json,
-          aspects_data: computed.aspects as unknown as Json,
+          ...geometryJson,
           timezone_offset_minutes: offset,
           house_system: houseSystem,
           updated_at: new Date().toISOString(),

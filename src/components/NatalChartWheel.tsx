@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { motion } from "framer-motion";
-import { SIGNS, PLANETS, formatDegree, signFromLongitude } from "@/lib/astrology/zodiac";
+import { SIGNS, formatDegree, signFromLongitude } from "@/lib/astrology/zodiac";
 import type { ChartData } from "@/lib/astrology/calculate";
 
 interface Props {
@@ -20,7 +20,7 @@ const ASPECT_COLOR: Record<string, string> = {
   sextil: "var(--chart-aspect-sextil)",
 };
 
-export function NatalChartWheel({
+function NatalChartWheelComponent({
   data,
   size = 520,
   highlightPlanet,
@@ -108,7 +108,6 @@ export function NatalChartWheel({
         const startLon = i * 30;
         const midLon = startLon + 15;
         const a1 = lonToAngle(startLon);
-        const a2 = lonToAngle(startLon + 30);
         // tick line at boundary
         const x1 = cx + rSignsInner * Math.cos(a1);
         const y1 = cy - rSignsInner * Math.sin(a1);
@@ -293,3 +292,7 @@ export function NatalChartWheel({
     </motion.svg>
   );
 }
+
+NatalChartWheelComponent.displayName = "NatalChartWheel";
+
+export const NatalChartWheel = memo(NatalChartWheelComponent);

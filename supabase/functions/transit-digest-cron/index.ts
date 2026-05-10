@@ -1,7 +1,11 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import type { HouseSystemId } from "../_shared/calculate.ts";
 import { chartRowToChartData, type ChartRow } from "../_shared/chart-from-row.ts";
-import { secretsMatchConstantTime, saoPauloDigestContext } from "../_shared/cron-utils.ts";
+import {
+  cronIpAllowlistAllows,
+  secretsMatchConstantTime,
+  saoPauloDigestContext,
+} from "../_shared/cron-utils.ts";
 import { buildTransitDigestHtml } from "../_shared/digest-html.ts";
 import { analyzeTransitDay } from "../_shared/transits.ts";
 
@@ -56,6 +60,14 @@ Deno.serve(async (req) => {
         message: "Credencial de cron inválida ou não configurada.",
       }),
       { status: 401, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  const allowedIps = Deno.env.get("TRANSIT_DIGEST_CRON_ALLOWED_IPS") ?? undefined;
+  if (!cronIpAllowlistAllows(req, allowedIps)) {
+    return new Response(
+      JSON.stringify({ code: "FORBIDDEN", message: "IP não autorizado para cron." }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
     );
   }
 

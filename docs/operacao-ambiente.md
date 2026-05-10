@@ -20,7 +20,11 @@ Ver [`.env.example`](../.env.example). No cliente só podem existir segredos **a
 
 ### Erros nas server functions
 
-Respostas JSON com `{ "code", "message" }`; falhas de validação Zod nas edges usam HTTP **400** e `code: "VALIDATION"`. O digest cron valida `cronSecret` com comparação em tempo constante (hash).
+Respostas JSON com `{ "code", "message" }`; falhas de validação Zod nas edges usam HTTP **400** e `code: "VALIDATION"`. O digest cron valida `cronSecret` com comparação em tempo constante.
+
+**Segredo do cron:** use valor aleatório longo (≥32 bytes em base64/hex), guarde só em secrets do Worker ou Supabase; **rote** se suspeitar de vazamento. Opcional: **`TRANSIT_DIGEST_CRON_ALLOWED_IPS`** — lista CSV de IPs (ex.: egress fixo do seu scheduler). No Cloudflare confie em **`CF-Connecting-IP`**; atrás de outros proxies configure headers com cuidado (`X-Forwarded-For` pode ser forjado sem rede de confiança).
+
+**Rate limiting:** recomenda-se regra WAF / Rate Limiting por caminho no cron para reduzir brute-force contra o segredo (em complemento à comparação em tempo constante).
 
 Matriz auth por função: [docs/server-fn-auth-matrix.md](server-fn-auth-matrix.md).
 
@@ -64,7 +68,7 @@ npx supabase functions deploy transit-digest-cron --no-verify-jwt
 npx supabase secrets set TRANSIT_DIGEST_CRON_SECRET="..." RESEND_API_KEY="..."
 ```
 
-Opcional: `RESEND_FROM_EMAIL` (predefinição no código: `AstroMap <onboarding@resend.dev>`). `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já são injectados pelo Supabase no runtime das Edge Functions.
+Opcional: `TRANSIT_DIGEST_CRON_ALLOWED_IPS` (CSV, mesma semântica que no Worker). Opcional: `RESEND_FROM_EMAIL` (predefinição no código: `AstroMap <onboarding@resend.dev>`). `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já são injectados pelo Supabase no runtime das Edge Functions.
 
 **URL do cron:**
 
@@ -95,4 +99,4 @@ A exportação usa `@react-pdf/renderer` **apenas no browser** (import dinâmico
 
 ## Auth SSR e cookies
 
-O cliente browser usa `createBrowserClient` (`@supabase/ssr`) para persistir sessão em **cookies** compatíveis com SSR. O layout `_authenticated` valida no servidor via [`hasSupabaseSessionCookie`](../src/lib/supabase-auth-server.ts). Utilizadores que ainda tinham só sessão antiga em `localStorage` podem precisar de **voltar a iniciar sessão** uma vez.
+O cliente browser usa `createBrowserClient` (`@supabase/ssr`) para persistir sessão em **cookies** compatíveis com SSR. O layout `_authenticated` valida no servidor via [`hasSupabaseSessionCookie`](../src/lib/supabase-auth-server.ts), que usa **`getUser()`** (validação alinhada à recomendação Supabase para SSR). Utilizadores que ainda tinham só sessão antiga em `localStorage` podem precisar de **voltar a iniciar sessão** uma vez.

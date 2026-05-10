@@ -23,7 +23,8 @@ export function UpgradeMapModal({ open, onOpenChange }: Props) {
           <AlertDialogTitle className="font-display">Mais mapas com Premium</AlertDialogTitle>
           <AlertDialogDescription>
             No plano gratuito você pode guardar um mapa natal. Para criar perfis adicionais
-            (família, estudos, etc.), desbloqueie o AstroMap Premium quando estiver disponível.
+            (família, estudos, etc.), o Premium será ativado quando ligarmos o checkout — na página
+            Planos Premium você vê o resumo honesto do que já existe e do que virá.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="gap-2 sm:gap-0">

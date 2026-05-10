@@ -1,8 +1,9 @@
 import { createFileRoute, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { AppAuthenticatedHeader } from "@/components/AppAuthenticatedHeader";
+import { AuthenticatedSessionSkeleton } from "@/components/AuthenticatedSessionSkeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { hasSupabaseSessionCookie } from "@/lib/supabase-auth-server";
@@ -43,10 +44,7 @@ function AuthenticatedLayout() {
       <div className="flex min-h-screen w-full">
         <AppSidebar />
         <div className="flex flex-1 flex-col">
-          <header className="flex h-12 items-center justify-between border-b px-2">
-            <SidebarTrigger />
-            <ThemeToggle />
-          </header>
+          <AppAuthenticatedHeader />
           <main className="relative flex-1 overflow-auto bg-shell-glow texture-grain">
             <Outlet />
           </main>

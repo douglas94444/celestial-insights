@@ -54,7 +54,7 @@ async function assertAiGenerationAllowed(
     throw jsonError(
       403,
       "PREMIUM_REQUIRED",
-      "As interpretações geradas por IA estão disponíveis para utilizadores Premium.",
+      "As interpretações geradas por IA estão disponíveis para usuários Premium.",
     );
   }
 

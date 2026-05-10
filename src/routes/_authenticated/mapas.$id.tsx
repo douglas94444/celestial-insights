@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -176,7 +177,22 @@ function ChartView() {
     },
   });
 
-  if (isLoading) return <div className="p-6 text-muted-foreground">Carregando mapa...</div>;
+  if (isLoading) {
+    return (
+      <div className="container mx-auto max-w-5xl space-y-6 p-4 md:p-6">
+        <Skeleton className="h-9 w-44 rounded-md" />
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <Skeleton className="mx-auto h-[280px] w-[280px] shrink-0 rounded-full lg:mx-0" />
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-full max-w-md" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-40 w-full rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (!chart) return <div className="p-6">Mapa não encontrado.</div>;
 
   const planets = chart.planets_data as unknown as PlanetPosition[];

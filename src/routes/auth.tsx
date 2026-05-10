@@ -43,7 +43,7 @@ function AuthPage() {
           </div>
           <span className="font-display text-2xl font-semibold">AstroMap</span>
         </Link>
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md text-foreground bg-card">
+        <div className="rounded-2xl border border-white/20 bg-card p-6 text-card-foreground shadow-2xl shadow-black/25 ring-1 ring-white/10">
           <Tabs defaultValue="signin">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Entrar</TabsTrigger>
@@ -58,9 +58,9 @@ function AuthPage() {
           </Tabs>
           <div className="relative mt-6">
             <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
+              <span className="w-full border-t border-border/80" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
+            <div className="relative flex justify-center text-xs uppercase tracking-wide">
               <span className="bg-card px-2 text-muted-foreground">ou</span>
             </div>
           </div>

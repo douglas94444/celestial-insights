@@ -197,7 +197,7 @@ function TransitosPage() {
   });
 
   return (
-    <div className="container mx-auto max-w-6xl p-6">
+    <div className="container mx-auto max-w-6xl p-4 pb-10 sm:p-6">
       <Button asChild variant="ghost" size="sm" className="mb-4">
         <Link to="/dashboard">
           <ArrowLeft className="mr-1 h-4 w-4" /> Voltar
@@ -274,7 +274,7 @@ function TransitosPage() {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 [&_button]:min-h-10 sm:[&_button]:min-h-9">
                   <Button
                     variant="secondary"
                     size="sm"
@@ -355,7 +355,7 @@ function TransitosPage() {
             <CardContent className="space-y-4">
               {transitsQuery.isLoading ? (
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin" /> A carregar trânsitos…
+                  <Loader2 className="h-5 w-5 animate-spin" /> Carregando trânsitos…
                 </div>
               ) : transitsQuery.isError ? (
                 <p className="text-sm text-destructive">

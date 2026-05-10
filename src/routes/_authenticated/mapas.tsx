@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Plus, MoreVertical, Pencil, Trash2, Eye } from "lucide-react";
+import { Eye, MoreVertical, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -77,10 +77,10 @@ function MapasList() {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="font-display text-3xl font-bold">Meus Mapas</h1>
-        <Button asChild className="bg-mystical text-white">
+    <div className="container mx-auto p-4 pb-10 sm:p-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-2xl font-bold sm:text-3xl">Meus Mapas</h1>
+        <Button asChild className="min-h-10 bg-mystical text-white">
           <Link to="/mapas/novo">
             <Plus className="mr-1 h-4 w-4" /> Novo
           </Link>
@@ -112,13 +112,26 @@ function MapasList() {
       </Dialog>
 
       {charts.length === 0 ? (
-        <p className="text-muted-foreground">
-          Nenhum mapa ainda.{" "}
-          <Link to="/onboarding" className="text-primary underline">
-            Criar o primeiro
-          </Link>
-          .
-        </p>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
+            <Sparkles className="h-12 w-12 text-primary" />
+            <div className="space-y-1">
+              <p className="font-display text-lg font-semibold">Nenhum mapa guardado</p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Crie o seu primeiro mapa natal — demora menos de um minuto — ou volte ao onboarding se
+                preferir o passo a passo inicial.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button asChild className="bg-mystical text-white">
+                <Link to="/onboarding">Começar pelo onboarding</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/mapas/novo">Novo mapa direto</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-3">
           {charts.map((c) => (

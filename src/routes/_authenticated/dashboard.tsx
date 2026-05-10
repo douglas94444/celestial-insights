@@ -170,7 +170,7 @@ function Dashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto space-y-6 p-4 pb-8 md:p-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="font-display text-3xl font-bold">Olá ✨</h1>
@@ -208,7 +208,7 @@ function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-6 md:flex-row md:items-start">
-              <div className="mx-auto shrink-0 md:mx-0">
+              <div className="mx-auto shrink-0 origin-top scale-[0.92] md:mx-0 md:scale-100">
                 <NatalChartWheel data={wheelData} size={280} />
               </div>
               <div className="flex-1 space-y-3">

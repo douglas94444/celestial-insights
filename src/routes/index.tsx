@@ -128,10 +128,10 @@ function Landing() {
               <p className="mt-6 font-display text-4xl font-bold">R$ 0</p>
               <ul className="mt-6 space-y-3 text-sm">
                 {[
-                  "1 mapa astral salvo",
-                  "Sol, Lua e Ascendente",
-                  "Visualização interativa",
-                  "Horóscopo diário",
+                  "1 mapa natal guardado na conta",
+                  "Planetas, casas, aspectos e roda interativa",
+                  "Painel com horóscopo e destaques",
+                  "Interpretações na página do mapa",
                 ].map((t) => (
                   <li key={t} className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
@@ -149,16 +149,19 @@ function Landing() {
               </div>
               <h3 className="font-display text-2xl font-semibold">Premium</h3>
               <p className="mt-1 text-sm text-muted-foreground">Toda a profundidade do céu</p>
+              <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-500/90">
+                Checkout em preparação — sem cobrança até ativarmos pagamentos.
+              </p>
               <p className="mt-6 font-display text-4xl font-bold">
                 R$ 24,90<span className="text-base font-normal text-muted-foreground">/mês</span>
               </p>
               <ul className="mt-6 space-y-3 text-sm">
                 {[
                   "Mapas ilimitados",
-                  "10 planetas + casas + aspectos",
+                  "Planetas, casas e aspectos em todos os perfis",
                   "Sinastria completa",
                   "Trânsitos personalizados",
-                  "Download em PDF",
+                  "Download em PDF (onde disponível)",
                 ].map((t) => (
                   <li key={t} className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
@@ -167,8 +170,11 @@ function Landing() {
                 ))}
               </ul>
               <Button asChild className="mt-8 w-full bg-mystical text-white hover:opacity-90">
-                <Link to="/auth">Começar trial</Link>
+                <Link to="/auth">Entrar para ver planos na conta</Link>
               </Button>
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                Após o login: menu «Planos Premium» com o mesmo resumo e estado da assinatura.
+              </p>
             </div>
           </div>
         </div>

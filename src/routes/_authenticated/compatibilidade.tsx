@@ -200,7 +200,7 @@ function CompatibilidadePage() {
   const canSynastry = charts.length >= 2;
 
   return (
-    <div className="container mx-auto max-w-6xl p-6">
+    <div className="container mx-auto max-w-6xl p-4 pb-10 sm:p-6">
       <Button asChild variant="ghost" size="sm" className="mb-4">
         <Link to="/dashboard">
           <ArrowLeft className="mr-1 h-4 w-4" /> Voltar
@@ -209,8 +209,8 @@ function CompatibilidadePage() {
 
       <div className="mb-8 flex flex-wrap items-start gap-4 justify-between">
         <div>
-          <h1 className="font-display text-3xl font-bold flex items-center gap-2">
-            <Heart className="h-8 w-8 text-primary" />
+          <h1 className="flex items-center gap-2 font-display text-2xl font-bold sm:text-3xl">
+            <Heart className="h-7 w-7 shrink-0 text-primary sm:h-8 sm:w-8" />
             Sinastria
           </h1>
           <p className="mt-2 text-muted-foreground max-w-xl">
@@ -227,8 +227,12 @@ function CompatibilidadePage() {
           <AlertTitle>São necessários pelo menos dois mapas</AlertTitle>
           <AlertDescription className="flex flex-wrap gap-3 items-center mt-2">
             <span>
-              No plano gratuito só pode existir um mapa por conta — ou convida outra conta de teste,
-              ou cria mais mapas quando o Premium estiver disponível.
+              No plano gratuito só pode existir um mapa por conta — convide outra conta de teste ou,
+              quando o checkout estiver ativo, faça upgrade em{" "}
+              <Link to="/premium" className="font-medium text-primary underline underline-offset-2">
+                Planos Premium
+              </Link>
+              .
             </span>
             <Button asChild size="sm" variant="secondary">
               <Link to="/mapas/novo">Novo mapa</Link>
@@ -281,7 +285,7 @@ function CompatibilidadePage() {
             </Select>
           </div>
           <Button
-            className="bg-mystical text-white shrink-0"
+            className="min-h-11 w-full shrink-0 bg-mystical text-white sm:min-h-10 md:w-auto"
             disabled={
               !canSynastry ||
               !chart1Id ||
@@ -293,7 +297,7 @@ function CompatibilidadePage() {
           >
             {calcMutation.isPending ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A calcular…
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Calculando…
               </>
             ) : (
               <>
@@ -307,11 +311,13 @@ function CompatibilidadePage() {
       {activeView && (
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="space-y-4">
-            <SynastryBiWheel
-              baseChart={activeView.baseChart}
-              overlayChart={activeView.overlayChart}
-              synastryAspects={activeView.analysis.aspects}
-            />
+            <div className="-mx-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:overflow-visible">
+              <SynastryBiWheel
+                baseChart={activeView.baseChart}
+                overlayChart={activeView.overlayChart}
+                synastryAspects={activeView.analysis.aspects}
+              />
+            </div>
             <p className="text-center text-xs text-muted-foreground">
               Círculos claros com contorno lilás: primeiro mapa · Círculos esverdeados: segundo mapa
               · Linhas: aspectos entre os dois.

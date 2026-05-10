@@ -5,6 +5,13 @@ export type MomentShareCaptionInput = {
   luckLine?: string;
   colorLabel?: string;
   colorHex?: string;
+  /** Linha curta da essência do mapa (IA cacheada), alinhada ao cartão. */
+  essenceLine?: string;
+  /**
+   * Gancho do dia a partir de dados já calculados (ex.: 1.ª linha da narrativa de trânsito).
+   * Omitido se for redundante com `luckLine`.
+   */
+  transitHookLine?: string;
   brandHandle: string;
   shareUrl?: string | null;
   /** Predefinição «medium» equilibra linhas úteis para redes sociais. */
@@ -12,6 +19,17 @@ export type MomentShareCaptionInput = {
   /** Hashtags sem `#`; são prefixadas na saída. */
   hashtags?: readonly string[];
 };
+
+function clipCaptionText(raw: string, maxLen: number): string {
+  const t = raw.trim();
+  if (!t) return "";
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, Math.max(0, maxLen - 1))}…`;
+}
+
+function normCaptionLine(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 /** Hash determinístico FNV-1a (32-bit) para picks estáveis. */
 function hash32(input: string): number {
@@ -88,9 +106,17 @@ export function buildMomentShareCaption(input: MomentShareCaptionInput): string 
   const colorOk = input.colorLabel?.trim() && input.colorHex?.trim();
   const url = input.shareUrl?.trim();
 
+  const essence = input.essenceLine?.trim() ? clipCaptionText(input.essenceLine, 200) : "";
+  let hookRaw = input.transitHookLine?.trim() ? clipCaptionText(input.transitHookLine, 160) : "";
+  if (hookRaw && luck && normCaptionLine(hookRaw) === normCaptionLine(luck)) {
+    hookRaw = "";
+  }
+
   if (preset === "short") {
     lines.push(`Momento com o céu — ${input.titleFirstName}`);
     if (luck) lines.push(`Sorte: ${luck}`);
+    if (essence) lines.push(`Essência do mapa: ${essence}`);
+    if (hookRaw) lines.push(`Linhagem do céu hoje: ${hookRaw}`);
     lines.push(input.brandHandle);
   } else if (preset === "medium") {
     lines.push(`Momento com o céu — ${input.titleFirstName}`);
@@ -98,6 +124,8 @@ export function buildMomentShareCaption(input: MomentShareCaptionInput): string 
     if (colorOk) {
       lines.push(`Cor de hoje: ${input.colorLabel!.trim()} (${input.colorHex!.trim()})`);
     }
+    if (essence) lines.push(`Essência do mapa: ${essence}`);
+    if (hookRaw) lines.push(`Contexto simbólico do dia: ${hookRaw}`);
     lines.push(`Criado em ${input.brandHandle}`);
     if (url) lines.push(`Monte o seu mapa: ${url}`);
   } else {
@@ -106,6 +134,8 @@ export function buildMomentShareCaption(input: MomentShareCaptionInput): string 
     if (colorOk) {
       lines.push(`Cor de hoje: ${input.colorLabel!.trim()} (${input.colorHex!.trim()})`);
     }
+    if (essence) lines.push(`Essência do mapa: ${essence}`);
+    if (hookRaw) lines.push(`Contexto simbólico do dia: ${hookRaw}`);
     lines.push(`Um gesto de presença com o mapa natal — reflexão simbólica, sem fatalismo.`);
     lines.push(`Criado em ${input.brandHandle}`);
     if (url) {

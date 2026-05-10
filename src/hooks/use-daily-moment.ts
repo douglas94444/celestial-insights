@@ -22,11 +22,21 @@ import type {
 import { computeAngles } from "@/lib/astrology/calculate";
 import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
 import { analyzeTransitDay, analyzeTransitRange } from "@/lib/astrology/transits";
-import { generateTransitDayNarrativeFn } from "@/lib/ai-interpretation.functions";
-import type { AiInterpretationFnResult } from "@/lib/types/server-fn-results";
+import {
+  generateMorningDeepMessageFn,
+  generateNatalEssenceFn,
+  generateTransitDayNarrativeFn,
+} from "@/lib/ai-interpretation.functions";
+import type {
+  AiInterpretationFnResult,
+  MorningDeepMessageFnResult,
+  NatalEssenceFnResult,
+} from "@/lib/types/server-fn-results";
+import type { MorningDeepOutput } from "@/lib/schemas/personalization-ai";
 import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { toast } from "sonner";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
 import {
   buildPersonalizedMomentInsights,
   resolveMomentDisplayName,
@@ -35,6 +45,7 @@ import {
 export function useDailyMoment() {
   const { user, session } = useAuth();
   const [dashTransitAi, setDashTransitAi] = useState<string | null>(null);
+  const [morningDeep, setMorningDeep] = useState<MorningDeepOutput | null>(null);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
@@ -152,6 +163,10 @@ export function useDailyMoment() {
     setDashTransitAi(null);
   }, [primary?.id, todayStr]);
 
+  useEffect(() => {
+    setMorningDeep(null);
+  }, [primary?.id, todayStr]);
+
   const dashTransitAiMutation = useMutation<AiInterpretationFnResult, Error, void>({
     mutationFn: async () => {
       if (!session || !primary) throw new Error("Sessão ou mapa necessário.");
@@ -162,11 +177,52 @@ export function useDailyMoment() {
     },
     onSuccess: (r) => {
       setDashTransitAi(r.content);
+      if (user?.id)
+        insertEngagementEvent(supabase, user.id, {
+          route_key: ENGAGEMENT_ROUTES.momento,
+          topic_key: ENGAGEMENT_TOPICS.ai_transit_momento,
+          meta: { cached: r.cached },
+        });
       if (r.cached) toast.message("Texto recuperado do cache.");
     },
     onError: async (e) => {
       toast.error(await getServerFnErrorMessage(e));
     },
+  });
+
+  const morningDeepMutation = useMutation<MorningDeepMessageFnResult, Error, void>({
+    mutationFn: async () => {
+      if (!session || !primary) throw new Error("Sessão ou mapa necessário.");
+      return generateMorningDeepMessageFn({
+        data: { chartId: primary.id, date: todayStr },
+        ...withSupabaseAuth(session),
+      });
+    },
+    onSuccess: (r) => {
+      setMorningDeep(r.morning);
+      if (user?.id)
+        insertEngagementEvent(supabase, user.id, {
+          route_key: ENGAGEMENT_ROUTES.momento,
+          topic_key: ENGAGEMENT_TOPICS.ai_morning_deep,
+          meta: { cached: r.cached },
+        });
+      if (r.cached) toast.message("Carta profunda recuperada do cache.");
+    },
+    onError: async (e) => {
+      toast.error(await getServerFnErrorMessage(e));
+    },
+  });
+
+  const natalEssenceQuery = useQuery<NatalEssenceFnResult>({
+    queryKey: ["natal-essence", primary?.id],
+    queryFn: async () =>
+      generateNatalEssenceFn({
+        data: { chartId: primary!.id },
+        ...withSupabaseAuth(session!),
+      }),
+    enabled: !!session && !!primary?.id,
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
   });
 
   return {
@@ -195,6 +251,10 @@ export function useDailyMoment() {
     dashTransitAi,
     setDashTransitAi,
     dashTransitAiMutation,
+    morningDeep,
+    setMorningDeep,
+    morningDeepMutation,
+    natalEssenceQuery,
     personalizedInsights,
     displayName,
 

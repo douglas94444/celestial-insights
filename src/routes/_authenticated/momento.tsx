@@ -32,6 +32,8 @@ import {
 import { primarySunMoonAsc } from "@/lib/personalized-moment";
 import { pickMomentFallbackQuote, signLabelPt } from "@/data/daily-moment-fallback";
 import { buildMomentQuoteLines } from "@/lib/moment-quote";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
+import { supabase } from "@/integrations/supabase/client";
 import {
   captureMomentShareCardPng,
   downloadBlob,
@@ -65,6 +67,9 @@ function MomentoPage() {
     transitToday,
     dashTransitAi,
     dashTransitAiMutation,
+    morningDeep,
+    morningDeepMutation,
+    natalEssenceQuery,
     personalizedInsights,
     displayName,
     sunSign,
@@ -74,6 +79,14 @@ function MomentoPage() {
     profile,
     user,
   } = useDailyMoment();
+
+  useEffect(() => {
+    if (!primary?.id || !user?.id) return;
+    insertEngagementEvent(supabase, user.id, {
+      route_key: ENGAGEMENT_ROUTES.momento,
+      topic_key: ENGAGEMENT_TOPICS.moment_open,
+    });
+  }, [primary?.id, user?.id]);
 
   const viewYmd = pickedYmd ?? todayStr;
   const isTodayView = viewYmd === todayStr;
@@ -247,6 +260,26 @@ function MomentoPage() {
     personalizedInsights?.dominantElement,
   ]);
 
+  const captionTransitHookLine = useMemo(() => {
+    if (isTodayView && transitToday?.narrative?.length) {
+      const line = transitToday.narrative[0]!.replace(/^✦\s*/, "").trim();
+      return line || undefined;
+    }
+    if (!isTodayView && histEntry?.transitSnippet) {
+      const line = histEntry.transitSnippet.replace(/^✦\s*/, "").trim();
+      return line || undefined;
+    }
+    return undefined;
+  }, [isTodayView, transitToday, histEntry]);
+
+  const captionEssenceLine = useMemo(() => {
+    if (natalEssenceQuery.data?.essence && !natalEssenceQuery.isError) {
+      const t = natalEssenceQuery.data.essence.trim();
+      return t || undefined;
+    }
+    return undefined;
+  }, [natalEssenceQuery.data?.essence, natalEssenceQuery.isError]);
+
   const captionText = useMemo(
     () =>
       buildMomentShareCaption({
@@ -254,6 +287,8 @@ function MomentoPage() {
         luckLine: shareCardDailyResolved?.luckLine,
         colorLabel: shareCardDailyResolved?.colorLabel,
         colorHex: shareCardDailyResolved?.colorHex,
+        essenceLine: captionEssenceLine,
+        transitHookLine: captionTransitHookLine,
         brandHandle,
         shareUrl: sharePublicUrl || undefined,
         preset: captionPreset,
@@ -262,6 +297,8 @@ function MomentoPage() {
     [
       cardTitle,
       shareCardDailyResolved,
+      captionEssenceLine,
+      captionTransitHookLine,
       brandHandle,
       sharePublicUrl,
       captionPreset,
@@ -348,7 +385,7 @@ function MomentoPage() {
   const previewScale = "min(1, calc((100vw - 32px) / 1080))";
   const dashAiShown = isTodayView ? dashTransitAi : histEntry?.aiText;
   const narrativeShown = isTodayView
-    ? transitToday?.narrative.slice(0, 4)
+    ? (transitToday?.narrative.slice(0, 4) ?? [])
     : histEntry?.transitSnippet
       ? [histEntry.transitSnippet]
       : [];
@@ -470,25 +507,59 @@ function MomentoPage() {
           ) : null}
 
           {isTodayView ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full border-primary/25"
-              disabled={dashTransitAiMutation.isPending}
-              aria-label="Gerar texto do dia com inteligência artificial"
-              onClick={() => dashTransitAiMutation.mutate()}
-            >
-              {dashTransitAiMutation.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="mr-2 h-4 w-4" />
-              )}
-              Iluminar com IA
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full border-primary/25"
+                disabled={dashTransitAiMutation.isPending}
+                aria-label="Gerar texto do dia com inteligência artificial"
+                onClick={() => dashTransitAiMutation.mutate()}
+              >
+                {dashTransitAiMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                Iluminar com IA
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full border border-primary/10"
+                disabled={morningDeepMutation.isPending}
+                aria-label="Gerar carta do dia profunda com estrutura JSON"
+                onClick={() => morningDeepMutation.mutate()}
+              >
+                {morningDeepMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                Carta do dia (profunda)
+              </Button>
+            </div>
           ) : null}
           {dashAiShown ? (
             <article className="whitespace-pre-wrap rounded-md border border-primary/10 bg-background/40 p-3 text-xs leading-relaxed text-foreground/90">
               {dashAiShown}
+            </article>
+          ) : null}
+          {isTodayView && morningDeep ? (
+            <article className="space-y-3 rounded-md border border-accent/20 bg-muted/25 p-3 text-xs leading-relaxed text-foreground/90">
+              <p className="font-semibold text-primary">{morningDeep.greeting}</p>
+              <p className="whitespace-pre-wrap">{morningDeep.main_message}</p>
+              {morningDeep.secondary_theme ? (
+                <p className="text-muted-foreground">{morningDeep.secondary_theme}</p>
+              ) : null}
+              <p>
+                <span className="font-medium text-foreground">Dica prática:</span>{" "}
+                {morningDeep.practical_tip}
+              </p>
+              <p className="italic text-primary/90">«{morningDeep.affirmation}»</p>
+              {morningDeep.closing_note ? (
+                <p className="text-[11px] text-muted-foreground">{morningDeep.closing_note}</p>
+              ) : null}
             </article>
           ) : null}
         </CardContent>
@@ -513,6 +584,11 @@ function MomentoPage() {
               ref={cardRef}
               displayName={cardTitle}
               identityLine={identityLine}
+              essenceLine={
+                natalEssenceQuery.data?.essence && !natalEssenceQuery.isError
+                  ? natalEssenceQuery.data.essence
+                  : undefined
+              }
               quoteLines={quoteLinesForCard}
               dominantElement={personalizedInsights.dominantElement}
               purposeLine={personalizedInsights.purposeLine}

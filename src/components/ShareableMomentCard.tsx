@@ -5,6 +5,8 @@ import { NatalChartWheel } from "@/components/NatalChartWheel";
 export type ShareableMomentCardProps = {
   displayName: string;
   identityLine: string;
+  /** Frase curta gerada por IA (opcional). */
+  essenceLine?: string;
   quoteLines: string[];
   dominantElement: string;
   purposeLine: string;
@@ -29,6 +31,7 @@ export const ShareableMomentCard = forwardRef<HTMLDivElement, ShareableMomentCar
     {
       displayName,
       identityLine,
+      essenceLine,
       quoteLines,
       dominantElement,
       purposeLine,
@@ -73,6 +76,17 @@ export const ShareableMomentCard = forwardRef<HTMLDivElement, ShareableMomentCar
           <p className="mt-8 text-center font-display text-[30px] font-medium leading-snug text-white/92">
             {identityLine}
           </p>
+
+          {essenceLine ? (
+            <p className="mt-6 max-w-[920px] text-center font-display text-[26px] font-normal italic leading-snug text-violet-200/90">
+              {essenceLine}
+            </p>
+          ) : null}
+          {essenceLine ? (
+            <p className="mt-4 max-w-[920px] text-center font-display text-[18px] leading-snug text-white/42">
+              Essência gerada por IA · reflexão simbólica
+            </p>
+          ) : null}
 
           <div className="mt-10 flex flex-1 flex-col items-center justify-start">
             <div className="rounded-full bg-black/25 p-4 ring-2 ring-white/15 shadow-inner">

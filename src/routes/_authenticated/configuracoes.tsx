@@ -30,9 +30,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
+import { parseFocusAreasFromProfileJson } from "@/lib/user-astro-profile";
 import {
   profileNameSchema,
   profilePreferencesSchema,
+  personalizationToneSchema,
+  type FocusAreaKey,
   type ProfilePreferencesForm,
 } from "@/lib/schemas/profile";
 import { deleteAccountFn } from "@/lib/profile.functions";
@@ -42,6 +46,15 @@ import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   component: Settings,
 });
+
+const FOCUS_AREA_LABELS: Record<FocusAreaKey, string> = {
+  AMOR: "Amor & vínculos",
+  CARREIRA: "Carreira & propósito",
+  SAUDE: "Saúde & corpo",
+  FAMILIA: "Família & raízes",
+  FINANCAS: "Finanças & recursos",
+  ESPIRITUALIDADE: "Espiritualidade & sentido",
+};
 
 function Settings() {
   const { user, session, signOut } = useAuth();
@@ -78,6 +91,9 @@ function Settings() {
       transit_digest_auto: false,
       transit_digest_hour: 8,
       transit_digest_weekdays: [1, 2, 3, 4, 5] as number[],
+      personalization_gender: "NONE",
+      personalization_tone: "PRATICO",
+      personalization_focus_areas: [] as FocusAreaKey[],
     },
   });
 
@@ -96,6 +112,20 @@ function Settings() {
           profile.transit_digest_weekdays.length > 0
             ? [...profile.transit_digest_weekdays].sort((a, b) => a - b)
             : [1, 2, 3, 4, 5],
+        personalization_gender:
+          profile.personalization_gender === "M" ||
+          profile.personalization_gender === "F" ||
+          profile.personalization_gender === "NB" ||
+          profile.personalization_gender === "OTHER"
+            ? profile.personalization_gender
+            : "NONE",
+        personalization_tone: (() => {
+          const r = personalizationToneSchema.safeParse(profile.personalization_tone);
+          return r.success ? r.data : "PRATICO";
+        })(),
+        personalization_focus_areas: parseFocusAreasFromProfileJson(
+          profile.personalization_focus_areas,
+        ),
       });
     }
   }, [profile, nameForm, prefForm]);
@@ -123,11 +153,19 @@ function Settings() {
         transit_digest_auto: values.transit_digest_auto,
         transit_digest_hour: values.transit_digest_hour,
         transit_digest_weekdays: values.transit_digest_weekdays,
+        personalization_gender:
+          values.personalization_gender === "NONE" ? null : values.personalization_gender,
+        personalization_tone: values.personalization_tone,
+        personalization_focus_areas: values.personalization_focus_areas,
       })
       .eq("id", user!.id);
     if (error) toast.error(error.message);
     else {
       toast.success("Preferências salvas");
+      insertEngagementEvent(supabase, user!.id, {
+        route_key: ENGAGEMENT_ROUTES.configuracoes,
+        topic_key: ENGAGEMENT_TOPICS.prefs_saved,
+      });
       qc.invalidateQueries({ queryKey: ["profile", user!.id] });
     }
   }
@@ -411,6 +449,101 @@ function Settings() {
                       </FormItem>
                     )}
                   />
+
+                  <div className="rounded-lg border border-primary/15 bg-muted/10 p-4 space-y-4">
+                    <p className="text-sm font-medium">Personalização para IA astrológica</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Estas preferências entram nos prompts das mensagens profundas, da linha de
+                      essência e da sinastria — não alteram os cálculos do mapa.
+                    </p>
+                    <FormField
+                      control={prefForm.control}
+                      name="personalization_tone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tom dos textos</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="PRATICO">Prático</SelectItem>
+                              <SelectItem value="MOTIVACIONAL">Motivacional</SelectItem>
+                              <SelectItem value="REALISTA">Realista</SelectItem>
+                              <SelectItem value="ESPIRITUAL">Espiritual suave</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={prefForm.control}
+                      name="personalization_gender"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Género (opcional)</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Prefiro não indicar" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="NONE">Prefiro não indicar</SelectItem>
+                              <SelectItem value="M">Mulher</SelectItem>
+                              <SelectItem value="F">Homem</SelectItem>
+                              <SelectItem value="NB">Não-binário</SelectItem>
+                              <SelectItem value="OTHER">Outro</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={prefForm.control}
+                      name="personalization_focus_areas"
+                      render={({ field }) => {
+                        const selected = field.value ?? [];
+                        return (
+                          <FormItem>
+                            <FormLabel>Áreas de foco (até 6)</FormLabel>
+                            <p className="text-xs text-muted-foreground mb-2">
+                              Ajuda a orientar exemplos nas mensagens geradas por IA.
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {(Object.keys(FOCUS_AREA_LABELS) as FocusAreaKey[]).map((key) => {
+                                const on = selected.includes(key);
+                                return (
+                                  <Button
+                                    key={key}
+                                    type="button"
+                                    size="sm"
+                                    variant={on ? "secondary" : "outline"}
+                                    disabled={!on && selected.length >= 6}
+                                    onClick={() => {
+                                      const next = on
+                                        ? selected.filter((k: FocusAreaKey) => k !== key)
+                                        : selected.length < 6
+                                          ? [...selected, key]
+                                          : selected;
+                                      field.onChange(next);
+                                    }}
+                                  >
+                                    {FOCUS_AREA_LABELS[key]}
+                                  </Button>
+                                );
+                              })}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                  </div>
 
                   <FormField
                     control={prefForm.control}

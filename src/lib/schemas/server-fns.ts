@@ -68,3 +68,20 @@ export const transitDayNarrativeInputSchema = z.object({
 });
 
 export type TransitDayNarrativeInput = z.infer<typeof transitDayNarrativeInputSchema>;
+
+export const morningDeepMessageInputSchema = z.object({
+  chartId: chartIdSchema,
+  date: dateYmdSchema,
+});
+
+export type MorningDeepMessageInput = z.infer<typeof morningDeepMessageInputSchema>;
+
+export const natalEssenceInputSchema = z.object({
+  chartId: chartIdSchema,
+});
+
+export type NatalEssenceInput = z.infer<typeof natalEssenceInputSchema>;
+
+export const synastryDeepNarrativeInputSchema = synastryNarrativeInputSchema;
+
+export type SynastryDeepNarrativeInput = z.infer<typeof synastryDeepNarrativeInputSchema>;

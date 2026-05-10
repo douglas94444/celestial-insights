@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Stars, Sparkles, CalendarRange } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
 import { UpgradeMapModal } from "@/components/UpgradeMapModal";
 import { useDailyMoment } from "@/hooks/use-daily-moment";
+import { useAuth } from "@/hooks/use-auth";
+import { supabase } from "@/integrations/supabase/client";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
 import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -16,6 +19,15 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const navigate = useNavigate();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    insertEngagementEvent(supabase, user.id, {
+      route_key: ENGAGEMENT_ROUTES.dashboard,
+      topic_key: ENGAGEMENT_TOPICS.dashboard_open,
+    });
+  }, [user?.id]);
 
   const {
     profile,

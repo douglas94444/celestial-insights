@@ -3,11 +3,18 @@ import type { SynastryAnalysis } from "@/lib/astrology/synastry";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import type { ChartRow } from "@/lib/chart-from-row";
 import type { Database } from "@/integrations/supabase/types";
+import type { MorningDeepOutput, SynastryDeepOutput } from "@/lib/schemas/personalization-ai";
 
 export type SynastryRow = Database["public"]["Tables"]["synastries"]["Row"];
 
 /** Resposta típica das funções de interpretação IA (cache hit/miss). */
 export type AiInterpretationFnResult = { cached: boolean; content: string };
+
+export type MorningDeepMessageFnResult = { cached: boolean; morning: MorningDeepOutput };
+
+export type NatalEssenceFnResult = { cached: boolean; essence: string };
+
+export type SynastryDeepNarrativeFnResult = { cached: boolean; deep: SynastryDeepOutput };
 
 export type CreateChartFnResult = { chart: ChartRow; computed: ChartData };
 

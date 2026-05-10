@@ -1,4 +1,4 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
+﻿export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -152,6 +152,33 @@ export type Database = {
           },
         ];
       };
+      user_engagement_events: {
+        Row: {
+          id: string;
+          user_id: string;
+          route_key: string;
+          topic_key: string | null;
+          meta: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          route_key: string;
+          topic_key?: string | null;
+          meta?: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          route_key?: string;
+          topic_key?: string | null;
+          meta?: Json;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       profiles: {
         Row: {
           avatar_url: string | null;
@@ -163,6 +190,9 @@ export type Database = {
           moment_last_visit_ymd: string | null;
           moment_streak: number;
           name: string | null;
+          personalization_focus_areas: Json;
+          personalization_gender: string | null;
+          personalization_tone: string;
           stripe_customer_id: string | null;
           subscription_tier: Database["public"]["Enums"]["subscription_tier"];
           transit_digest_auto: boolean;
@@ -181,6 +211,9 @@ export type Database = {
           moment_last_visit_ymd?: string | null;
           moment_streak?: number;
           name?: string | null;
+          personalization_focus_areas?: Json;
+          personalization_gender?: string | null;
+          personalization_tone?: string;
           stripe_customer_id?: string | null;
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"];
           transit_digest_auto?: boolean;
@@ -199,6 +232,9 @@ export type Database = {
           moment_last_visit_ymd?: string | null;
           moment_streak?: number;
           name?: string | null;
+          personalization_focus_areas?: Json;
+          personalization_gender?: string | null;
+          personalization_tone?: string;
           stripe_customer_id?: string | null;
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"];
           transit_digest_auto?: boolean;
@@ -290,7 +326,14 @@ export type Database = {
     };
     Enums: {
       app_role: "admin" | "user";
-      interpretation_ai_kind: "natal_summary" | "natal_planet" | "synastry" | "transit_day";
+      interpretation_ai_kind:
+        | "natal_summary"
+        | "natal_planet"
+        | "synastry"
+        | "transit_day"
+        | "morning_deep"
+        | "natal_essence"
+        | "synastry_deep";
       subscription_tier: "FREE" | "PREMIUM";
     };
     CompositeTypes: {
@@ -418,7 +461,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
-      interpretation_ai_kind: ["natal_summary", "natal_planet", "synastry", "transit_day"],
+      interpretation_ai_kind: [
+        "natal_summary",
+        "natal_planet",
+        "synastry",
+        "transit_day",
+        "morning_deep",
+        "natal_essence",
+        "synastry_deep",
+      ],
       subscription_tier: ["FREE", "PREMIUM"],
     },
   },

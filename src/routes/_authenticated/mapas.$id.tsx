@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ChevronDown, Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ import { recalculateChartFn } from "@/lib/charts.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
 import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
 import type {
   AiInterpretationFnResult,
   RecalculateChartFnResult,
@@ -54,6 +55,15 @@ function ChartView() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session, user } = useAuth();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    insertEngagementEvent(supabase, user.id, {
+      route_key: ENGAGEMENT_ROUTES.mapas_detail,
+      topic_key: ENGAGEMENT_TOPICS.chart_detail_open,
+      meta: { chart_id: id },
+    });
+  }, [user?.id, id]);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
@@ -133,6 +143,12 @@ function ChartView() {
     },
     onSuccess: (r) => {
       setAiExecutiveText(r.content);
+      if (user?.id)
+        insertEngagementEvent(supabase, user.id, {
+          route_key: ENGAGEMENT_ROUTES.mapas_detail,
+          topic_key: ENGAGEMENT_TOPICS.ai_natal_executive,
+          meta: { chart_id: id, cached: r.cached },
+        });
       if (r.cached) toast.message("Texto recuperado do cache.");
     },
     onError: async (e) => {
@@ -152,6 +168,12 @@ function ChartView() {
     onSettled: () => setAiPlanetLoading(null),
     onSuccess: (r, planetKey) => {
       setAiPlanetTexts((prev) => ({ ...prev, [planetKey]: r.content }));
+      if (user?.id)
+        insertEngagementEvent(supabase, user.id, {
+          route_key: ENGAGEMENT_ROUTES.mapas_detail,
+          topic_key: ENGAGEMENT_TOPICS.ai_natal_planet,
+          meta: { chart_id: id, planet_key: planetKey, cached: r.cached },
+        });
       if (r.cached) toast.message("Texto recuperado do cache.");
     },
     onError: async (e) => {

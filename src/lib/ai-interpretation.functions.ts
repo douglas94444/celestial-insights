@@ -2,29 +2,60 @@ import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   AI_PROMPT_VERSION,
+  MORNING_DEEP_PROMPT_VERSION,
+  NATAL_ESSENCE_PROMPT_VERSION,
+  SYNASTRY_DEEP_PROMPT_VERSION,
+  buildMorningDeepFingerprintPayload,
+  buildNatalEssenceFingerprintPayload,
+  buildSynastryDeepFingerprintPayload,
   buildNatalFingerprintPayload,
   buildSynastryFingerprintPayload,
   buildTransitFingerprintPayload,
   formatNatalPromptContext,
   formatSynastryPromptContext,
   formatTransitPromptContext,
+  patternsFingerprintCompact,
   sha256FingerprintHex,
   type SynastryInterpretInput,
 } from "@/lib/ai/chart-summary";
+import { extractFirstJsonObject } from "@/lib/ai/json-response";
 import { completeChat, resolveAiProvider } from "@/lib/ai/llm-provider";
 import type { HouseSystemId } from "@/lib/astrology/calculate";
 import type { SynastryAreaScores, SynastryCrossAspect } from "@/lib/astrology/synastry";
 import { analyzeTransitDay } from "@/lib/astrology/transits";
 import { PLANETS } from "@/lib/astrology/zodiac";
 import { chartRowToChartData } from "@/lib/chart-from-row";
+import { deriveChartPatterns } from "@/lib/chart-patterns";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
 import {
+  parseSynastryDeepCached,
+  synastryDeepFromLlm,
+  SYNASTRY_COMPOSITE_MVP_PT,
+} from "@/lib/ai/synastry-deep-parse";
+import {
+  morningDeepOutputSchema,
+  natalEssenceOutputSchema,
+  type MorningDeepOutput,
+} from "@/lib/schemas/personalization-ai";
+import {
+  morningDeepMessageInputSchema,
+  natalEssenceInputSchema,
   natalExecutiveSummaryInputSchema,
   natalPlanetInsightInputSchema,
+  synastryDeepNarrativeInputSchema,
   synastryNarrativeInputSchema,
   transitDayNarrativeInputSchema,
 } from "@/lib/schemas/server-fns";
+import {
+  compactReadingHistoryForFingerprint,
+  fetchReadingHistorySummary,
+} from "@/lib/reading-history";
+import {
+  buildUserAstroProfile,
+  parseFocusAreasFromProfileJson,
+  userAstroProfileLuminariesNote,
+} from "@/lib/user-astro-profile";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
 
@@ -36,6 +67,14 @@ const DISCLAIMER =
 
 const SYSTEM_ASTROLOGY_PT =
   'És um assistente de astrologia psicológica. Escreve em português do Brasil (PT-BR), com tom acolhedor e respeitoso. Evita fatalismo e previsões definitivas. Promove autoconhecimento e autonomia. Usa apenas os dados astrológicos que te forem dados; não inventes posições ou datas. Produz 2 a 4 parágrafos fluidos. No final, num parágrafo separado, inclui exactamente esta frase (entre aspas ou como citação): "' +
+  DISCLAIMER +
+  '".';
+
+const SYSTEM_ASTROLOGY_STRUCTURED_PT =
+  "És um assistente de astrologia psicológica. Escreve em português do Brasil (PT-BR). " +
+  "Responde APENAS com um único objeto JSON válido UTF-8 (sem markdown nem texto extra). " +
+  "Evita fatalismo; não inventes posições nem horários exactos não fornecidos. " +
+  'Inclui sempre textualmente em `closing_note` (mensagem profunda do dia) ou `integration_summary` (sinastria profunda) o aviso: "' +
   DISCLAIMER +
   '".';
 
@@ -120,6 +159,55 @@ function parseSynastryPayload(raw: unknown): SynastryInterpretInput | null {
     areas: o.areas as SynastryAreaScores,
     highlights: Array.isArray(o.highlights) ? (o.highlights as string[]) : [],
   };
+}
+
+function parseMorningDeepCached(content: string): MorningDeepOutput | null {
+  try {
+    const o = JSON.parse(content) as unknown;
+    const p = morningDeepOutputSchema.safeParse(o);
+    return p.success ? p.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseMorningDeepFromLlm(text: string): MorningDeepOutput {
+  try {
+    const raw = extractFirstJsonObject(text);
+    const p = morningDeepOutputSchema.safeParse(raw);
+    if (p.success) return p.data;
+  } catch {
+    /* ignore */
+  }
+  return {
+    greeting: "Olá",
+    main_message: text.trim().slice(0, 4200),
+    practical_tip: "Reserva um momento calmo para integrar o dia.",
+    affirmation: "Posso escolher como respondo ao que o dia pede.",
+    closing_note: DISCLAIMER,
+  };
+}
+
+function parseNatalEssenceCached(content: string): string | null {
+  try {
+    const o = JSON.parse(content) as unknown;
+    const p = natalEssenceOutputSchema.safeParse(o);
+    return p.success ? p.data.essence : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseNatalEssenceFromLlm(text: string): string {
+  try {
+    const raw = extractFirstJsonObject(text);
+    const p = natalEssenceOutputSchema.safeParse(raw);
+    if (p.success) return p.data.essence;
+  } catch {
+    /* ignore */
+  }
+  const t = text.replace(/^["']|["']$/g, "").trim();
+  return t.slice(0, 220) || "Presença entre o céu interior e o mundo.";
 }
 
 async function fetchSynastryOwned(
@@ -555,5 +643,398 @@ export const generateTransitDayNarrativeFn = createServerFn({ method: "POST" })
       if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
       return { cached: false as const, content: completion.text };
+    }),
+  );
+
+export const generateMorningDeepMessageFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    const parsed = morningDeepMessageInputSchema.safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
+    return parsed.data;
+  })
+  .handler(
+    timedServerFn("generateMorningDeepMessageFn", async ({ data, context }) => {
+      const supabase = context.supabase;
+      const userId = context.userId;
+      const kind: InterpretationKind = "morning_deep";
+
+      const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
+        await Promise.all([
+          supabase
+            .from("profiles")
+            .select(
+              "subscription_tier, name, personalization_gender, personalization_tone, personalization_focus_areas",
+            )
+            .eq("id", userId)
+            .single(),
+          supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
+        ]);
+
+      if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
+      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
+
+      const tier = profile?.subscription_tier ?? "FREE";
+      const chartData = chartRowToChartData(chart);
+      const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
+      const dayPayload = analyzeTransitDay(
+        data.date,
+        chartData.planets,
+        chartData.houses,
+        chartData.ascendant,
+        houseSystem,
+      );
+
+      const patterns = deriveChartPatterns(chartData);
+      const patternsCompact = patternsFingerprintCompact(patterns);
+      const readingHistory = await fetchReadingHistorySummary(supabase, userId);
+      const readingCompact = compactReadingHistoryForFingerprint(readingHistory);
+
+      const toneRaw = profile?.personalization_tone ?? "PRATICO";
+      const genderRaw = profile?.personalization_gender ?? null;
+      const focusAreas = parseFocusAreasFromProfileJson(profile?.personalization_focus_areas);
+
+      const astroProfile = buildUserAstroProfile({
+        chartRow: chart,
+        chartData,
+        profileDisplayName: profile?.name ?? null,
+        personalizationGender: genderRaw,
+        personalizationTone: toneRaw,
+        personalizationFocusAreas: profile?.personalization_focus_areas ?? [],
+        transitDay: dayPayload,
+        readingHistory,
+      });
+
+      const fpPayload = buildMorningDeepFingerprintPayload({
+        chart,
+        dateYmd: data.date,
+        tone: astroProfile.preferences.tone,
+        gender: astroProfile.personal.gender,
+        focusAreas,
+        patternsCompact,
+        readingHistoryCompact: readingCompact,
+      });
+      const fingerprint = await sha256FingerprintHex(fpPayload);
+
+      const { data: cached, error: cacheErr } = await supabase
+        .from("interpretation_ai_cache")
+        .select("content")
+        .eq("user_id", userId)
+        .eq("kind", kind)
+        .eq("fingerprint", fingerprint)
+        .maybeSingle();
+
+      if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
+      const cachedParsed = cached?.content ? parseMorningDeepCached(cached.content) : null;
+      if (cachedParsed) return { cached: true as const, morning: cachedParsed };
+
+      await assertAiGenerationAllowed(supabase, userId, tier);
+
+      if (!resolveAiProvider()) {
+        throw jsonError(
+          503,
+          "LLM_NOT_CONFIGURED",
+          "Serviço de IA não configurado no servidor (chaves em falta).",
+        );
+      }
+
+      const transitCtx = formatTransitPromptContext(chart, dayPayload);
+      const profileJson = JSON.stringify(astroProfile, null, 2);
+      const userPrompt = `Perfil astrológico do utilizador (JSON):\n${profileJson}\n\nReferência rápida:\n${userAstroProfileLuminariesNote(astroProfile)}\n\nContexto do trânsito do dia:\n${transitCtx}\n\nTarefa: devolve um objeto JSON com as chaves exactas: greeting (saudação curta), main_message (2–4 parágrafos simbólicos integrando trânsito + padrões), secondary_theme (opcional, string curta), practical_tip (ação concreta), affirmation (uma frase), closing_note (deve incluir o aviso legal pedido no system). Tom preferido: ${astroProfile.preferences.tone}. Áreas de foco: ${focusAreas.length ? focusAreas.join(", ") : "equilíbrio geral"}.`;
+
+      const t0 = Date.now();
+      let completion;
+      try {
+        completion = await completeChat(SYSTEM_ASTROLOGY_STRUCTURED_PT, userPrompt, {
+          maxTokens: 4096,
+          maxResponseChars: 14_000,
+          jsonObject: true,
+        });
+      } catch (e) {
+        console.error("[ai-interpretation] morning_deep LLM", e);
+        throw jsonError(
+          503,
+          "LLM_UNAVAILABLE",
+          e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
+        );
+      }
+      const morning = parseMorningDeepFromLlm(completion.text);
+      console.info(
+        `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
+      );
+
+      const serialized = JSON.stringify(morning);
+      const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
+        user_id: userId,
+        kind,
+        fingerprint,
+        chart_id: chart.id,
+        synastry_id: null,
+        transit_date: data.date,
+        prompt_version: MORNING_DEEP_PROMPT_VERSION,
+        model: completion.model,
+        content: serialized,
+        tokens_in: completion.tokensIn ?? null,
+        tokens_out: completion.tokensOut ?? null,
+      });
+
+      if (insertErr?.code === "23505") {
+        const { data: again } = await supabase
+          .from("interpretation_ai_cache")
+          .select("content")
+          .eq("user_id", userId)
+          .eq("kind", kind)
+          .eq("fingerprint", fingerprint)
+          .maybeSingle();
+        const p2 = again?.content ? parseMorningDeepCached(again.content) : null;
+        if (p2) return { cached: true as const, morning: p2 };
+      }
+      if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
+
+      return { cached: false as const, morning };
+    }),
+  );
+
+export const generateNatalEssenceFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    const parsed = natalEssenceInputSchema.safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
+    return parsed.data;
+  })
+  .handler(
+    timedServerFn("generateNatalEssenceFn", async ({ data, context }) => {
+      const supabase = context.supabase;
+      const userId = context.userId;
+      const kind: InterpretationKind = "natal_essence";
+
+      const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
+        await Promise.all([
+          supabase
+            .from("profiles")
+            .select(
+              "subscription_tier, personalization_gender, personalization_tone, personalization_focus_areas",
+            )
+            .eq("id", userId)
+            .single(),
+          supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
+        ]);
+
+      if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
+      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
+
+      const tier = profile?.subscription_tier ?? "FREE";
+      const chartData = chartRowToChartData(chart);
+      const patterns = deriveChartPatterns(chartData);
+      const patternsCompact = patternsFingerprintCompact(patterns);
+      const toneRaw = profile?.personalization_tone ?? "PRATICO";
+      const genderRaw = profile?.personalization_gender ?? null;
+      const focusAreas = parseFocusAreasFromProfileJson(profile?.personalization_focus_areas);
+
+      const fpPayload = buildNatalEssenceFingerprintPayload({
+        chart,
+        tone: toneRaw,
+        gender: genderRaw,
+        focusAreas,
+        patternsCompact,
+      });
+      const fingerprint = await sha256FingerprintHex(fpPayload);
+
+      const { data: cached, error: cacheErr } = await supabase
+        .from("interpretation_ai_cache")
+        .select("content")
+        .eq("user_id", userId)
+        .eq("kind", kind)
+        .eq("fingerprint", fingerprint)
+        .maybeSingle();
+
+      if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
+      const essenceCached = cached?.content ? parseNatalEssenceCached(cached.content) : null;
+      if (essenceCached) return { cached: true as const, essence: essenceCached };
+
+      await assertAiGenerationAllowed(supabase, userId, tier);
+
+      if (!resolveAiProvider()) {
+        throw jsonError(
+          503,
+          "LLM_NOT_CONFIGURED",
+          "Serviço de IA não configurado no servidor (chaves em falta).",
+        );
+      }
+
+      const ctx = formatNatalPromptContext(chart, chartData);
+      const userPrompt = `${ctx}\n\nTarefa: uma única linha «essência» do mapa (máx. 200 caracteres), voz activa, simbólica, sem contradizer dados. Tom preferido: ${toneRaw}. Áreas de foco: ${focusAreas.length ? focusAreas.join(", ") : "equilíbrio geral"}.\nDevolve JSON exacto: {"essence":"<texto>"}`;
+
+      const t0 = Date.now();
+      let completion;
+      try {
+        completion = await completeChat(SYSTEM_ASTROLOGY_STRUCTURED_PT, userPrompt, {
+          maxTokens: 1024,
+          maxResponseChars: 1200,
+          jsonObject: true,
+        });
+      } catch (e) {
+        console.error("[ai-interpretation] natal_essence LLM", e);
+        throw jsonError(
+          503,
+          "LLM_UNAVAILABLE",
+          e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
+        );
+      }
+      const essence = parseNatalEssenceFromLlm(completion.text);
+      const serialized = JSON.stringify({ essence });
+      console.info(
+        `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
+      );
+
+      const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
+        user_id: userId,
+        kind,
+        fingerprint,
+        chart_id: chart.id,
+        synastry_id: null,
+        transit_date: null,
+        prompt_version: NATAL_ESSENCE_PROMPT_VERSION,
+        model: completion.model,
+        content: serialized,
+        tokens_in: completion.tokensIn ?? null,
+        tokens_out: completion.tokensOut ?? null,
+      });
+
+      if (insertErr?.code === "23505") {
+        const { data: again } = await supabase
+          .from("interpretation_ai_cache")
+          .select("content")
+          .eq("user_id", userId)
+          .eq("kind", kind)
+          .eq("fingerprint", fingerprint)
+          .maybeSingle();
+        const e2 = again?.content ? parseNatalEssenceCached(again.content) : null;
+        if (e2) return { cached: true as const, essence: e2 };
+      }
+      if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
+
+      return { cached: false as const, essence };
+    }),
+  );
+
+export const generateSynastryDeepNarrativeFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    const parsed = synastryDeepNarrativeInputSchema.safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
+    return parsed.data;
+  })
+  .handler(
+    timedServerFn("generateSynastryDeepNarrativeFn", async ({ data, context }) => {
+      const supabase = context.supabase;
+      const userId = context.userId;
+      const kind: InterpretationKind = "synastry_deep";
+
+      const { data: profile, error: profileErr } = await supabase
+        .from("profiles")
+        .select(
+          "subscription_tier, personalization_gender, personalization_tone, personalization_focus_areas",
+        )
+        .eq("id", userId)
+        .single();
+
+      if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
+      const tier = profile?.subscription_tier ?? "FREE";
+
+      const row = await fetchSynastryOwned(supabase, userId, data);
+      if (!row) throw jsonError(404, "NOT_FOUND", "Sinastria não encontrada.");
+
+      const parsedPayload = parseSynastryPayload(row.compatibility_data);
+      if (!parsedPayload) {
+        throw jsonError(500, "INVALID_DATA", "Dados de compatibilidade inválidos.");
+      }
+
+      const toneRaw = profile?.personalization_tone ?? "PRATICO";
+      const genderRaw = profile?.personalization_gender ?? null;
+      const focusAreas = parseFocusAreasFromProfileJson(profile?.personalization_focus_areas);
+
+      const fpPayload = buildSynastryDeepFingerprintPayload(row, parsedPayload, {
+        tone: toneRaw,
+        gender: genderRaw,
+        focusAreas,
+      });
+      const fingerprint = await sha256FingerprintHex(fpPayload);
+
+      const { data: cached, error: cacheErr } = await supabase
+        .from("interpretation_ai_cache")
+        .select("content")
+        .eq("user_id", userId)
+        .eq("kind", kind)
+        .eq("fingerprint", fingerprint)
+        .maybeSingle();
+
+      if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
+      const deepCached = cached?.content ? parseSynastryDeepCached(cached.content) : null;
+      if (deepCached) return { cached: true as const, deep: deepCached };
+
+      await assertAiGenerationAllowed(supabase, userId, tier);
+
+      if (!resolveAiProvider()) {
+        throw jsonError(
+          503,
+          "LLM_NOT_CONFIGURED",
+          "Serviço de IA não configurado no servidor (chaves em falta).",
+        );
+      }
+
+      const ctx = formatSynastryPromptContext(row, parsedPayload);
+      const userPrompt = `${ctx}\n\nPontuações por área (ecoar sem contradizer): amor ${parsedPayload.areas.love}, amizade ${parsedPayload.areas.friendship}, trabalho ${parsedPayload.areas.work}, convivência ${parsedPayload.areas.convivencia}.\n\n${SYNASTRY_COMPOSITE_MVP_PT}\n\nTarefa: responde só com JSON com chaves exactas: composite_disclaimer (repete ou parafraseia a limitação do mapa composto acima), overview, emotional_dynamics, communication_styles, intimacy_attraction, conflict_repair, daily_rhythm, long_term_growth, integration_summary (inclui o aviso legal do system). Tom IA preferido: ${toneRaw}. Áreas de foco do utilizador: ${focusAreas.length ? focusAreas.join(", ") : "equilíbrio geral"}.`;
+
+      const t0 = Date.now();
+      let completion;
+      try {
+        completion = await completeChat(SYSTEM_ASTROLOGY_STRUCTURED_PT, userPrompt, {
+          maxTokens: 4096,
+          maxResponseChars: 18_000,
+          jsonObject: true,
+        });
+      } catch (e) {
+        console.error("[ai-interpretation] synastry_deep LLM", e);
+        throw jsonError(
+          503,
+          "LLM_UNAVAILABLE",
+          e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
+        );
+      }
+      const deep = synastryDeepFromLlm(completion.text, DISCLAIMER);
+      const serialized = JSON.stringify(deep);
+      console.info(
+        `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
+      );
+
+      const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
+        user_id: userId,
+        kind,
+        fingerprint,
+        chart_id: null,
+        synastry_id: row.id,
+        transit_date: null,
+        prompt_version: SYNASTRY_DEEP_PROMPT_VERSION,
+        model: completion.model,
+        content: serialized,
+        tokens_in: completion.tokensIn ?? null,
+        tokens_out: completion.tokensOut ?? null,
+      });
+
+      if (insertErr?.code === "23505") {
+        const { data: again } = await supabase
+          .from("interpretation_ai_cache")
+          .select("content")
+          .eq("user_id", userId)
+          .eq("kind", kind)
+          .eq("fingerprint", fingerprint)
+          .maybeSingle();
+        const d2 = again?.content ? parseSynastryDeepCached(again.content) : null;
+        if (d2) return { cached: true as const, deep: d2 };
+      }
+      if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
+
+      return { cached: false as const, deep };
     }),
   );

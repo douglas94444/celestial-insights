@@ -22,11 +22,17 @@ import type {
   SynastryCrossAspect,
 } from "@/lib/astrology/synastry";
 import { chartRowToChartData } from "@/lib/chart-from-row";
-import { generateSynastryNarrativeFn } from "@/lib/ai-interpretation.functions";
+import {
+  generateSynastryDeepNarrativeFn,
+  generateSynastryNarrativeFn,
+} from "@/lib/ai-interpretation.functions";
 import type {
   AiInterpretationFnResult,
   CalculateAndSaveSynastryFnResult,
+  SynastryDeepNarrativeFnResult,
 } from "@/lib/types/server-fn-results";
+import type { SynastryDeepOutput } from "@/lib/schemas/personalization-ai";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
 import { calculateAndSaveSynastryFn } from "@/lib/synastry.functions";
 import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
@@ -73,7 +79,7 @@ const AREA_META: { key: keyof SynastryAreaScores; title: string; hint: string }[
 ];
 
 function CompatibilidadePage() {
-  const { session } = useAuth();
+  const { session, user } = useAuth();
   const qc = useQueryClient();
   const [chart1Id, setChart1Id] = useState<string>("");
   const [chart2Id, setChart2Id] = useState<string>("");
@@ -86,6 +92,7 @@ function CompatibilidadePage() {
     synastryId?: string;
   } | null>(null);
   const [synastryAiText, setSynastryAiText] = useState<string | null>(null);
+  const [synastryDeep, setSynastryDeep] = useState<SynastryDeepOutput | null>(null);
 
   const { data: charts = [], isLoading: chartsLoading } = useQuery({
     queryKey: ["charts-list"],
@@ -122,7 +129,17 @@ function CompatibilidadePage() {
 
   useEffect(() => {
     setSynastryAiText(null);
+    setSynastryDeep(null);
   }, [activeView?.synastryId]);
+
+  useEffect(() => {
+    if (!activeView?.synastryId || !user?.id) return;
+    insertEngagementEvent(supabase, user.id, {
+      route_key: "compatibilidade",
+      topic_key: "synastry_view",
+      meta: { synastry_id: activeView.synastryId },
+    });
+  }, [activeView?.synastryId, user?.id]);
 
   const synastryAiMutation = useMutation<AiInterpretationFnResult, Error, void>({
     mutationFn: async () => {
@@ -136,7 +153,38 @@ function CompatibilidadePage() {
     },
     onSuccess: (r) => {
       setSynastryAiText(r.content);
+      if (user?.id)
+        insertEngagementEvent(supabase, user.id, {
+          route_key: ENGAGEMENT_ROUTES.compatibilidade,
+          topic_key: ENGAGEMENT_TOPICS.ai_synastry_narrative,
+          meta: { cached: r.cached },
+        });
       if (r.cached) toast.message("Texto recuperado do cache.");
+    },
+    onError: async (e) => {
+      toast.error(await getServerFnErrorMessage(e));
+    },
+  });
+
+  const synastryDeepMutation = useMutation<SynastryDeepNarrativeFnResult, Error, void>({
+    mutationFn: async () => {
+      if (!session) throw new Error("Sessão necessária.");
+      const sid = activeView?.synastryId;
+      if (!sid) throw new Error("Sinastria não identificada.");
+      return generateSynastryDeepNarrativeFn({
+        data: { synastryId: sid },
+        ...withSupabaseAuth(session),
+      });
+    },
+    onSuccess: (r) => {
+      setSynastryDeep(r.deep);
+      if (user?.id)
+        insertEngagementEvent(supabase, user.id, {
+          route_key: ENGAGEMENT_ROUTES.compatibilidade,
+          topic_key: ENGAGEMENT_TOPICS.ai_synastry_deep,
+          meta: { cached: r.cached },
+        });
+      if (r.cached) toast.message("Análise profunda recuperada do cache.");
     },
     onError: async (e) => {
       toast.error(await getServerFnErrorMessage(e));
@@ -367,6 +415,61 @@ function CompatibilidadePage() {
                   {synastryAiText ? (
                     <article className="rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed whitespace-pre-wrap">
                       {synastryAiText}
+                    </article>
+                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={synastryDeepMutation.isPending}
+                    onClick={() => synastryDeepMutation.mutate()}
+                  >
+                    {synastryDeepMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 h-4 w-4" />
+                    )}
+                    Análise profunda (JSON)
+                  </Button>
+                  {synastryDeep ? (
+                    <article className="max-h-[520px] overflow-y-auto rounded-lg border border-primary/15 bg-background/40 p-3 text-xs leading-relaxed space-y-3">
+                      <p className="text-[11px] font-medium uppercase text-muted-foreground">
+                        Sinastria profunda
+                      </p>
+                      <p className="text-muted-foreground">{synastryDeep.composite_disclaimer}</p>
+                      <section>
+                        <h4 className="font-semibold text-sm">Visão geral</h4>
+                        <p>{synastryDeep.overview}</p>
+                      </section>
+                      <section>
+                        <h4 className="font-semibold text-sm">Dinâmica emocional</h4>
+                        <p>{synastryDeep.emotional_dynamics}</p>
+                      </section>
+                      <section>
+                        <h4 className="font-semibold text-sm">Comunicação</h4>
+                        <p>{synastryDeep.communication_styles}</p>
+                      </section>
+                      <section>
+                        <h4 className="font-semibold text-sm">Intimidade & atração</h4>
+                        <p>{synastryDeep.intimacy_attraction}</p>
+                      </section>
+                      <section>
+                        <h4 className="font-semibold text-sm">Conflito & reparação</h4>
+                        <p>{synastryDeep.conflict_repair}</p>
+                      </section>
+                      <section>
+                        <h4 className="font-semibold text-sm">Ritmo quotidiano</h4>
+                        <p>{synastryDeep.daily_rhythm}</p>
+                      </section>
+                      <section>
+                        <h4 className="font-semibold text-sm">Crescimento a longo prazo</h4>
+                        <p>{synastryDeep.long_term_growth}</p>
+                      </section>
+                      <section>
+                        <h4 className="font-semibold text-sm">Síntese</h4>
+                        <p>{synastryDeep.integration_summary}</p>
+                      </section>
                     </article>
                   ) : null}
                 </CardContent>

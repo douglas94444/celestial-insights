@@ -34,14 +34,21 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
 }
 
 const REQUEST_MS = parsePositiveInt(process.env.AI_REQUEST_TIMEOUT_MS, 35_000);
-const MAX_RESPONSE_CHARS = parsePositiveInt(process.env.AI_MAX_RESPONSE_CHARS, 10_000);
+const DEFAULT_MAX_RESPONSE_CHARS = parsePositiveInt(process.env.AI_MAX_RESPONSE_CHARS, 10_000);
 
-function sanitizeModelOutput(text: string): string {
+export type CompleteChatOptions = {
+  maxTokens?: number;
+  /** Só OpenAI: força `response_format: { type: "json_object" }`. */
+  jsonObject?: boolean;
+  maxResponseChars?: number;
+};
+
+function sanitizeModelOutput(text: string, maxChars: number): string {
   let t = text.trim();
   // Remove cercas de código comuns para entregar texto corrido à UI.
   t = t.replace(/^```[a-z]*\s*/i, "").replace(/\s*```$/i, "");
-  if (t.length > MAX_RESPONSE_CHARS) {
-    t = `${t.slice(0, MAX_RESPONSE_CHARS).trimEnd()}…`;
+  if (t.length > maxChars) {
+    t = `${t.slice(0, maxChars).trimEnd()}…`;
   }
   return t.trim();
 }
@@ -56,9 +63,15 @@ async function fetchWithTimeout(url: string, init: RequestInit, ms: number): Pro
   }
 }
 
-async function completeAnthropic(system: string, user: string): Promise<CompleteChatResult> {
+async function completeAnthropic(
+  system: string,
+  user: string,
+  opts?: CompleteChatOptions,
+): Promise<CompleteChatResult> {
   const key = process.env.ANTHROPIC_API_KEY!;
   const model = process.env.AI_ANTHROPIC_MODEL?.trim() || "claude-sonnet-4-20250514";
+  const maxTokens = opts?.maxTokens ?? 2048;
+  const maxChars = opts?.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS;
   const res = await fetchWithTimeout(
     "https://api.anthropic.com/v1/messages",
     {
@@ -70,7 +83,7 @@ async function completeAnthropic(system: string, user: string): Promise<Complete
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2048,
+        max_tokens: maxTokens,
         system,
         messages: [{ role: "user", content: user }],
       }),
@@ -100,7 +113,7 @@ async function completeAnthropic(system: string, user: string): Promise<Complete
     }
   }
   const usage = raw.usage as { input_tokens?: number; output_tokens?: number } | undefined;
-  const cleaned = sanitizeModelOutput(text);
+  const cleaned = sanitizeModelOutput(text, maxChars);
   if (!cleaned) throw new Error("Resposta do modelo vazia.");
   return {
     text: cleaned,
@@ -110,9 +123,15 @@ async function completeAnthropic(system: string, user: string): Promise<Complete
   };
 }
 
-async function completeOpenAI(system: string, user: string): Promise<CompleteChatResult> {
+async function completeOpenAI(
+  system: string,
+  user: string,
+  opts?: CompleteChatOptions,
+): Promise<CompleteChatResult> {
   const key = process.env.OPENAI_API_KEY!;
   const model = process.env.AI_OPENAI_MODEL?.trim() || "gpt-4o-mini";
+  const maxTokens = opts?.maxTokens ?? 2048;
+  const maxChars = opts?.maxResponseChars ?? DEFAULT_MAX_RESPONSE_CHARS;
   const res = await fetchWithTimeout(
     "https://api.openai.com/v1/chat/completions",
     {
@@ -127,7 +146,9 @@ async function completeOpenAI(system: string, user: string): Promise<CompleteCha
           { role: "system", content: system },
           { role: "user", content: user },
         ],
-        temperature: 0.7,
+        temperature: 0.65,
+        max_tokens: maxTokens,
+        ...(opts?.jsonObject ? { response_format: { type: "json_object" } } : {}),
       }),
     },
     REQUEST_MS,
@@ -148,7 +169,7 @@ async function completeOpenAI(system: string, user: string): Promise<CompleteCha
         completion_tokens?: number;
       }
     | undefined;
-  const cleaned = sanitizeModelOutput(text);
+  const cleaned = sanitizeModelOutput(text, maxChars);
   if (!cleaned) throw new Error("Resposta do modelo vazia.");
   return {
     text: cleaned,
@@ -161,13 +182,17 @@ async function completeOpenAI(system: string, user: string): Promise<CompleteCha
 /**
  * Completa um turno chat (system + user). Usa Anthropic ou OpenAI conforme env.
  */
-export async function completeChat(system: string, user: string): Promise<CompleteChatResult> {
+export async function completeChat(
+  system: string,
+  user: string,
+  opts?: CompleteChatOptions,
+): Promise<CompleteChatResult> {
   const provider = resolveAiProvider();
   if (!provider) {
     throw new Error(
       "LLM não configurado: defina ANTHROPIC_API_KEY ou OPENAI_API_KEY (e opcionalmente AI_PROVIDER).",
     );
   }
-  if (provider === "anthropic") return completeAnthropic(system, user);
-  return completeOpenAI(system, user);
+  if (provider === "anthropic") return completeAnthropic(system, user, opts);
+  return completeOpenAI(system, user, opts);
 }

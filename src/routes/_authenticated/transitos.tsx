@@ -29,6 +29,7 @@ import { calculateTransitsFn } from "@/lib/transits.functions";
 import { sendTransitDigestEmailFn } from "@/lib/email.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import {
   filterAspectsByFastTransit,
@@ -52,6 +53,14 @@ function planetLabel(key: PlanetKey) {
 function TransitosPage() {
   const { session, user } = useAuth();
   const qc = useQueryClient();
+
+  useEffect(() => {
+    if (!user?.id) return;
+    insertEngagementEvent(supabase, user.id, {
+      route_key: ENGAGEMENT_ROUTES.transitos,
+      topic_key: ENGAGEMENT_TOPICS.transitos_open,
+    });
+  }, [user?.id]);
 
   const [chartId, setChartId] = useState("");
   const [rangePreset, setRangePreset] = useState<"30" | "60" | "90">("30");
@@ -130,6 +139,12 @@ function TransitosPage() {
     },
     onSuccess: (r) => {
       setTransitAiText(r.content);
+      if (user?.id)
+        insertEngagementEvent(supabase, user.id, {
+          route_key: ENGAGEMENT_ROUTES.transitos,
+          topic_key: ENGAGEMENT_TOPICS.ai_transit_transitos,
+          meta: { chart_id: chartId, date: selectedKey, cached: r.cached },
+        });
       if (r.cached) toast.message("Texto recuperado do cache.");
     },
     onError: async (e) => {

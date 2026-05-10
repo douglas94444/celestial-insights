@@ -20,7 +20,13 @@ const ASPECT_COLOR: Record<string, string> = {
   sextil: "var(--chart-aspect-sextil)",
 };
 
-export function NatalChartWheel({ data, size = 520, highlightPlanet, onPlanetClick }: Props) {
+export function NatalChartWheel({
+  data,
+  size = 520,
+  highlightPlanet,
+  onPlanetClick,
+  reduceMotion,
+}: Props) {
   const cx = size / 2;
   const cy = size / 2;
   const rOuter = size / 2 - 4;

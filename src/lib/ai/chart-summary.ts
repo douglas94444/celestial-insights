@@ -1,6 +1,7 @@
 import type { Database } from "@/integrations/supabase/types";
 import type { Aspect, ChartData, PlanetPosition } from "@/lib/astrology/calculate";
 import { chartRowToChartData } from "@/lib/chart-from-row";
+import type { DerivedChartPatterns } from "@/lib/chart-patterns";
 import type { SynastryAreaScores, SynastryCrossAspect } from "@/lib/astrology/synastry";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import type { PlanetKey } from "@/lib/astrology/zodiac";
@@ -10,6 +11,83 @@ export type SynastryRow = Database["public"]["Tables"]["synastries"]["Row"];
 
 /** Versão do prompt incluída no fingerprint para invalidar cache ao mudar instruções. */
 export const AI_PROMPT_VERSION = "v1";
+
+export const MORNING_DEEP_PROMPT_VERSION = "md-v1";
+export const NATAL_ESSENCE_PROMPT_VERSION = "ne-v1";
+export const SYNASTRY_DEEP_PROMPT_VERSION = "sd-v1";
+
+export function patternsFingerprintCompact(
+  patterns: DerivedChartPatterns,
+): Record<string, unknown> {
+  return {
+    dominant_element: patterns.dominant_element,
+    dominant_modality: patterns.dominant_modality,
+    chart_shape: patterns.chart_shape,
+    stelliums: patterns.stelliums.map((s) => ({
+      kind: s.kind,
+      sign: s.sign,
+      house: s.house,
+      planets: [...s.planets].sort(),
+    })),
+    life_purpose: patterns.life_purpose,
+    main_challenges: patterns.main_challenges,
+    natural_talents: patterns.natural_talents,
+  };
+}
+
+export function buildMorningDeepFingerprintPayload(args: {
+  chart: ChartRow;
+  dateYmd: string;
+  tone: string;
+  gender: string | null;
+  focusAreas: string[];
+  patternsCompact: Record<string, unknown>;
+  readingHistoryCompact: Record<string, unknown>;
+}): Record<string, unknown> {
+  return {
+    pv: MORNING_DEEP_PROMPT_VERSION,
+    chartUpdatedAt: args.chart.updated_at,
+    date: args.dateYmd,
+    tone: args.tone,
+    gender: args.gender,
+    focus: [...args.focusAreas].sort(),
+    patterns: args.patternsCompact,
+    reading: args.readingHistoryCompact,
+  };
+}
+
+export function buildNatalEssenceFingerprintPayload(args: {
+  chart: ChartRow;
+  tone: string;
+  gender: string | null;
+  focusAreas: string[];
+  patternsCompact: Record<string, unknown>;
+}): Record<string, unknown> {
+  return {
+    pv: NATAL_ESSENCE_PROMPT_VERSION,
+    chartUpdatedAt: args.chart.updated_at,
+    tone: args.tone,
+    gender: args.gender,
+    focus: [...args.focusAreas].sort(),
+    patterns: args.patternsCompact,
+  };
+}
+
+export function buildSynastryDeepFingerprintPayload(
+  synastry: SynastryRow,
+  payload: SynastryInterpretInput,
+  prefs: { tone: string; gender: string | null; focusAreas: string[] },
+): Record<string, unknown> {
+  const core = buildSynastryFingerprintPayload(synastry, payload);
+  return {
+    ...core,
+    kind: "synastry_deep",
+    pv: SYNASTRY_DEEP_PROMPT_VERSION,
+    prefsTone: prefs.tone,
+    prefsGender: prefs.gender,
+    prefsFocus: [...prefs.focusAreas].sort(),
+  };
+}
 
 function round(n: number, dec: number): number {
   const p = 10 ** dec;

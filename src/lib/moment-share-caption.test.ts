@@ -54,6 +54,43 @@ describe("buildMomentShareCaption", () => {
     expect(text).not.toContain("Monte o seu mapa");
     expect(text).toContain("Criado em astro.app");
   });
+
+  it("inclui essência e gancho de trânsito quando presentes (médio)", () => {
+    const text = buildMomentShareCaption({
+      ...base,
+      preset: "medium",
+      essenceLine: " Luz entre estrutura e sonho.",
+      transitHookLine: "Lua em aspecto tenso com Saturno no mapa.",
+    });
+    expect(text).toContain("Essência do mapa:");
+    expect(text).toContain("Contexto simbólico do dia:");
+    expect(text).toContain("Lua em aspecto tenso");
+  });
+
+  it("omitir gancho quando igual à linha de sorte", () => {
+    const luck = "Mesmo texto repetido.";
+    const text = buildMomentShareCaption({
+      titleFirstName: "Ana",
+      luckLine: luck,
+      transitHookLine: luck,
+      brandHandle: "@astro",
+      preset: "short",
+    });
+    expect(text).not.toContain("Linhagem do céu hoje:");
+    expect(text).toContain("Sorte:");
+  });
+
+  it("preset curto inclui essência e gancho diferenciados", () => {
+    const text = buildMomentShareCaption({
+      titleFirstName: "Lua",
+      brandHandle: "@astro",
+      preset: "short",
+      essenceLine: "Essência curta.",
+      transitHookLine: "Primeira impressão simbólica.",
+    });
+    expect(text).toContain("Essência do mapa:");
+    expect(text).toContain("Linhagem do céu hoje:");
+  });
 });
 
 describe("suggestedMomentHashtags", () => {

@@ -164,12 +164,12 @@ function SignUpForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { name },
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: `${window.location.origin}/onboarding`,
       },
     });
     setBusy(false);
@@ -177,8 +177,25 @@ function SignUpForm() {
       toast.error(error.message);
       return;
     }
-    toast.success("Conta criada! Bem-vindo(a) ao AstroMap.");
-    navigate({ to: "/onboarding" });
+    // Email já registado: Supabase devolve user sem identities (sem erro, por segurança).
+    if (data.user?.identities?.length === 0) {
+      toast.message("Este email já está registado", {
+        description: "Inicie sessão com a sua palavra-passe no separador Entrar.",
+        duration: 8000,
+      });
+      return;
+    }
+    // Com "Confirmar email" no Supabase não há sessão até o utilizador abrir o link.
+    if (data.session) {
+      toast.success("Conta criada! Vamos configurar o seu mapa.");
+      navigate({ to: "/onboarding" });
+      return;
+    }
+    toast.success("Confirme o seu email", {
+      description:
+        "Enviámos um link para o seu email. Depois de confirmar, será enviado para o onboarding. Verifique também o spam.",
+      duration: 12000,
+    });
   }
 
   return (

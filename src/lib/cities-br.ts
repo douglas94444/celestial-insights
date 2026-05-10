@@ -1,0 +1,127 @@
+// Maiores cidades brasileiras com coordenadas e timezone.
+// Timezone offset em minutos (negativo = oeste de UTC). Brasil é principalmente UTC-3 (-180).
+export interface City {
+  name: string;
+  state: string;
+  lat: number;
+  lon: number;
+  tz: number; // offset em minutos
+}
+
+const TZ = -180; // UTC-3 (a maior parte do Brasil; Acre é -300, Fernando de Noronha é -120)
+
+export const CITIES_BR: City[] = [
+  { name: "São Paulo", state: "SP", lat: -23.5505, lon: -46.6333, tz: TZ },
+  { name: "Rio de Janeiro", state: "RJ", lat: -22.9068, lon: -43.1729, tz: TZ },
+  { name: "Brasília", state: "DF", lat: -15.7942, lon: -47.8825, tz: TZ },
+  { name: "Salvador", state: "BA", lat: -12.9714, lon: -38.5014, tz: TZ },
+  { name: "Fortaleza", state: "CE", lat: -3.7172, lon: -38.5433, tz: TZ },
+  { name: "Belo Horizonte", state: "MG", lat: -19.9167, lon: -43.9345, tz: TZ },
+  { name: "Manaus", state: "AM", lat: -3.119, lon: -60.0217, tz: -240 },
+  { name: "Curitiba", state: "PR", lat: -25.4284, lon: -49.2733, tz: TZ },
+  { name: "Recife", state: "PE", lat: -8.0476, lon: -34.877, tz: TZ },
+  { name: "Porto Alegre", state: "RS", lat: -30.0346, lon: -51.2177, tz: TZ },
+  { name: "Goiânia", state: "GO", lat: -16.6869, lon: -49.2648, tz: TZ },
+  { name: "Belém", state: "PA", lat: -1.4558, lon: -48.5039, tz: TZ },
+  { name: "Guarulhos", state: "SP", lat: -23.4543, lon: -46.5337, tz: TZ },
+  { name: "Campinas", state: "SP", lat: -22.9056, lon: -47.0608, tz: TZ },
+  { name: "São Luís", state: "MA", lat: -2.5307, lon: -44.3068, tz: TZ },
+  { name: "São Gonçalo", state: "RJ", lat: -22.8268, lon: -43.054, tz: TZ },
+  { name: "Maceió", state: "AL", lat: -9.6498, lon: -35.7089, tz: TZ },
+  { name: "Duque de Caxias", state: "RJ", lat: -22.7858, lon: -43.3055, tz: TZ },
+  { name: "Campo Grande", state: "MS", lat: -20.4697, lon: -54.6201, tz: -240 },
+  { name: "Natal", state: "RN", lat: -5.7945, lon: -35.211, tz: TZ },
+  { name: "Teresina", state: "PI", lat: -5.0892, lon: -42.8019, tz: TZ },
+  { name: "São Bernardo do Campo", state: "SP", lat: -23.6914, lon: -46.565, tz: TZ },
+  { name: "Nova Iguaçu", state: "RJ", lat: -22.7592, lon: -43.4511, tz: TZ },
+  { name: "João Pessoa", state: "PB", lat: -7.115, lon: -34.8631, tz: TZ },
+  { name: "Santo André", state: "SP", lat: -23.6639, lon: -46.5383, tz: TZ },
+  { name: "Osasco", state: "SP", lat: -23.5329, lon: -46.7918, tz: TZ },
+  { name: "Jaboatão dos Guararapes", state: "PE", lat: -8.1128, lon: -35.0148, tz: TZ },
+  { name: "São José dos Campos", state: "SP", lat: -23.2237, lon: -45.9009, tz: TZ },
+  { name: "Ribeirão Preto", state: "SP", lat: -21.1775, lon: -47.8103, tz: TZ },
+  { name: "Uberlândia", state: "MG", lat: -18.9186, lon: -48.2772, tz: TZ },
+  { name: "Sorocaba", state: "SP", lat: -23.5015, lon: -47.4526, tz: TZ },
+  { name: "Contagem", state: "MG", lat: -19.9317, lon: -44.0536, tz: TZ },
+  { name: "Aracaju", state: "SE", lat: -10.9472, lon: -37.0731, tz: TZ },
+  { name: "Feira de Santana", state: "BA", lat: -12.2667, lon: -38.9663, tz: TZ },
+  { name: "Cuiabá", state: "MT", lat: -15.601, lon: -56.0974, tz: -240 },
+  { name: "Joinville", state: "SC", lat: -26.3045, lon: -48.8487, tz: TZ },
+  { name: "Juiz de Fora", state: "MG", lat: -21.7642, lon: -43.3503, tz: TZ },
+  { name: "Londrina", state: "PR", lat: -23.3045, lon: -51.1696, tz: TZ },
+  { name: "Aparecida de Goiânia", state: "GO", lat: -16.8231, lon: -49.2438, tz: TZ },
+  { name: "Niterói", state: "RJ", lat: -22.8833, lon: -43.1036, tz: TZ },
+  { name: "Ananindeua", state: "PA", lat: -1.3656, lon: -48.3722, tz: TZ },
+  { name: "Porto Velho", state: "RO", lat: -8.7619, lon: -63.9039, tz: -240 },
+  { name: "Caxias do Sul", state: "RS", lat: -29.1678, lon: -51.1794, tz: TZ },
+  { name: "Florianópolis", state: "SC", lat: -27.5954, lon: -48.548, tz: TZ },
+  { name: "Macapá", state: "AP", lat: 0.0349, lon: -51.0694, tz: TZ },
+  { name: "Vila Velha", state: "ES", lat: -20.3297, lon: -40.2925, tz: TZ },
+  { name: "Mauá", state: "SP", lat: -23.6678, lon: -46.4613, tz: TZ },
+  { name: "São José do Rio Preto", state: "SP", lat: -20.8113, lon: -49.3759, tz: TZ },
+  { name: "Mogi das Cruzes", state: "SP", lat: -23.5226, lon: -46.1879, tz: TZ },
+  { name: "Diadema", state: "SP", lat: -23.6814, lon: -46.6207, tz: TZ },
+  { name: "Campos dos Goytacazes", state: "RJ", lat: -21.7587, lon: -41.3253, tz: TZ },
+  { name: "Betim", state: "MG", lat: -19.9678, lon: -44.198, tz: TZ },
+  { name: "Olinda", state: "PE", lat: -7.9939, lon: -34.8554, tz: TZ },
+  { name: "Carapicuíba", state: "SP", lat: -23.5226, lon: -46.8356, tz: TZ },
+  { name: "Vitória", state: "ES", lat: -20.3155, lon: -40.3128, tz: TZ },
+  { name: "Piracicaba", state: "SP", lat: -22.7253, lon: -47.6492, tz: TZ },
+  { name: "Bauru", state: "SP", lat: -22.3145, lon: -49.0606, tz: TZ },
+  { name: "Itaquaquecetuba", state: "SP", lat: -23.4861, lon: -46.348, tz: TZ },
+  { name: "Cariacica", state: "ES", lat: -20.2633, lon: -40.4197, tz: TZ },
+  { name: "Serra", state: "ES", lat: -20.1289, lon: -40.3078, tz: TZ },
+  { name: "São Vicente", state: "SP", lat: -23.9608, lon: -46.3917, tz: TZ },
+  { name: "Pelotas", state: "RS", lat: -31.7654, lon: -52.3376, tz: TZ },
+  { name: "Canoas", state: "RS", lat: -29.9214, lon: -51.1834, tz: TZ },
+  { name: "Anápolis", state: "GO", lat: -16.3267, lon: -48.9536, tz: TZ },
+  { name: "Caucaia", state: "CE", lat: -3.7359, lon: -38.6531, tz: TZ },
+  { name: "Petrolina", state: "PE", lat: -9.3891, lon: -40.5031, tz: TZ },
+  { name: "Maringá", state: "PR", lat: -23.4205, lon: -51.9333, tz: TZ },
+  { name: "Santos", state: "SP", lat: -23.9608, lon: -46.3331, tz: TZ },
+  { name: "Franca", state: "SP", lat: -20.5386, lon: -47.4006, tz: TZ },
+  { name: "Praia Grande", state: "SP", lat: -24.005, lon: -46.4133, tz: TZ },
+  { name: "Boa Vista", state: "RR", lat: 2.8235, lon: -60.6758, tz: -240 },
+  { name: "Rio Branco", state: "AC", lat: -9.9747, lon: -67.8243, tz: -300 },
+  { name: "Palmas", state: "TO", lat: -10.1689, lon: -48.3317, tz: TZ },
+  { name: "Limeira", state: "SP", lat: -22.5647, lon: -47.4017, tz: TZ },
+  { name: "Suzano", state: "SP", lat: -23.5425, lon: -46.3107, tz: TZ },
+  { name: "Taubaté", state: "SP", lat: -23.0265, lon: -45.5552, tz: TZ },
+  { name: "Caruaru", state: "PE", lat: -8.2828, lon: -35.9763, tz: TZ },
+  { name: "Vitória da Conquista", state: "BA", lat: -14.8615, lon: -40.8443, tz: TZ },
+  { name: "Blumenau", state: "SC", lat: -26.9194, lon: -49.0661, tz: TZ },
+  { name: "Ponta Grossa", state: "PR", lat: -25.0916, lon: -50.1668, tz: TZ },
+  { name: "Volta Redonda", state: "RJ", lat: -22.5202, lon: -44.0996, tz: TZ },
+  { name: "Foz do Iguaçu", state: "PR", lat: -25.5478, lon: -54.5882, tz: TZ },
+  { name: "Uberaba", state: "MG", lat: -19.7472, lon: -47.9381, tz: TZ },
+  { name: "Cascavel", state: "PR", lat: -24.9555, lon: -53.4552, tz: TZ },
+  { name: "Paulista", state: "PE", lat: -7.9407, lon: -34.873, tz: TZ },
+  { name: "Limoeiro do Norte", state: "CE", lat: -5.1453, lon: -38.0931, tz: TZ },
+  { name: "Santarém", state: "PA", lat: -2.4431, lon: -54.7083, tz: TZ },
+  { name: "Governador Valadares", state: "MG", lat: -18.8511, lon: -41.9494, tz: TZ },
+  { name: "Imperatriz", state: "MA", lat: -5.5191, lon: -47.4777, tz: TZ },
+  { name: "Mossoró", state: "RN", lat: -5.1875, lon: -37.3445, tz: TZ },
+  { name: "Marília", state: "SP", lat: -22.2139, lon: -49.9456, tz: TZ },
+  { name: "Itabuna", state: "BA", lat: -14.7858, lon: -39.2803, tz: TZ },
+  { name: "Ilhéus", state: "BA", lat: -14.793, lon: -39.0395, tz: TZ },
+  { name: "Sumaré", state: "SP", lat: -22.8219, lon: -47.2669, tz: TZ },
+  { name: "Indaiatuba", state: "SP", lat: -23.0903, lon: -47.2178, tz: TZ },
+  { name: "São José", state: "SC", lat: -27.6111, lon: -48.6311, tz: TZ },
+  { name: "Magé", state: "RJ", lat: -22.6633, lon: -43.0408, tz: TZ },
+  { name: "Itapevi", state: "SP", lat: -23.5489, lon: -46.9342, tz: TZ },
+  { name: "Petrópolis", state: "RJ", lat: -22.5052, lon: -43.1825, tz: TZ },
+  { name: "Chapecó", state: "SC", lat: -27.0964, lon: -52.6184, tz: TZ },
+  { name: "Criciúma", state: "SC", lat: -28.6772, lon: -49.3697, tz: TZ },
+  { name: "Itajaí", state: "SC", lat: -26.9077, lon: -48.6618, tz: TZ },
+];
+
+export function searchCities(query: string, limit = 10): City[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return CITIES_BR.slice(0, limit);
+  return CITIES_BR
+    .filter((c) =>
+      c.name.toLowerCase().includes(q) ||
+      `${c.name}, ${c.state}`.toLowerCase().includes(q),
+    )
+    .slice(0, limit);
+}

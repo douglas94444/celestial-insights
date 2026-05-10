@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { ArrowLeft, Download, Loader2, Mail, RefreshCw, Sparkles, Filter } from "lucide-react";
+import { Download, Loader2, Mail, RefreshCw, Sparkles, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,9 +17,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { AiCacheAgeBadgeFromResult } from "@/components/AiCacheAgeBadge";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useChartsListQuery } from "@/hooks/use-charts-list";
 import { generateTransitDayNarrativeFn } from "@/lib/ai-interpretation.functions";
 import type {
   AiInterpretationFnResult,
@@ -28,8 +31,13 @@ import type {
 import { calculateTransitsFn } from "@/lib/transits.functions";
 import { sendTransitDigestEmailFn } from "@/lib/email.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
-import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
-import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
+import { toastServerFnError } from "@/lib/toast-server-fn-error";
+import {
+  ENGAGEMENT_ROUTES,
+  ENGAGEMENT_TOPICS,
+  insertEngagementEventDeduped,
+  recordAiEngagement,
+} from "@/lib/engagement";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import {
   filterAspectsByFastTransit,
@@ -56,7 +64,7 @@ function TransitosPage() {
 
   useEffect(() => {
     if (!user?.id) return;
-    insertEngagementEvent(supabase, user.id, {
+    insertEngagementEventDeduped(supabase, user.id, {
       route_key: ENGAGEMENT_ROUTES.transitos,
       topic_key: ENGAGEMENT_TOPICS.transitos_open,
     });
@@ -79,17 +87,7 @@ function TransitosPage() {
     return [format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd")] as const;
   }, [rangePreset]);
 
-  const { data: charts = [] } = useQuery({
-    queryKey: ["charts-list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("charts")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: charts = [] } = useChartsListQuery();
 
   useEffect(() => {
     if (!chartId && charts.length) {
@@ -139,17 +137,15 @@ function TransitosPage() {
     },
     onSuccess: (r) => {
       setTransitAiText(r.content);
-      if (user?.id)
-        insertEngagementEvent(supabase, user.id, {
-          route_key: ENGAGEMENT_ROUTES.transitos,
-          topic_key: ENGAGEMENT_TOPICS.ai_transit_transitos,
-          meta: { chart_id: chartId, date: selectedKey, cached: r.cached },
-        });
+      recordAiEngagement(supabase, user?.id, {
+        route_key: ENGAGEMENT_ROUTES.transitos,
+        topic_key: ENGAGEMENT_TOPICS.ai_transit_transitos,
+        cached: r.cached,
+        meta: { chart_id: chartId, date: selectedKey },
+      });
       if (r.cached) toast.message("Texto recuperado do cache.");
     },
-    onError: async (e) => {
-      toast.error(await getServerFnErrorMessage(e));
-    },
+    onError: (e) => void toastServerFnError(e),
   });
 
   const filteredAspects = useMemo(() => {
@@ -206,18 +202,12 @@ function TransitosPage() {
     onSuccess: (r) => {
       toast.success(`Resumo enviado para ${r.to}`);
     },
-    onError: async (e) => {
-      toast.error(await getServerFnErrorMessage(e));
-    },
+    onError: (e) => void toastServerFnError(e),
   });
 
   return (
     <div className="container mx-auto max-w-6xl p-4 pb-10 sm:p-6">
-      <Button asChild variant="ghost" size="sm" className="mb-4">
-        <Link to="/dashboard">
-          <ArrowLeft className="mr-1 h-4 w-4" /> Voltar
-        </Link>
-      </Button>
+      <BackToDashboardLink buttonClassName="mb-4" />
 
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -471,7 +461,8 @@ function TransitosPage() {
                       Explicar este dia em linguagem simples
                     </Button>
                     {transitAiText ? (
-                      <article className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 border-t border-border/60 pt-3">
+                      <article className="space-y-2 border-t border-border/60 pt-3 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
+                        <AiCacheAgeBadgeFromResult result={transitAiMutation.data} />
                         {transitAiText}
                       </article>
                     ) : null}

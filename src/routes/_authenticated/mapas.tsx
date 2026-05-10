@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Eye, MoreVertical, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { useChartsListQuery } from "@/hooks/use-charts-list";
 
 export const Route = createFileRoute("/_authenticated/mapas")({
   component: MapasList,
@@ -32,17 +33,7 @@ function MapasList() {
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
-  const { data: charts = [] } = useQuery({
-    queryKey: ["charts-list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("charts")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data: charts = [] } = useChartsListQuery();
 
   function openRename(c: { id: string; name: string }) {
     setRenameId(c.id);

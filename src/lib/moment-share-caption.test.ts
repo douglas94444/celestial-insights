@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildMomentShareCaption, suggestedMomentHashtags } from "@/lib/moment-share-caption";
+import {
+  buildMomentShareCaption,
+  clipCaptionForInstagram,
+  INSTAGRAM_CAPTION_SOFT_CAP,
+  suggestedMomentHashtags,
+} from "@/lib/moment-share-caption";
 
 describe("buildMomentShareCaption", () => {
   const base = {
@@ -90,6 +95,26 @@ describe("buildMomentShareCaption", () => {
     });
     expect(text).toContain("Essência do mapa:");
     expect(text).toContain("Linhagem do céu hoje:");
+  });
+
+  it("preset só essência omite sorte e cor", () => {
+    const text = buildMomentShareCaption({
+      ...base,
+      preset: "essence",
+      essenceLine: "Núcleo simbólico.",
+      transitHookLine: "Gancho curto.",
+    });
+    expect(text).toContain("Essência do mapa:");
+    expect(text).toContain("Contexto simbólico do dia:");
+    expect(text).not.toContain("Sorte");
+    expect(text).not.toContain("Cor de hoje");
+  });
+
+  it("clipCaptionForInstagram corta texto longo", () => {
+    const long = "x".repeat(INSTAGRAM_CAPTION_SOFT_CAP + 50);
+    const clipped = clipCaptionForInstagram(long);
+    expect(clipped.length).toBeLessThanOrEqual(INSTAGRAM_CAPTION_SOFT_CAP);
+    expect(clipped.endsWith("…")).toBe(true);
   });
 });
 

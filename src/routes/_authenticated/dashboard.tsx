@@ -9,7 +9,11 @@ import { UpgradeMapModal } from "@/components/UpgradeMapModal";
 import { useDailyMoment } from "@/hooks/use-daily-moment";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
-import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
+import {
+  ENGAGEMENT_ROUTES,
+  ENGAGEMENT_TOPICS,
+  insertEngagementEventDeduped,
+} from "@/lib/engagement";
 import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -23,7 +27,7 @@ function Dashboard() {
 
   useEffect(() => {
     if (!user?.id) return;
-    insertEngagementEvent(supabase, user.id, {
+    insertEngagementEventDeduped(supabase, user.id, {
       route_key: ENGAGEMENT_ROUTES.dashboard,
       topic_key: ENGAGEMENT_TOPICS.dashboard_open,
     });

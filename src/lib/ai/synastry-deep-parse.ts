@@ -18,11 +18,14 @@ export function parseSynastryDeepCached(content: string): SynastryDeepOutput | n
   }
 }
 
-export function synastryDeepFromLlm(text: string, legalDisclaimer: string): SynastryDeepOutput {
+export function synastryDeepFromLlm(
+  text: string,
+  legalDisclaimer: string,
+): { deep: SynastryDeepOutput; parse_ok: boolean } {
   try {
     const raw = extractFirstJsonObject(text);
     const p = synastryDeepOutputSchema.safeParse(raw);
-    if (p.success) return p.data;
+    if (p.success) return { deep: p.data, parse_ok: true };
   } catch {
     /* ignore */
   }
@@ -30,14 +33,17 @@ export function synastryDeepFromLlm(text: string, legalDisclaimer: string): Syna
   const filler =
     "Integra tensões e recursos já descritos nos dados; linguagem acessível; evita julgar a relação.";
   return {
-    composite_disclaimer: SYNASTRY_COMPOSITE_MVP_PT,
-    overview: chunk || filler,
-    emotional_dynamics: filler,
-    communication_styles: filler,
-    intimacy_attraction: filler,
-    conflict_repair: filler,
-    daily_rhythm: filler,
-    long_term_growth: filler,
-    integration_summary: legalDisclaimer,
+    deep: {
+      composite_disclaimer: SYNASTRY_COMPOSITE_MVP_PT,
+      overview: chunk || filler,
+      emotional_dynamics: filler,
+      communication_styles: filler,
+      intimacy_attraction: filler,
+      conflict_repair: filler,
+      daily_rhythm: filler,
+      long_term_growth: filler,
+      integration_summary: legalDisclaimer,
+    },
+    parse_ok: false,
   };
 }

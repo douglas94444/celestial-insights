@@ -83,6 +83,24 @@ function parsePositiveInt(raw: string | undefined, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
+type ChartsRow = Database["public"]["Tables"]["charts"]["Row"];
+
+/** Mapa garantidamente do utilizador (`404` se não existir ou não pertencer ao user). */
+async function fetchChartOwnedByUser(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  chartId: string,
+): Promise<ChartsRow> {
+  const { data: chart, error: chartErr } = await supabase
+    .from("charts")
+    .select("*")
+    .eq("id", chartId)
+    .eq("user_id", userId)
+    .single();
+  if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
+  return chart;
+}
+
 async function assertAiGenerationAllowed(
   supabase: SupabaseClient<Database>,
   userId: string,
@@ -254,14 +272,12 @@ export const generateNatalExecutiveSummaryFn = createServerFn({ method: "POST" }
       const userId = context.userId;
       const kind: InterpretationKind = "natal_summary";
 
-      const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
-        await Promise.all([
-          supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
-          supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
-        ]);
+      const [{ data: profile, error: profileErr }, chart] = await Promise.all([
+        supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
+        fetchChartOwnedByUser(supabase, userId, data.chartId),
+      ]);
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
 
       const tier = profile?.subscription_tier ?? "FREE";
       const fpPayload = buildNatalFingerprintPayload(chart, "natal_summary");
@@ -269,14 +285,19 @@ export const generateNatalExecutiveSummaryFn = createServerFn({ method: "POST" }
 
       const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
-        .select("content")
+        .select("content, created_at")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
         .maybeSingle();
 
       if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
-      if (cached?.content) return { cached: true as const, content: cached.content };
+      if (cached?.content)
+        return {
+          cached: true as const,
+          content: cached.content,
+          cached_at: cached.created_at ?? null,
+        };
 
       await assertAiGenerationAllowed(supabase, userId, tier);
 
@@ -325,12 +346,17 @@ export const generateNatalExecutiveSummaryFn = createServerFn({ method: "POST" }
       if (insertErr?.code === "23505") {
         const { data: row } = await supabase
           .from("interpretation_ai_cache")
-          .select("content")
+          .select("content, created_at")
           .eq("user_id", userId)
           .eq("kind", kind)
           .eq("fingerprint", fingerprint)
           .maybeSingle();
-        if (row?.content) return { cached: true as const, content: row.content };
+        if (row?.content)
+          return {
+            cached: true as const,
+            content: row.content,
+            cached_at: row.created_at ?? null,
+          };
       }
       if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
@@ -351,14 +377,12 @@ export const generateNatalPlanetInsightFn = createServerFn({ method: "POST" })
       const userId = context.userId;
       const kind: InterpretationKind = "natal_planet";
 
-      const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
-        await Promise.all([
-          supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
-          supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
-        ]);
+      const [{ data: profile, error: profileErr }, chart] = await Promise.all([
+        supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
+        fetchChartOwnedByUser(supabase, userId, data.chartId),
+      ]);
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
 
       const tier = profile?.subscription_tier ?? "FREE";
       const fpPayload = buildNatalFingerprintPayload(chart, "natal_planet", data.planetKey);
@@ -366,14 +390,19 @@ export const generateNatalPlanetInsightFn = createServerFn({ method: "POST" })
 
       const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
-        .select("content")
+        .select("content, created_at")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
         .maybeSingle();
 
       if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
-      if (cached?.content) return { cached: true as const, content: cached.content };
+      if (cached?.content)
+        return {
+          cached: true as const,
+          content: cached.content,
+          cached_at: cached.created_at ?? null,
+        };
 
       await assertAiGenerationAllowed(supabase, userId, tier);
 
@@ -424,12 +453,17 @@ export const generateNatalPlanetInsightFn = createServerFn({ method: "POST" })
       if (insertErr?.code === "23505") {
         const { data: row } = await supabase
           .from("interpretation_ai_cache")
-          .select("content")
+          .select("content, created_at")
           .eq("user_id", userId)
           .eq("kind", kind)
           .eq("fingerprint", fingerprint)
           .maybeSingle();
-        if (row?.content) return { cached: true as const, content: row.content };
+        if (row?.content)
+          return {
+            cached: true as const,
+            content: row.content,
+            cached_at: row.created_at ?? null,
+          };
       }
       if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
@@ -472,14 +506,19 @@ export const generateSynastryNarrativeFn = createServerFn({ method: "POST" })
 
       const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
-        .select("content")
+        .select("content, created_at")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
         .maybeSingle();
 
       if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
-      if (cached?.content) return { cached: true as const, content: cached.content };
+      if (cached?.content)
+        return {
+          cached: true as const,
+          content: cached.content,
+          cached_at: cached.created_at ?? null,
+        };
 
       await assertAiGenerationAllowed(supabase, userId, tier);
 
@@ -527,12 +566,17 @@ export const generateSynastryNarrativeFn = createServerFn({ method: "POST" })
       if (insertErr?.code === "23505") {
         const { data: again } = await supabase
           .from("interpretation_ai_cache")
-          .select("content")
+          .select("content, created_at")
           .eq("user_id", userId)
           .eq("kind", kind)
           .eq("fingerprint", fingerprint)
           .maybeSingle();
-        if (again?.content) return { cached: true as const, content: again.content };
+        if (again?.content)
+          return {
+            cached: true as const,
+            content: again.content,
+            cached_at: again.created_at ?? null,
+          };
       }
       if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
@@ -553,14 +597,12 @@ export const generateTransitDayNarrativeFn = createServerFn({ method: "POST" })
       const userId = context.userId;
       const kind: InterpretationKind = "transit_day";
 
-      const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
-        await Promise.all([
-          supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
-          supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
-        ]);
+      const [{ data: profile, error: profileErr }, chart] = await Promise.all([
+        supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
+        fetchChartOwnedByUser(supabase, userId, data.chartId),
+      ]);
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
 
       const tier = profile?.subscription_tier ?? "FREE";
       const chartData = chartRowToChartData(chart);
@@ -578,14 +620,19 @@ export const generateTransitDayNarrativeFn = createServerFn({ method: "POST" })
 
       const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
-        .select("content")
+        .select("content, created_at")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
         .maybeSingle();
 
       if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
-      if (cached?.content) return { cached: true as const, content: cached.content };
+      if (cached?.content)
+        return {
+          cached: true as const,
+          content: cached.content,
+          cached_at: cached.created_at ?? null,
+        };
 
       await assertAiGenerationAllowed(supabase, userId, tier);
 
@@ -633,12 +680,17 @@ export const generateTransitDayNarrativeFn = createServerFn({ method: "POST" })
       if (insertErr?.code === "23505") {
         const { data: again } = await supabase
           .from("interpretation_ai_cache")
-          .select("content")
+          .select("content, created_at")
           .eq("user_id", userId)
           .eq("kind", kind)
           .eq("fingerprint", fingerprint)
           .maybeSingle();
-        if (again?.content) return { cached: true as const, content: again.content };
+        if (again?.content)
+          return {
+            cached: true as const,
+            content: again.content,
+            cached_at: again.created_at ?? null,
+          };
       }
       if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
@@ -659,20 +711,18 @@ export const generateMorningDeepMessageFn = createServerFn({ method: "POST" })
       const userId = context.userId;
       const kind: InterpretationKind = "morning_deep";
 
-      const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
-        await Promise.all([
-          supabase
-            .from("profiles")
-            .select(
-              "subscription_tier, name, personalization_gender, personalization_tone, personalization_focus_areas",
-            )
-            .eq("id", userId)
-            .single(),
-          supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
-        ]);
+      const [{ data: profile, error: profileErr }, chart] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select(
+            "subscription_tier, name, personalization_gender, personalization_tone, personalization_focus_areas",
+          )
+          .eq("id", userId)
+          .single(),
+        fetchChartOwnedByUser(supabase, userId, data.chartId),
+      ]);
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
 
       const tier = profile?.subscription_tier ?? "FREE";
       const chartData = chartRowToChartData(chart);
@@ -718,7 +768,7 @@ export const generateMorningDeepMessageFn = createServerFn({ method: "POST" })
 
       const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
-        .select("content")
+        .select("content, created_at")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
@@ -726,7 +776,12 @@ export const generateMorningDeepMessageFn = createServerFn({ method: "POST" })
 
       if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
       const cachedParsed = cached?.content ? parseMorningDeepCached(cached.content) : null;
-      if (cachedParsed) return { cached: true as const, morning: cachedParsed };
+      if (cachedParsed)
+        return {
+          cached: true as const,
+          morning: cachedParsed,
+          cached_at: cached?.created_at ?? null,
+        };
 
       await assertAiGenerationAllowed(supabase, userId, tier);
 
@@ -781,13 +836,18 @@ export const generateMorningDeepMessageFn = createServerFn({ method: "POST" })
       if (insertErr?.code === "23505") {
         const { data: again } = await supabase
           .from("interpretation_ai_cache")
-          .select("content")
+          .select("content, created_at")
           .eq("user_id", userId)
           .eq("kind", kind)
           .eq("fingerprint", fingerprint)
           .maybeSingle();
         const p2 = again?.content ? parseMorningDeepCached(again.content) : null;
-        if (p2) return { cached: true as const, morning: p2 };
+        if (p2)
+          return {
+            cached: true as const,
+            morning: p2,
+            cached_at: again?.created_at ?? null,
+          };
       }
       if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
@@ -808,20 +868,18 @@ export const generateNatalEssenceFn = createServerFn({ method: "POST" })
       const userId = context.userId;
       const kind: InterpretationKind = "natal_essence";
 
-      const [{ data: profile, error: profileErr }, { data: chart, error: chartErr }] =
-        await Promise.all([
-          supabase
-            .from("profiles")
-            .select(
-              "subscription_tier, personalization_gender, personalization_tone, personalization_focus_areas",
-            )
-            .eq("id", userId)
-            .single(),
-          supabase.from("charts").select("*").eq("id", data.chartId).eq("user_id", userId).single(),
-        ]);
+      const [{ data: profile, error: profileErr }, chart] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select(
+            "subscription_tier, personalization_gender, personalization_tone, personalization_focus_areas",
+          )
+          .eq("id", userId)
+          .single(),
+        fetchChartOwnedByUser(supabase, userId, data.chartId),
+      ]);
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-      if (chartErr || !chart) throw jsonError(404, "NOT_FOUND", "Mapa não encontrado.");
 
       const tier = profile?.subscription_tier ?? "FREE";
       const chartData = chartRowToChartData(chart);
@@ -842,7 +900,7 @@ export const generateNatalEssenceFn = createServerFn({ method: "POST" })
 
       const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
-        .select("content")
+        .select("content, created_at")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
@@ -850,7 +908,12 @@ export const generateNatalEssenceFn = createServerFn({ method: "POST" })
 
       if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
       const essenceCached = cached?.content ? parseNatalEssenceCached(cached.content) : null;
-      if (essenceCached) return { cached: true as const, essence: essenceCached };
+      if (essenceCached)
+        return {
+          cached: true as const,
+          essence: essenceCached,
+          cached_at: cached?.created_at ?? null,
+        };
 
       await assertAiGenerationAllowed(supabase, userId, tier);
 
@@ -904,13 +967,18 @@ export const generateNatalEssenceFn = createServerFn({ method: "POST" })
       if (insertErr?.code === "23505") {
         const { data: again } = await supabase
           .from("interpretation_ai_cache")
-          .select("content")
+          .select("content, created_at")
           .eq("user_id", userId)
           .eq("kind", kind)
           .eq("fingerprint", fingerprint)
           .maybeSingle();
         const e2 = again?.content ? parseNatalEssenceCached(again.content) : null;
-        if (e2) return { cached: true as const, essence: e2 };
+        if (e2)
+          return {
+            cached: true as const,
+            essence: e2,
+            cached_at: again?.created_at ?? null,
+          };
       }
       if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 
@@ -963,7 +1031,7 @@ export const generateSynastryDeepNarrativeFn = createServerFn({ method: "POST" }
 
       const { data: cached, error: cacheErr } = await supabase
         .from("interpretation_ai_cache")
-        .select("content")
+        .select("content, created_at")
         .eq("user_id", userId)
         .eq("kind", kind)
         .eq("fingerprint", fingerprint)
@@ -971,7 +1039,12 @@ export const generateSynastryDeepNarrativeFn = createServerFn({ method: "POST" }
 
       if (cacheErr) throw jsonError(500, "CACHE", cacheErr.message);
       const deepCached = cached?.content ? parseSynastryDeepCached(cached.content) : null;
-      if (deepCached) return { cached: true as const, deep: deepCached };
+      if (deepCached)
+        return {
+          cached: true as const,
+          deep: deepCached,
+          cached_at: cached?.created_at ?? null,
+        };
 
       await assertAiGenerationAllowed(supabase, userId, tier);
 
@@ -1002,10 +1075,15 @@ export const generateSynastryDeepNarrativeFn = createServerFn({ method: "POST" }
           e instanceof Error ? e.message : "Não foi possível gerar a interpretação.",
         );
       }
-      const deep = synastryDeepFromLlm(completion.text, DISCLAIMER);
+      const { deep, parse_ok } = synastryDeepFromLlm(completion.text, DISCLAIMER);
       const serialized = JSON.stringify(deep);
+      if (!parse_ok) {
+        console.warn(
+          `[ai-interpretation] synastry_deep_parse_fallback kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} response_chars=${completion.text.length}`,
+        );
+      }
       console.info(
-        `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0}`,
+        `[ai-interpretation] kind=${kind} fp=${fingerprint.slice(0, 12)} model=${completion.model} ms=${Date.now() - t0} parse_ok=${parse_ok}`,
       );
 
       const { error: insertErr } = await supabase.from("interpretation_ai_cache").insert({
@@ -1025,13 +1103,18 @@ export const generateSynastryDeepNarrativeFn = createServerFn({ method: "POST" }
       if (insertErr?.code === "23505") {
         const { data: again } = await supabase
           .from("interpretation_ai_cache")
-          .select("content")
+          .select("content, created_at")
           .eq("user_id", userId)
           .eq("kind", kind)
           .eq("fingerprint", fingerprint)
           .maybeSingle();
         const d2 = again?.content ? parseSynastryDeepCached(again.content) : null;
-        if (d2) return { cached: true as const, deep: d2 };
+        if (d2)
+          return {
+            cached: true as const,
+            deep: d2,
+            cached_at: again?.created_at ?? null,
+          };
       }
       if (insertErr) throw jsonError(500, "CACHE_WRITE", insertErr.message);
 

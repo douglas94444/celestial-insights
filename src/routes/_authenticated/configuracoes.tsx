@@ -30,7 +30,11 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
+import {
+  ENGAGEMENT_ROUTES,
+  ENGAGEMENT_TOPICS,
+  insertEngagementEventDeduped,
+} from "@/lib/engagement";
 import { parseFocusAreasFromProfileJson } from "@/lib/user-astro-profile";
 import {
   profileNameSchema,
@@ -41,7 +45,7 @@ import {
 } from "@/lib/schemas/profile";
 import { deleteAccountFn } from "@/lib/profile.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
-import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
+import { toastServerFnError } from "@/lib/toast-server-fn-error";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   component: Settings,
@@ -162,7 +166,7 @@ function Settings() {
     if (error) toast.error(error.message);
     else {
       toast.success("Preferências salvas");
-      insertEngagementEvent(supabase, user!.id, {
+      insertEngagementEventDeduped(supabase, user!.id, {
         route_key: ENGAGEMENT_ROUTES.configuracoes,
         topic_key: ENGAGEMENT_TOPICS.prefs_saved,
       });
@@ -215,7 +219,7 @@ function Settings() {
       navigate({ to: "/", replace: true });
       toast.success("Conta excluída.");
     } catch (e: unknown) {
-      toast.error(await getServerFnErrorMessage(e));
+      void toastServerFnError(e);
     }
   }
 

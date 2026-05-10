@@ -1,4 +1,13 @@
-export type MomentCaptionPreset = "short" | "medium" | "full";
+export type MomentCaptionPreset = "short" | "medium" | "full" | "essence";
+
+/** Limite macio para legendas no Instagram (~2200); texto final é cortado em `buildMomentShareCaption`. */
+export const INSTAGRAM_CAPTION_SOFT_CAP = 2200;
+
+export function clipCaptionForInstagram(raw: string, maxLen = INSTAGRAM_CAPTION_SOFT_CAP): string {
+  const t = raw.trimEnd();
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, Math.max(0, maxLen - 1))}…`;
+}
 
 export type MomentShareCaptionInput = {
   titleFirstName: string;
@@ -118,6 +127,12 @@ export function buildMomentShareCaption(input: MomentShareCaptionInput): string 
     if (essence) lines.push(`Essência do mapa: ${essence}`);
     if (hookRaw) lines.push(`Linhagem do céu hoje: ${hookRaw}`);
     lines.push(input.brandHandle);
+  } else if (preset === "essence") {
+    lines.push(`Momento com o céu — ${input.titleFirstName}`);
+    if (essence) lines.push(`Essência do mapa: ${essence}`);
+    if (hookRaw) lines.push(`Contexto simbólico do dia: ${hookRaw}`);
+    lines.push(`Criado em ${input.brandHandle}`);
+    if (url) lines.push(`Monte o seu mapa: ${url}`);
   } else if (preset === "medium") {
     lines.push(`Momento com o céu — ${input.titleFirstName}`);
     if (luck) lines.push(`Sorte do dia: ${luck}`);
@@ -149,5 +164,5 @@ export function buildMomentShareCaption(input: MomentShareCaptionInput): string 
     const ht = input.hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ");
     body = `${body}\n\n${ht}`;
   }
-  return body;
+  return clipCaptionForInstagram(body);
 }

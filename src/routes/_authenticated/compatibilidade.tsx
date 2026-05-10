@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Heart, Loader2, Sparkles } from "lucide-react";
+import { Heart, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AiCacheAgeBadgeFromResult } from "@/components/AiCacheAgeBadge";
 import { SynastryBiWheel } from "@/components/SynastryBiWheel";
 import { supabase } from "@/integrations/supabase/client";
 import type { ChartData } from "@/lib/astrology/calculate";
@@ -32,11 +34,17 @@ import type {
   SynastryDeepNarrativeFnResult,
 } from "@/lib/types/server-fn-results";
 import type { SynastryDeepOutput } from "@/lib/schemas/personalization-ai";
-import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
+import {
+  ENGAGEMENT_ROUTES,
+  ENGAGEMENT_TOPICS,
+  insertEngagementEventDeduped,
+  recordAiEngagement,
+} from "@/lib/engagement";
 import { calculateAndSaveSynastryFn } from "@/lib/synastry.functions";
-import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
+import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
+import { useChartsListQuery } from "@/hooks/use-charts-list";
 
 export const Route = createFileRoute("/_authenticated/compatibilidade")({
   component: CompatibilidadePage,
@@ -94,19 +102,19 @@ function CompatibilidadePage() {
   const [synastryAiText, setSynastryAiText] = useState<string | null>(null);
   const [synastryDeep, setSynastryDeep] = useState<SynastryDeepOutput | null>(null);
 
-  const { data: charts = [], isLoading: chartsLoading } = useQuery({
-    queryKey: ["charts-list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("charts")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
+  const {
+    data: charts = [],
+    isLoading: chartsLoading,
+    isError: chartsError,
+    refetch: refetchCharts,
+  } = useChartsListQuery();
 
-  const { data: history = [] } = useQuery({
+  const {
+    data: history = [],
+    isLoading: historyLoading,
+    isError: historyError,
+    refetch: refetchHistory,
+  } = useQuery({
     queryKey: ["synastries-list"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -134,9 +142,9 @@ function CompatibilidadePage() {
 
   useEffect(() => {
     if (!activeView?.synastryId || !user?.id) return;
-    insertEngagementEvent(supabase, user.id, {
-      route_key: "compatibilidade",
-      topic_key: "synastry_view",
+    insertEngagementEventDeduped(supabase, user.id, {
+      route_key: ENGAGEMENT_ROUTES.compatibilidade,
+      topic_key: ENGAGEMENT_TOPICS.synastry_view,
       meta: { synastry_id: activeView.synastryId },
     });
   }, [activeView?.synastryId, user?.id]);
@@ -153,17 +161,14 @@ function CompatibilidadePage() {
     },
     onSuccess: (r) => {
       setSynastryAiText(r.content);
-      if (user?.id)
-        insertEngagementEvent(supabase, user.id, {
-          route_key: ENGAGEMENT_ROUTES.compatibilidade,
-          topic_key: ENGAGEMENT_TOPICS.ai_synastry_narrative,
-          meta: { cached: r.cached },
-        });
+      recordAiEngagement(supabase, user?.id, {
+        route_key: ENGAGEMENT_ROUTES.compatibilidade,
+        topic_key: ENGAGEMENT_TOPICS.ai_synastry_narrative,
+        cached: r.cached,
+      });
       if (r.cached) toast.message("Texto recuperado do cache.");
     },
-    onError: async (e) => {
-      toast.error(await getServerFnErrorMessage(e));
-    },
+    onError: (e) => void toastServerFnError(e),
   });
 
   const synastryDeepMutation = useMutation<SynastryDeepNarrativeFnResult, Error, void>({
@@ -178,17 +183,14 @@ function CompatibilidadePage() {
     },
     onSuccess: (r) => {
       setSynastryDeep(r.deep);
-      if (user?.id)
-        insertEngagementEvent(supabase, user.id, {
-          route_key: ENGAGEMENT_ROUTES.compatibilidade,
-          topic_key: ENGAGEMENT_TOPICS.ai_synastry_deep,
-          meta: { cached: r.cached },
-        });
+      recordAiEngagement(supabase, user?.id, {
+        route_key: ENGAGEMENT_ROUTES.compatibilidade,
+        topic_key: ENGAGEMENT_TOPICS.ai_synastry_deep,
+        cached: r.cached,
+      });
       if (r.cached) toast.message("Análise profunda recuperada do cache.");
     },
-    onError: async (e) => {
-      toast.error(await getServerFnErrorMessage(e));
-    },
+    onError: (e) => void toastServerFnError(e),
   });
 
   const calcMutation = useMutation<CalculateAndSaveSynastryFnResult, Error, void>({
@@ -211,9 +213,7 @@ function CompatibilidadePage() {
       });
       toast.success("Sinastria calculada e guardada.");
     },
-    onError: async (e) => {
-      toast.error(await getServerFnErrorMessage(e));
-    },
+    onError: (e) => void toastServerFnError(e),
   });
 
   function loadFromHistory(row: (typeof history)[0]) {
@@ -249,11 +249,7 @@ function CompatibilidadePage() {
 
   return (
     <div className="container mx-auto max-w-6xl p-4 pb-10 sm:p-6">
-      <Button asChild variant="ghost" size="sm" className="mb-4">
-        <Link to="/dashboard">
-          <ArrowLeft className="mr-1 h-4 w-4" /> Voltar
-        </Link>
-      </Button>
+      <BackToDashboardLink buttonClassName="mb-4" />
 
       <div className="mb-8 flex flex-wrap items-start gap-4 justify-between">
         <div>
@@ -268,6 +264,42 @@ function CompatibilidadePage() {
           </p>
         </div>
       </div>
+
+      {chartsError ? (
+        <Alert variant="destructive" className="mb-6">
+          <Sparkles className="h-4 w-4" />
+          <AlertTitle>Não foi possível carregar os mapas</AlertTitle>
+          <AlertDescription className="mt-2 flex flex-wrap items-center gap-3">
+            <span>Verifique a ligação e tente novamente.</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void refetchCharts()}
+            >
+              Tentar novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {historyError ? (
+        <Alert variant="destructive" className="mb-6">
+          <Sparkles className="h-4 w-4" />
+          <AlertTitle>Não foi possível carregar o histórico</AlertTitle>
+          <AlertDescription className="mt-2 flex flex-wrap items-center gap-3">
+            <span>Os mapas podem estar disponíveis mesmo assim.</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => void refetchHistory()}
+            >
+              Tentar novamente
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {!chartsLoading && !canSynastry && (
         <Alert className="mb-6">
@@ -356,6 +388,16 @@ function CompatibilidadePage() {
         </CardContent>
       </Card>
 
+      {!chartsLoading && canSynastry && chart1Id === chart2Id && chart1Id ? (
+        <Alert className="mb-6 border-amber-500/40 bg-amber-500/10">
+          <Sparkles className="h-4 w-4 text-amber-700 dark:text-amber-400" />
+          <AlertTitle>Escolha dois mapas diferentes</AlertTitle>
+          <AlertDescription className="mt-1">
+            Para comparar sinastria são necessários dois mapas distintos na conta.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       {activeView && (
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="space-y-4">
@@ -413,7 +455,8 @@ function CompatibilidadePage() {
                     Gerar análise narrativa
                   </Button>
                   {synastryAiText ? (
-                    <article className="rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                    <article className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                      <AiCacheAgeBadgeFromResult result={synastryAiMutation.data} />
                       {synastryAiText}
                     </article>
                   ) : null}
@@ -434,6 +477,7 @@ function CompatibilidadePage() {
                   </Button>
                   {synastryDeep ? (
                     <article className="max-h-[520px] overflow-y-auto rounded-lg border border-primary/15 bg-background/40 p-3 text-xs leading-relaxed space-y-3">
+                      <AiCacheAgeBadgeFromResult result={synastryDeepMutation.data} />
                       <p className="text-[11px] font-medium uppercase text-muted-foreground">
                         Sinastria profunda
                       </p>
@@ -508,33 +552,46 @@ function CompatibilidadePage() {
         </div>
       )}
 
-      {history.length > 0 && (
+      {!historyError && (
         <Card className="mt-10">
           <CardHeader>
             <CardTitle className="font-display text-lg">Histórico recente</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {history.map((row) => {
-              const p = parseStoredPayload(row.compatibility_data);
-              return (
-                <button
-                  key={row.id}
-                  type="button"
-                  className="w-full text-left rounded-lg border px-4 py-3 text-sm hover:bg-muted/60 transition-colors"
-                  onClick={() => loadFromHistory(row)}
-                >
-                  <span className="font-medium">
-                    {p?.chart1Name ?? "Mapa"} × {p?.chart2Name ?? "Mapa"}
-                  </span>
-                  <span className="text-muted-foreground"> · </span>
-                  <span className="text-primary font-semibold">{row.compatibility_score}/100</span>
-                  <span className="text-muted-foreground">
-                    {" "}
-                    · {new Date(row.created_at).toLocaleDateString("pt-BR")}
-                  </span>
-                </button>
-              );
-            })}
+            {historyLoading ? (
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin shrink-0" /> A carregar…
+              </p>
+            ) : history.length === 0 ? (
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Ainda não há comparações guardadas. Use «Calcular e guardar» acima para criar a
+                primeira entrada no histórico.
+              </p>
+            ) : (
+              history.map((row) => {
+                const p = parseStoredPayload(row.compatibility_data);
+                return (
+                  <button
+                    key={row.id}
+                    type="button"
+                    className="w-full text-left rounded-lg border px-4 py-3 text-sm hover:bg-muted/60 transition-colors"
+                    onClick={() => loadFromHistory(row)}
+                  >
+                    <span className="font-medium">
+                      {p?.chart1Name ?? "Mapa"} × {p?.chart2Name ?? "Mapa"}
+                    </span>
+                    <span className="text-muted-foreground"> · </span>
+                    <span className="text-primary font-semibold">
+                      {row.compatibility_score}/100
+                    </span>
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {new Date(row.created_at).toLocaleDateString("pt-BR")}
+                    </span>
+                  </button>
+                );
+              })
+            )}
           </CardContent>
         </Card>
       )}

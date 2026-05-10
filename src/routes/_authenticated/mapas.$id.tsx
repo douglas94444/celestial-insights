@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown, Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { AiCacheAgeBadge } from "@/components/AiCacheAgeBadge";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
 import { computeAngles, type HouseSystemId } from "@/lib/astrology/calculate";
 import { HOUSE_SYSTEM_LABELS } from "@/lib/astrology/houses";
@@ -39,8 +41,13 @@ import {
 import { recalculateChartFn } from "@/lib/charts.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
-import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
-import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
+import { toastServerFnError } from "@/lib/toast-server-fn-error";
+import {
+  ENGAGEMENT_ROUTES,
+  ENGAGEMENT_TOPICS,
+  insertEngagementEventDeduped,
+  recordAiEngagement,
+} from "@/lib/engagement";
 import type {
   AiInterpretationFnResult,
   RecalculateChartFnResult,
@@ -58,7 +65,7 @@ function ChartView() {
 
   useEffect(() => {
     if (!user?.id) return;
-    insertEngagementEvent(supabase, user.id, {
+    insertEngagementEventDeduped(supabase, user.id, {
       route_key: ENGAGEMENT_ROUTES.mapas_detail,
       topic_key: ENGAGEMENT_TOPICS.chart_detail_open,
       meta: { chart_id: id },
@@ -84,8 +91,17 @@ function ChartView() {
   );
   const [aiExecOpen, setAiExecOpen] = useState(false);
   const [aiExecutiveText, setAiExecutiveText] = useState<string | null>(null);
+  const [aiExecutiveCachedAt, setAiExecutiveCachedAt] = useState<string | null>(null);
   const [aiPlanetTexts, setAiPlanetTexts] = useState<Partial<Record<PlanetKey, string>>>({});
+  const [aiPlanetCachedAt, setAiPlanetCachedAt] = useState<Partial<Record<PlanetKey, string>>>({});
   const [aiPlanetLoading, setAiPlanetLoading] = useState<PlanetKey | null>(null);
+
+  useEffect(() => {
+    setAiExecutiveText(null);
+    setAiExecutiveCachedAt(null);
+    setAiPlanetTexts({});
+    setAiPlanetCachedAt({});
+  }, [id]);
 
   const { data: chart, isLoading } = useQuery({
     queryKey: ["chart", id],
@@ -143,17 +159,16 @@ function ChartView() {
     },
     onSuccess: (r) => {
       setAiExecutiveText(r.content);
-      if (user?.id)
-        insertEngagementEvent(supabase, user.id, {
-          route_key: ENGAGEMENT_ROUTES.mapas_detail,
-          topic_key: ENGAGEMENT_TOPICS.ai_natal_executive,
-          meta: { chart_id: id, cached: r.cached },
-        });
+      setAiExecutiveCachedAt(r.cached ? (r.cached_at ?? null) : null);
+      recordAiEngagement(supabase, user?.id, {
+        route_key: ENGAGEMENT_ROUTES.mapas_detail,
+        topic_key: ENGAGEMENT_TOPICS.ai_natal_executive,
+        cached: r.cached,
+        meta: { chart_id: id },
+      });
       if (r.cached) toast.message("Texto recuperado do cache.");
     },
-    onError: async (e) => {
-      toast.error(await getServerFnErrorMessage(e));
-    },
+    onError: (e) => void toastServerFnError(e),
   });
 
   const aiPlanetMutation = useMutation<AiInterpretationFnResult, Error, PlanetKey>({
@@ -168,17 +183,19 @@ function ChartView() {
     onSettled: () => setAiPlanetLoading(null),
     onSuccess: (r, planetKey) => {
       setAiPlanetTexts((prev) => ({ ...prev, [planetKey]: r.content }));
-      if (user?.id)
-        insertEngagementEvent(supabase, user.id, {
-          route_key: ENGAGEMENT_ROUTES.mapas_detail,
-          topic_key: ENGAGEMENT_TOPICS.ai_natal_planet,
-          meta: { chart_id: id, planet_key: planetKey, cached: r.cached },
-        });
+      setAiPlanetCachedAt((prev) => ({
+        ...prev,
+        [planetKey]: r.cached ? (r.cached_at ?? undefined) : undefined,
+      }));
+      recordAiEngagement(supabase, user?.id, {
+        route_key: ENGAGEMENT_ROUTES.mapas_detail,
+        topic_key: ENGAGEMENT_TOPICS.ai_natal_planet,
+        cached: r.cached,
+        meta: { chart_id: id, planet_key: planetKey },
+      });
       if (r.cached) toast.message("Texto recuperado do cache.");
     },
-    onError: async (e) => {
-      toast.error(await getServerFnErrorMessage(e));
-    },
+    onError: (e) => void toastServerFnError(e),
   });
 
   const recalcMutation = useMutation<RecalculateChartFnResult, Error, void>({
@@ -194,9 +211,7 @@ function ChartView() {
       await queryClient.invalidateQueries({ queryKey: ["charts"] });
       toast.success("Mapa recalculado com os dados atualizados.");
     },
-    onError: async (e) => {
-      toast.error(await getServerFnErrorMessage(e));
-    },
+    onError: (e) => void toastServerFnError(e),
   });
 
   if (isLoading) {
@@ -252,11 +267,7 @@ function ChartView() {
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">
-      <Button asChild variant="ghost" size="sm" className="mb-4">
-        <Link to="/dashboard">
-          <ArrowLeft className="mr-1 h-4 w-4" /> Voltar
-        </Link>
-      </Button>
+      <BackToDashboardLink buttonClassName="mb-4" />
 
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
@@ -350,7 +361,8 @@ function ChartView() {
                 Gerar resumo executivo
               </Button>
               {aiExecutiveText ? (
-                <article className="rounded-lg border bg-card p-4 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                <article className="space-y-2 rounded-lg border bg-card p-4 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                  <AiCacheAgeBadge cachedAt={aiExecutiveCachedAt} />
                   {aiExecutiveText}
                 </article>
               ) : null}
@@ -462,7 +474,8 @@ function ChartView() {
                         {planetInSignInterpretation(p.key, p.sign as SignName)}
                       </p>
                       {aiPlanetTexts[p.key] ? (
-                        <article className="mt-3 rounded-md border border-primary/15 bg-primary/5 p-3 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                        <article className="mt-3 space-y-2 rounded-md border border-primary/15 bg-primary/5 p-3 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                          <AiCacheAgeBadge cachedAt={aiPlanetCachedAt[p.key]} />
                           {aiPlanetTexts[p.key]}
                         </article>
                       ) : null}

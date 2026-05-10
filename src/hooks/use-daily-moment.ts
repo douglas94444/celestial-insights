@@ -33,10 +33,10 @@ import type {
   NatalEssenceFnResult,
 } from "@/lib/types/server-fn-results";
 import type { MorningDeepOutput } from "@/lib/schemas/personalization-ai";
-import { getServerFnErrorMessage } from "@/lib/server-fn-errors";
+import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { toast } from "sonner";
-import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, recordAiEngagement } from "@/lib/engagement";
 import {
   buildPersonalizedMomentInsights,
   resolveMomentDisplayName,
@@ -46,6 +46,8 @@ export function useDailyMoment() {
   const { user, session } = useAuth();
   const [dashTransitAi, setDashTransitAi] = useState<string | null>(null);
   const [morningDeep, setMorningDeep] = useState<MorningDeepOutput | null>(null);
+  const [dashTransitAiCachedAt, setDashTransitAiCachedAt] = useState<string | null>(null);
+  const [morningDeepCachedAt, setMorningDeepCachedAt] = useState<string | null>(null);
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
@@ -161,10 +163,12 @@ export function useDailyMoment() {
 
   useEffect(() => {
     setDashTransitAi(null);
+    setDashTransitAiCachedAt(null);
   }, [primary?.id, todayStr]);
 
   useEffect(() => {
     setMorningDeep(null);
+    setMorningDeepCachedAt(null);
   }, [primary?.id, todayStr]);
 
   const dashTransitAiMutation = useMutation<AiInterpretationFnResult, Error, void>({
@@ -177,17 +181,15 @@ export function useDailyMoment() {
     },
     onSuccess: (r) => {
       setDashTransitAi(r.content);
-      if (user?.id)
-        insertEngagementEvent(supabase, user.id, {
-          route_key: ENGAGEMENT_ROUTES.momento,
-          topic_key: ENGAGEMENT_TOPICS.ai_transit_momento,
-          meta: { cached: r.cached },
-        });
+      setDashTransitAiCachedAt(r.cached ? (r.cached_at ?? null) : null);
+      recordAiEngagement(supabase, user?.id, {
+        route_key: ENGAGEMENT_ROUTES.momento,
+        topic_key: ENGAGEMENT_TOPICS.ai_transit_momento,
+        cached: r.cached,
+      });
       if (r.cached) toast.message("Texto recuperado do cache.");
     },
-    onError: async (e) => {
-      toast.error(await getServerFnErrorMessage(e));
-    },
+    onError: (e) => void toastServerFnError(e),
   });
 
   const morningDeepMutation = useMutation<MorningDeepMessageFnResult, Error, void>({
@@ -200,17 +202,15 @@ export function useDailyMoment() {
     },
     onSuccess: (r) => {
       setMorningDeep(r.morning);
-      if (user?.id)
-        insertEngagementEvent(supabase, user.id, {
-          route_key: ENGAGEMENT_ROUTES.momento,
-          topic_key: ENGAGEMENT_TOPICS.ai_morning_deep,
-          meta: { cached: r.cached },
-        });
+      setMorningDeepCachedAt(r.cached ? (r.cached_at ?? null) : null);
+      recordAiEngagement(supabase, user?.id, {
+        route_key: ENGAGEMENT_ROUTES.momento,
+        topic_key: ENGAGEMENT_TOPICS.ai_morning_deep,
+        cached: r.cached,
+      });
       if (r.cached) toast.message("Carta profunda recuperada do cache.");
     },
-    onError: async (e) => {
-      toast.error(await getServerFnErrorMessage(e));
-    },
+    onError: (e) => void toastServerFnError(e),
   });
 
   const natalEssenceQuery = useQuery<NatalEssenceFnResult>({
@@ -250,9 +250,11 @@ export function useDailyMoment() {
     moonSkyLine,
     dashTransitAi,
     setDashTransitAi,
+    dashTransitAiCachedAt,
     dashTransitAiMutation,
     morningDeep,
     setMorningDeep,
+    morningDeepCachedAt,
     morningDeepMutation,
     natalEssenceQuery,
     personalizedInsights,

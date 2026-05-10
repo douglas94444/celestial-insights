@@ -45,15 +45,17 @@ describe("synastryDeepFromLlm", () => {
       integration_summary: LEGAL,
     });
     const out = synastryDeepFromLlm(blob, LEGAL);
-    expect(out.overview).toBe("Visão");
-    expect(out.composite_disclaimer).toContain("mapa composto");
+    expect(out.parse_ok).toBe(true);
+    expect(out.deep.overview).toBe("Visão");
+    expect(out.deep.composite_disclaimer).toContain("mapa composto");
   });
 
   it("fallback mantém composite_disclaimer MVP e integration_summary legal", () => {
     const out = synastryDeepFromLlm("isto não é json válido", LEGAL);
-    expect(out.composite_disclaimer).toBe(SYNASTRY_COMPOSITE_MVP_PT);
-    expect(out.integration_summary).toBe(LEGAL);
-    expect(out.overview.length).toBeGreaterThan(0);
-    expect(out.emotional_dynamics).toContain("Integra tensões");
+    expect(out.parse_ok).toBe(false);
+    expect(out.deep.composite_disclaimer).toBe(SYNASTRY_COMPOSITE_MVP_PT);
+    expect(out.deep.integration_summary).toBe(LEGAL);
+    expect(out.deep.overview.length).toBeGreaterThan(0);
+    expect(out.deep.emotional_dynamics).toContain("Integra tensões");
   });
 });

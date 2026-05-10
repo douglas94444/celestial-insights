@@ -8,13 +8,30 @@ import type { MorningDeepOutput, SynastryDeepOutput } from "@/lib/schemas/person
 export type SynastryRow = Database["public"]["Tables"]["synastries"]["Row"];
 
 /** Resposta típica das funções de interpretação IA (cache hit/miss). */
-export type AiInterpretationFnResult = { cached: boolean; content: string };
+export type AiInterpretationFnResult = {
+  cached: boolean;
+  content: string;
+  /** Preenchido em cache hit (ISO da linha em `interpretation_ai_cache`). */
+  cached_at?: string | null;
+};
 
-export type MorningDeepMessageFnResult = { cached: boolean; morning: MorningDeepOutput };
+export type MorningDeepMessageFnResult = {
+  cached: boolean;
+  morning: MorningDeepOutput;
+  cached_at?: string | null;
+};
 
-export type NatalEssenceFnResult = { cached: boolean; essence: string };
+export type NatalEssenceFnResult = {
+  cached: boolean;
+  essence: string;
+  cached_at?: string | null;
+};
 
-export type SynastryDeepNarrativeFnResult = { cached: boolean; deep: SynastryDeepOutput };
+export type SynastryDeepNarrativeFnResult = {
+  cached: boolean;
+  deep: SynastryDeepOutput;
+  cached_at?: string | null;
+};
 
 export type CreateChartFnResult = { chart: ChartRow; computed: ChartData };
 

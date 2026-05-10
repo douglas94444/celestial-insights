@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Loader2, Sparkles, Share2, Download, ArrowLeft, Copy } from "lucide-react";
+import { Loader2, Sparkles, Share2, Download, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { AiCacheAgeBadge, AiCacheAgeBadgeFromResult } from "@/components/AiCacheAgeBadge";
+import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { ShareableMomentCard } from "@/components/ShareableMomentCard";
 import { useDailyMoment } from "@/hooks/use-daily-moment";
 import {
@@ -21,9 +23,12 @@ import { persistMomentStreakToProfile } from "@/lib/moment-streak-sync";
 import { getInstagramBrandHandle, getSharePublicUrl } from "@/lib/app-branding";
 import {
   buildMomentShareCaption,
+  INSTAGRAM_CAPTION_SOFT_CAP,
   suggestedMomentHashtags,
   type MomentCaptionPreset,
 } from "@/lib/moment-share-caption";
+
+const CAPTION_PRESETS: MomentCaptionPreset[] = ["short", "medium", "full", "essence"];
 import {
   loadMomentHistory,
   upsertMomentHistory,
@@ -32,7 +37,11 @@ import {
 import { primarySunMoonAsc } from "@/lib/personalized-moment";
 import { pickMomentFallbackQuote, signLabelPt } from "@/data/daily-moment-fallback";
 import { buildMomentQuoteLines } from "@/lib/moment-quote";
-import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, insertEngagementEvent } from "@/lib/engagement";
+import {
+  ENGAGEMENT_ROUTES,
+  ENGAGEMENT_TOPICS,
+  insertEngagementEventDeduped,
+} from "@/lib/engagement";
 import { supabase } from "@/integrations/supabase/client";
 import {
   captureMomentShareCardPng,
@@ -66,8 +75,10 @@ function MomentoPage() {
     houses,
     transitToday,
     dashTransitAi,
+    dashTransitAiCachedAt,
     dashTransitAiMutation,
     morningDeep,
+    morningDeepCachedAt,
     morningDeepMutation,
     natalEssenceQuery,
     personalizedInsights,
@@ -82,7 +93,7 @@ function MomentoPage() {
 
   useEffect(() => {
     if (!primary?.id || !user?.id) return;
-    insertEngagementEvent(supabase, user.id, {
+    insertEngagementEventDeduped(supabase, user.id, {
       route_key: ENGAGEMENT_ROUTES.momento,
       topic_key: ENGAGEMENT_TOPICS.moment_open,
     });
@@ -393,11 +404,7 @@ function MomentoPage() {
   return (
     <div className="mx-auto max-w-lg px-3 pb-16 pt-4 md:max-w-3xl md:px-6">
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <Button variant="ghost" size="sm" asChild className="-ml-2 gap-1 text-muted-foreground">
-          <Link to="/dashboard">
-            <ArrowLeft className="h-4 w-4" /> Voltar
-          </Link>
-        </Button>
+        <BackToDashboardLink buttonClassName="-ml-2 gap-1 text-muted-foreground" />
         <Badge variant="secondary" className="bg-primary/15 font-display text-primary">
           {streak > 0 ? `${streak} dia${streak === 1 ? "" : "s"} seguidos` : "Comece sua sequência"}
         </Badge>
@@ -541,12 +548,16 @@ function MomentoPage() {
             </div>
           ) : null}
           {dashAiShown ? (
-            <article className="whitespace-pre-wrap rounded-md border border-primary/10 bg-background/40 p-3 text-xs leading-relaxed text-foreground/90">
+            <article className="space-y-2 whitespace-pre-wrap rounded-md border border-primary/10 bg-background/40 p-3 text-xs leading-relaxed text-foreground/90">
+              {isTodayView && dashTransitAiCachedAt ? (
+                <AiCacheAgeBadge cachedAt={dashTransitAiCachedAt} />
+              ) : null}
               {dashAiShown}
             </article>
           ) : null}
           {isTodayView && morningDeep ? (
             <article className="space-y-3 rounded-md border border-accent/20 bg-muted/25 p-3 text-xs leading-relaxed text-foreground/90">
+              {morningDeepCachedAt ? <AiCacheAgeBadge cachedAt={morningDeepCachedAt} /> : null}
               <p className="font-semibold text-primary">{morningDeep.greeting}</p>
               <p className="whitespace-pre-wrap">{morningDeep.main_message}</p>
               {morningDeep.secondary_theme ? (
@@ -567,6 +578,11 @@ function MomentoPage() {
 
       <section className="space-y-4">
         <h2 className="text-center font-display text-xl font-semibold">Cartão para o Instagram</h2>
+        {natalEssenceQuery.data?.cached ? (
+          <div className="flex justify-center">
+            <AiCacheAgeBadgeFromResult result={natalEssenceQuery.data} />
+          </div>
+        ) : null}
         <p className="text-center text-xs text-muted-foreground/90">
           {isTodayView
             ? "Pré-visualização — exportação em alta resolução (1080×1350)."
@@ -611,6 +627,12 @@ function MomentoPage() {
         </div>
 
         <div className="mx-auto flex max-w-md flex-col gap-3 rounded-lg border border-border/40 bg-muted/10 p-4">
+          {!isTodayView && !captionTransitHookLine ? (
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Neste dia o gancho simbólico do trânsito não está disponível na vista histórica — a
+              legenda pode usar sorte, cor do dia e essência do mapa quando existirem.
+            </p>
+          ) : null}
           <div className="space-y-2">
             <Label className="text-xs font-medium uppercase text-muted-foreground">
               Tamanho da legenda
@@ -619,7 +641,9 @@ function MomentoPage() {
               type="single"
               value={captionPreset}
               onValueChange={(v) => {
-                if (v === "short" || v === "medium" || v === "full") setCaptionPreset(v);
+                if (CAPTION_PRESETS.includes(v as MomentCaptionPreset)) {
+                  setCaptionPreset(v as MomentCaptionPreset);
+                }
               }}
               variant="outline"
               size="sm"
@@ -634,8 +658,18 @@ function MomentoPage() {
               <ToggleGroupItem value="full" aria-label="Legenda completa">
                 Completa
               </ToggleGroupItem>
+              <ToggleGroupItem value="essence" aria-label="Legenda só essência">
+                Só essência
+              </ToggleGroupItem>
             </ToggleGroup>
           </div>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            Quebras de linha são mantidas ao colar; algumas apps podem mostrar espaços de forma
+            diferente. Limite macio ~{INSTAGRAM_CAPTION_SOFT_CAP} caracteres (Instagram).
+          </p>
+          <p className="text-center text-xs tabular-nums text-muted-foreground">
+            {captionText.length} caracteres
+          </p>
           <div className="flex items-center justify-between gap-3">
             <Label htmlFor="caption-hashtags" className="text-sm">
               Incluir hashtags sugeridas

@@ -25,7 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useChartsListQuery } from "@/hooks/use-charts-list";
 import { useAuth } from "@/hooks/use-auth";
 
-export const Route = createFileRoute("/_authenticated/mapas")({
+export const Route = createFileRoute("/_authenticated/mapas/")({
   component: MapasList,
 });
 

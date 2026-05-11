@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useMemo } from "react";
 import {
   Home,
   Stars,
@@ -9,6 +10,7 @@ import {
   LogOut,
   Crown,
   Coffee,
+  Shield,
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,6 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { useUserIsAdmin } from "@/hooks/use-user-is-admin";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -50,6 +53,13 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const path = useRouterState({ select: (r) => r.location.pathname });
   const { user, signOut } = useAuth();
+  const adminGate = useUserIsAdmin();
+  const showAdmin = adminGate.data === true;
+
+  const navItems = useMemo(() => {
+    const adminEntry = { title: "Administração", url: "/admin", icon: Shield };
+    return [...items.slice(0, 5), ...(showAdmin ? [adminEntry] : []), ...items.slice(5)];
+  }, [showAdmin]);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -69,9 +79,13 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                {items.map((item) => {
+                {navItems.map((item) => {
                   const active =
-                    item.url === "/premium" ? path === "/premium" : path.startsWith(item.url);
+                    item.url === "/premium"
+                      ? path === "/premium"
+                      : item.url === "/admin"
+                        ? path === "/admin" || path.startsWith("/admin/")
+                        : path.startsWith(item.url);
                   const expandedLink = (
                     <Link to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4 shrink-0" />

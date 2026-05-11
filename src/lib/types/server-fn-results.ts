@@ -89,3 +89,14 @@ export type CalculateCompositeFnResult = {
   chart2Name: string;
   composite: ChartData;
 };
+
+/** Agregados globais devolvidos por `adminOverviewFn` / RPC `admin_overview_metrics`. */
+export type AdminOverviewFnResult = {
+  profiles_count: number;
+  charts_count: number;
+  synastries_count: number;
+  mood_logs_count: number;
+  ai_cache_count: number;
+  engagement_events_total: number;
+  engagement_events_last_7d: number;
+};

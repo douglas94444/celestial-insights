@@ -60,8 +60,9 @@ Rotas em `src/routes/`. Textos de UI em **PT-BR**. Nome comercial na app: **Astr
 | `/momento` | `_authenticated/momento.tsx` | Dia civil (SP): cartão partilhável, streak, histórico local, IA «Momento», export PNG do cartão, **MoodWidget** (humor + gráfico vs intensidade). |
 | `/configuracoes` | `_authenticated/configuracoes.tsx` | Perfil (nome, género, avatar), sistema de casas, preferências; gestão de conta / eliminar conta (server fn). |
 | `/premium` | `_authenticated/premium.tsx` | Planos / upgrade PREMIUM. |
+| `/admin` | `_authenticated/admin.tsx` | Painel operacional só para utilizadores com papel `admin` em `user_roles`: métricas agregadas (RPC `admin_overview_metrics`), atalhos Supabase/docs; não expõe linhas com dados pessoais. |
 
-**Server functions** (`src/lib/*.functions.ts`): `astrology.functions.ts` — `calculateChartFn` (pré-visualização de mapa, rate limit `chart_preview_calc_events`); `charts.functions.ts` — CRUD mapas, recalcular geometria; `transits.functions.ts` — trânsitos por intervalo; `annual-forecast.functions.ts`; `synastry.functions.ts`; `composite.functions.ts`; `ai-interpretation.functions.ts` (IAs em cache); `mood.functions.ts`; `email.functions.ts` (digest trânsitos); `profile.functions.ts`. Cliente: `withSupabaseAuth(session)`. Erros: `server-fn-http.ts`; quotas IA: `assertAiGenerationAllowed`.
+**Server functions** (`src/lib/*.functions.ts`): `astrology.functions.ts` — `calculateChartFn` (pré-visualização de mapa, rate limit `chart_preview_calc_events`); `charts.functions.ts` — CRUD mapas, recalcular geometria; `transits.functions.ts` — trânsitos por intervalo; `annual-forecast.functions.ts`; `synastry.functions.ts`; `composite.functions.ts`; `ai-interpretation.functions.ts` (IAs em cache); `mood.functions.ts`; `email.functions.ts` (digest trânsitos); `profile.functions.ts`; `admin.functions.ts` — `adminOverviewFn` (métricas globais após `assertAdminUser`). Cliente: `withSupabaseAuth(session)`. Erros: `server-fn-http.ts`; quotas IA: `assertAiGenerationAllowed`.
 
 **Componentes notáveis**: `NatalChartWheel`, `SynastryBiWheel`, `CompositeChartWheel`, `ShareableMomentCard`, `BirthChartForm`, `MoodWidget`, listas virtualizadas (`NatalAspectsVirtualList`, `SynastryAspectsVirtualList`), PDF `TransitReportPdf`.
 
@@ -134,8 +135,17 @@ Migrations in `supabase/migrations/`. Key tables:
 - `interpretation_ai_cache` — cache de IAs por `(user_id, kind, fingerprint)`
 - `chart_preview_calc_events` — rate-limiting table for `calculateChartFn`
 - `user_engagement_events` — analytics; fire-and-forget via `insertEngagementEventDeduped`
+- `user_roles` — `(user_id, role)` com enum `app_role` (`admin` \| `user`); o cliente pode ler as próprias linhas (RLS); função SQL `has_role` existe mas não está exposta ao cliente para chamadas diretas
 
 Types auto-generated at `src/integrations/supabase/types.ts` — run `npm run supabase:types` after schema changes.
+
+### Painel `/admin` (operacional)
+
+- **Quem acede:** apenas utilizadores com uma linha `user_roles` com `role = 'admin'`. A UI verifica na própria tabela (RLS); as server functions usam `assertAdminUser` (`src/integrations/supabase/admin-guard.ts`) e a RPC `admin_overview_metrics()` confere `has_role(auth.uid(), 'admin')`.
+- **Primeiro administrador:** não automatizar por produto; promover manualmente no SQL Editor do Supabase, por exemplo:  
+  `INSERT INTO public.user_roles (user_id, role) VALUES ('<uuid-do-auth.users>', 'admin');`
+- **Limitações do MVP:** contagens globais e links úteis — não é listagem de utilizadores nem edição de dados alheios; alargamentos futuros devem ser uma server function + política/RPC explícita cada um.
+- Migração: `supabase/migrations/*_admin_overview_metrics.sql` — após `npm run supabase:push`, alinhar tipos com `npm run supabase:types` se preferir regenerar `types.ts` em vez de editar à mão.
 
 ### UI
 
@@ -143,7 +153,7 @@ shadcn/ui components in `src/components/ui/` (Radix UI primitives). TailwindCSS 
 
 Toast notifications via `sonner`. All user-facing strings are in Portuguese (PT-BR).
 
-**Hooks úteis**: `use-auth.tsx`, `use-charts-list.ts` (lista de mapas React Query), `use-daily-moment.ts` (Momento + Dashboard: trânsitos do dia/semana, geometria do mapa primário, `todayStr` America/Sao_Paulo com atualização ao longo do dia).
+**Hooks úteis**: `use-auth.tsx`, `use-charts-list.ts` (lista de mapas React Query), `use-user-is-admin.ts` (papel `admin` para gate da sidebar / `/admin`), `use-daily-moment.ts` (Momento + Dashboard: trânsitos do dia/semana, geometria do mapa primário, `todayStr` America/Sao_Paulo com atualização ao longo do dia).
 
 ### Environment Variables
 
@@ -161,4 +171,5 @@ Toast notifications via `sonner`. All user-facing strings are in Portuguese (PT-
 | `AI_INTERPRETATION_FREE_TRIES_PER_MONTH`              | Monthly limit for FREE users                         |
 | `CALCULATE_CHART_MAX_PER_USER_PER_HOUR`               | Default: 90                                          |
 | `VITE_APP_INSTAGRAM_HANDLE` / `VITE_APP_SHARE_URL`    | Branding (Instagram card)                            |
+| `VITE_APP_GITHUB_URL`                                 | Opcional; link «Repositório GitHub» no painel `/admin` |
 | `TRANSIT_DIGEST_CRON_SECRET`                          | Edge function auth                                   |

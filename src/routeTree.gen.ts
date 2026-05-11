@@ -17,11 +17,11 @@ import { Route as AuthenticatedTransitosRouteImport } from './routes/_authentica
 import { Route as AuthenticatedPremiumRouteImport } from './routes/_authenticated/premium'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMomentoRouteImport } from './routes/_authenticated/momento'
-import { Route as AuthenticatedMapasRouteImport } from './routes/_authenticated/mapas'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCompatibilidadeRouteImport } from './routes/_authenticated/compatibilidade'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedMapasIndexRouteImport } from './routes/_authenticated/mapas.index'
 import { Route as AuthenticatedMapasNovoRouteImport } from './routes/_authenticated/mapas.novo'
 import { Route as AuthenticatedMapasIdRouteImport } from './routes/_authenticated/mapas.$id'
 
@@ -64,11 +64,6 @@ const AuthenticatedMomentoRoute = AuthenticatedMomentoRouteImport.update({
   path: '/momento',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedMapasRoute = AuthenticatedMapasRouteImport.update({
-  id: '/mapas',
-  path: '/mapas',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -91,15 +86,20 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedMapasIndexRoute = AuthenticatedMapasIndexRouteImport.update({
+  id: '/mapas/',
+  path: '/mapas/',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedMapasNovoRoute = AuthenticatedMapasNovoRouteImport.update({
-  id: '/novo',
-  path: '/novo',
-  getParentRoute: () => AuthenticatedMapasRoute,
+  id: '/mapas/novo',
+  path: '/mapas/novo',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedMapasIdRoute = AuthenticatedMapasIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AuthenticatedMapasRoute,
+  id: '/mapas/$id',
+  path: '/mapas/$id',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -110,13 +110,13 @@ export interface FileRoutesByFullPath {
   '/compatibilidade': typeof AuthenticatedCompatibilidadeRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/mapas': typeof AuthenticatedMapasRouteWithChildren
   '/momento': typeof AuthenticatedMomentoRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/premium': typeof AuthenticatedPremiumRoute
   '/transitos': typeof AuthenticatedTransitosRoute
   '/mapas/$id': typeof AuthenticatedMapasIdRoute
   '/mapas/novo': typeof AuthenticatedMapasNovoRoute
+  '/mapas/': typeof AuthenticatedMapasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,13 +126,13 @@ export interface FileRoutesByTo {
   '/compatibilidade': typeof AuthenticatedCompatibilidadeRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/mapas': typeof AuthenticatedMapasRouteWithChildren
   '/momento': typeof AuthenticatedMomentoRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/premium': typeof AuthenticatedPremiumRoute
   '/transitos': typeof AuthenticatedTransitosRoute
   '/mapas/$id': typeof AuthenticatedMapasIdRoute
   '/mapas/novo': typeof AuthenticatedMapasNovoRoute
+  '/mapas': typeof AuthenticatedMapasIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -144,13 +144,13 @@ export interface FileRoutesById {
   '/_authenticated/compatibilidade': typeof AuthenticatedCompatibilidadeRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/mapas': typeof AuthenticatedMapasRouteWithChildren
   '/_authenticated/momento': typeof AuthenticatedMomentoRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/premium': typeof AuthenticatedPremiumRoute
   '/_authenticated/transitos': typeof AuthenticatedTransitosRoute
   '/_authenticated/mapas/$id': typeof AuthenticatedMapasIdRoute
   '/_authenticated/mapas/novo': typeof AuthenticatedMapasNovoRoute
+  '/_authenticated/mapas/': typeof AuthenticatedMapasIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -162,13 +162,13 @@ export interface FileRouteTypes {
     | '/compatibilidade'
     | '/configuracoes'
     | '/dashboard'
-    | '/mapas'
     | '/momento'
     | '/onboarding'
     | '/premium'
     | '/transitos'
     | '/mapas/$id'
     | '/mapas/novo'
+    | '/mapas/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -178,13 +178,13 @@ export interface FileRouteTypes {
     | '/compatibilidade'
     | '/configuracoes'
     | '/dashboard'
-    | '/mapas'
     | '/momento'
     | '/onboarding'
     | '/premium'
     | '/transitos'
     | '/mapas/$id'
     | '/mapas/novo'
+    | '/mapas'
   id:
     | '__root__'
     | '/'
@@ -195,13 +195,13 @@ export interface FileRouteTypes {
     | '/_authenticated/compatibilidade'
     | '/_authenticated/configuracoes'
     | '/_authenticated/dashboard'
-    | '/_authenticated/mapas'
     | '/_authenticated/momento'
     | '/_authenticated/onboarding'
     | '/_authenticated/premium'
     | '/_authenticated/transitos'
     | '/_authenticated/mapas/$id'
     | '/_authenticated/mapas/novo'
+    | '/_authenticated/mapas/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -269,13 +269,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMomentoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/mapas': {
-      id: '/_authenticated/mapas'
-      path: '/mapas'
-      fullPath: '/mapas'
-      preLoaderRoute: typeof AuthenticatedMapasRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -304,46 +297,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/mapas/': {
+      id: '/_authenticated/mapas/'
+      path: '/mapas'
+      fullPath: '/mapas/'
+      preLoaderRoute: typeof AuthenticatedMapasIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/mapas/novo': {
       id: '/_authenticated/mapas/novo'
-      path: '/novo'
+      path: '/mapas/novo'
       fullPath: '/mapas/novo'
       preLoaderRoute: typeof AuthenticatedMapasNovoRouteImport
-      parentRoute: typeof AuthenticatedMapasRoute
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/mapas/$id': {
       id: '/_authenticated/mapas/$id'
-      path: '/$id'
+      path: '/mapas/$id'
       fullPath: '/mapas/$id'
       preLoaderRoute: typeof AuthenticatedMapasIdRouteImport
-      parentRoute: typeof AuthenticatedMapasRoute
+      parentRoute: typeof AuthenticatedRoute
     }
   }
 }
-
-interface AuthenticatedMapasRouteChildren {
-  AuthenticatedMapasIdRoute: typeof AuthenticatedMapasIdRoute
-  AuthenticatedMapasNovoRoute: typeof AuthenticatedMapasNovoRoute
-}
-
-const AuthenticatedMapasRouteChildren: AuthenticatedMapasRouteChildren = {
-  AuthenticatedMapasIdRoute: AuthenticatedMapasIdRoute,
-  AuthenticatedMapasNovoRoute: AuthenticatedMapasNovoRoute,
-}
-
-const AuthenticatedMapasRouteWithChildren =
-  AuthenticatedMapasRoute._addFileChildren(AuthenticatedMapasRouteChildren)
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedCompatibilidadeRoute: typeof AuthenticatedCompatibilidadeRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedMapasRoute: typeof AuthenticatedMapasRouteWithChildren
   AuthenticatedMomentoRoute: typeof AuthenticatedMomentoRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPremiumRoute: typeof AuthenticatedPremiumRoute
   AuthenticatedTransitosRoute: typeof AuthenticatedTransitosRoute
+  AuthenticatedMapasIdRoute: typeof AuthenticatedMapasIdRoute
+  AuthenticatedMapasNovoRoute: typeof AuthenticatedMapasNovoRoute
+  AuthenticatedMapasIndexRoute: typeof AuthenticatedMapasIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -351,11 +340,13 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCompatibilidadeRoute: AuthenticatedCompatibilidadeRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedMapasRoute: AuthenticatedMapasRouteWithChildren,
   AuthenticatedMomentoRoute: AuthenticatedMomentoRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPremiumRoute: AuthenticatedPremiumRoute,
   AuthenticatedTransitosRoute: AuthenticatedTransitosRoute,
+  AuthenticatedMapasIdRoute: AuthenticatedMapasIdRoute,
+  AuthenticatedMapasNovoRoute: AuthenticatedMapasNovoRoute,
+  AuthenticatedMapasIndexRoute: AuthenticatedMapasIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

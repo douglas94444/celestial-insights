@@ -15,6 +15,7 @@ import {
   formatSynastryPromptContext,
   formatTransitPromptContext,
   patternsFingerprintCompact,
+  sanitizePromptString,
   sha256FingerprintHex,
   type SynastryInterpretInput,
 } from "@/lib/ai/chart-summary";
@@ -1244,7 +1245,9 @@ export const generateCompositeNarrativeFn = createServerFn({ method: "POST" })
         .map((a) => `- ${a.planet1} ${a.type} ${a.planet2} (órbe ${a.orb}°)`)
         .join("\n");
 
-      const userPrompt = `Gera uma interpretação do mapa composto entre "${chartA.name}" e "${chartB.name}" — relacionamento como terceira entidade simbólica (midpoint de posições e médias para casas).\n\nPlanetas e pontos compostos:\n${planetLines}\n\nAscendente composto ~ ${roundDegComposite(composite.ascendant, 2)}° · MC ~ ${roundDegComposite(composite.midheaven, 2)}°\n\nAspectos principais:\n${aspLines}\n\nEscreve para um público em PT-BR que já viu sinastria; foca na dinámica do «nós» como campo partilhado, propósito comum e tensões criativas. Não contradigas os dados listados.`;
+      const nameA = sanitizePromptString(chartA.name);
+      const nameB = sanitizePromptString(chartB.name);
+      const userPrompt = `Gera uma interpretação do mapa composto entre "${nameA}" e "${nameB}" — relacionamento como terceira entidade simbólica (midpoint de posições e médias para casas).\n\nPlanetas e pontos compostos:\n${planetLines}\n\nAscendente composto ~ ${roundDegComposite(composite.ascendant, 2)}° · MC ~ ${roundDegComposite(composite.midheaven, 2)}°\n\nAspectos principais:\n${aspLines}\n\nEscreve para um público em PT-BR que já viu sinastria; foca na dinámica do «nós» como campo partilhado, propósito comum e tensões criativas. Não contradigas os dados listados.`;
 
       const t0 = Date.now();
       let completion;

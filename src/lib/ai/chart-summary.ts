@@ -16,9 +16,7 @@ export const MORNING_DEEP_PROMPT_VERSION = "md-v1";
 export const NATAL_ESSENCE_PROMPT_VERSION = "ne-v1";
 export const SYNASTRY_DEEP_PROMPT_VERSION = "sd-v1";
 
-export function patternsFingerprintCompact(
-  patterns: DerivedChartPatterns,
-): Record<string, unknown> {
+export function patternsFingerprintCompact(patterns: DerivedChartPatterns) {
   return {
     dominant_element: patterns.dominant_element,
     dominant_modality: patterns.dominant_modality,
@@ -50,13 +48,15 @@ export function patternsFingerprintCompact(
   };
 }
 
+export type PatternsFingerprintCompact = ReturnType<typeof patternsFingerprintCompact>;
+
 export function buildMorningDeepFingerprintPayload(args: {
   chart: ChartRow;
   dateYmd: string;
   tone: string;
   gender: string | null;
   focusAreas: string[];
-  patternsCompact: Record<string, unknown>;
+  patternsCompact: PatternsFingerprintCompact;
   readingHistoryCompact: Record<string, unknown>;
 }): Record<string, unknown> {
   return {
@@ -76,7 +76,7 @@ export function buildNatalEssenceFingerprintPayload(args: {
   tone: string;
   gender: string | null;
   focusAreas: string[];
-  patternsCompact: Record<string, unknown>;
+  patternsCompact: PatternsFingerprintCompact;
 }): Record<string, unknown> {
   return {
     pv: NATAL_ESSENCE_PROMPT_VERSION,
@@ -195,11 +195,24 @@ export function buildNatalFingerprintPayload(
   return base;
 }
 
+/** Remove padrões de prompt injection de texto livre fornecido pelo utilizador. */
+export function sanitizePromptString(text: string, maxLen = 120): string {
+  return text
+    .replace(/[<>{}[\]]/g, "")
+    .replace(/ignore\s+(all\s+)?.*instructions?/gi, "[removed]")
+    .replace(/system\s*:/gi, "[removed]")
+    .replace(/you\s+are\s+now/gi, "[removed]")
+    .trim()
+    .slice(0, maxLen);
+}
+
 /** Texto compacto para prompt (não para fingerprint). */
 export function formatNatalPromptContext(chart: ChartRow, data: ChartData): string {
   const lines: string[] = [];
-  lines.push(`Nome simbólico do mapa: ${chart.name}`);
-  lines.push(`Data/local: ${chart.birth_date} ${chart.birth_time} · ${chart.birth_place}`);
+  lines.push(`Nome simbólico do mapa: ${sanitizePromptString(chart.name)}`);
+  lines.push(
+    `Data/local: ${chart.birth_date} ${chart.birth_time} · ${sanitizePromptString(chart.birth_place ?? "")}`,
+  );
   lines.push(`Sistema de casas: ${chart.house_system}`);
   const planets = [...data.planets].sort((a, b) => a.key.localeCompare(b.key));
   for (const p of planets) {
@@ -253,8 +266,8 @@ export function formatSynastryPromptContext(
   payload: SynastryInterpretInput,
 ): string {
   const lines: string[] = [];
-  lines.push(`Mapa A: ${payload.chart1Name}`);
-  lines.push(`Mapa B: ${payload.chart2Name}`);
+  lines.push(`Mapa A: ${sanitizePromptString(payload.chart1Name)}`);
+  lines.push(`Mapa B: ${sanitizePromptString(payload.chart2Name)}`);
   lines.push(`Pontuação heurística global: ${synastry.compatibility_score}/100`);
   lines.push(
     `Áreas: amor ${payload.areas.love}, amizade ${payload.areas.friendship}, trabalho ${payload.areas.work}, convivência ${payload.areas.convivencia}`,
@@ -298,7 +311,7 @@ export function buildTransitFingerprintPayload(
 
 export function formatTransitPromptContext(chart: ChartRow, day: TransitDayPayload): string {
   const lines: string[] = [];
-  lines.push(`Mapa de referência: ${chart.name}`);
+  lines.push(`Mapa de referência: ${sanitizePromptString(chart.name)}`);
   lines.push(`Dia (UTC civil): ${day.date}`);
   lines.push(`Lua em trânsito (meio-dia UTC): ${day.transitMoonSign || "—"}`);
   lines.push(`Intensidade heurística: ${day.intensity}/100`);

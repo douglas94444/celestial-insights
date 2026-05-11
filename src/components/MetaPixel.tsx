@@ -37,8 +37,8 @@ function loadFbeventsJs(): Promise<void> {
 export function MetaPixel() {
   const pixelId = (import.meta.env.VITE_META_PIXEL_ID as string | undefined)?.trim();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const search = useRouterState({ select: (s) => s.location.search });
-  const fullPath = `${pathname}${search}`;
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr ?? "" });
+  const fullPath = `${pathname}${searchStr}`;
   const prevPathRef = useRef<string | null>(null);
 
   useEffect(() => {

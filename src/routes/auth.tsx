@@ -121,7 +121,11 @@ function SignInForm() {
       return;
     }
     toast.success("Bem-vindo de volta!");
-    window.location.assign("/dashboard");
+    const { count } = await supabase
+      .from("charts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", data.session.user.id);
+    window.location.assign((count ?? 0) > 0 ? "/dashboard" : "/onboarding");
   }
 
   return (

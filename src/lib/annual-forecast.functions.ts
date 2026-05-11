@@ -5,6 +5,7 @@ import { chartRowToChartData } from "@/lib/chart-from-row";
 import { annualForecastInputSchema } from "@/lib/schemas/server-fns";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
+import { assertRolloutGate, fetchProfileRolloutState } from "@/lib/subscription-rollout";
 
 export const generateAnnualForecastFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -17,6 +18,14 @@ export const generateAnnualForecastFn = createServerFn({ method: "POST" })
     timedServerFn("generateAnnualForecastFn", async ({ data, context }) => {
       const supabase = context.supabase;
       const userId = context.userId;
+
+      const rollout = await fetchProfileRolloutState(supabase, userId);
+      assertRolloutGate(
+        rollout.applies,
+        rollout.gates.annualForecast,
+        "annualForecast",
+        rollout.dayIndex,
+      );
 
       const { data: chart, error } = await supabase
         .from("charts")

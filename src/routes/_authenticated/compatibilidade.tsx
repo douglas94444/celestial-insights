@@ -73,6 +73,8 @@ import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
 import { useChartsListQuery } from "@/hooks/use-charts-list";
+import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
+import { rolloutLockedMessage } from "@/lib/subscription-rollout";
 
 export const Route = createFileRoute("/_authenticated/compatibilidade")({
   component: CompatibilidadePage,
@@ -155,6 +157,7 @@ function CompatibilidadePage() {
     isError: chartsError,
     refetch: refetchCharts,
   } = useChartsListQuery();
+  const rollout = useSubscriptionRollout();
 
   const {
     data: history = [],
@@ -204,6 +207,12 @@ function CompatibilidadePage() {
     if (!chart1Id || !chart2Id || chart1Id === chart2Id) setCompatSubview("sinastria");
   }, [chart1Id, chart2Id]);
 
+  useEffect(() => {
+    if (rollout?.active && !rollout.gates.composite && compatSubview === "composto") {
+      setCompatSubview("sinastria");
+    }
+  }, [rollout, compatSubview]);
+
   usePageEngagement(
     ENGAGEMENT_ROUTES.compatibilidade,
     ENGAGEMENT_TOPICS.synastry_view,
@@ -250,7 +259,9 @@ function CompatibilidadePage() {
       !!chart1Id &&
       !!chart2Id &&
       chart1Id !== chart2Id &&
-      compatSubview === "composto",
+      compatSubview === "composto" &&
+      rollout !== null &&
+      rollout.gates.composite,
     staleTime: 120_000,
   });
 
@@ -381,10 +392,18 @@ function CompatibilidadePage() {
   );
 
   const canSynastry = charts.length >= 2;
+  const synastryRolloutOk = !rollout?.active || rollout.gates.synastry;
 
   return (
     <div className="container mx-auto max-w-6xl p-4 pb-10 sm:p-6">
       <BackToDashboardLink buttonClassName="mb-4" />
+
+      {rollout?.active && !rollout.gates.synastry ? (
+        <Alert className="mb-6 border-primary/25 bg-primary/5">
+          <AlertTitle>Sinastria em breve</AlertTitle>
+          <AlertDescription>{rolloutLockedMessage("synastry", rollout.dayIndex)}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="mb-8 flex flex-wrap items-start gap-4 justify-between">
         <div>
@@ -540,6 +559,7 @@ function CompatibilidadePage() {
             className="min-h-11 w-full shrink-0 bg-mystical text-white sm:min-h-10 md:w-auto"
             disabled={
               !canSynastry ||
+              !synastryRolloutOk ||
               !chart1Id ||
               !chart2Id ||
               chart1Id === chart2Id ||
@@ -578,7 +598,12 @@ function CompatibilidadePage() {
         >
           <TabsList className="mb-4 grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="sinastria">Sinastria</TabsTrigger>
-            <TabsTrigger value="composto">Mapa composto</TabsTrigger>
+            <TabsTrigger
+              value="composto"
+              disabled={!!(rollout?.active && !rollout.gates.composite)}
+            >
+              Mapa composto
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="sinastria" className="mt-0 space-y-4">
@@ -771,6 +796,14 @@ function CompatibilidadePage() {
           </TabsContent>
 
           <TabsContent value="composto" className="mt-0 space-y-6">
+            {rollout?.active && !rollout.gates.composite ? (
+              <Alert className="border-primary/25 bg-primary/5">
+                <AlertTitle>Mapa composto em breve</AlertTitle>
+                <AlertDescription>
+                  {rolloutLockedMessage("composite", rollout.dayIndex)}
+                </AlertDescription>
+              </Alert>
+            ) : null}
             {compositeQuery.isLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin shrink-0" /> A calcular mapa composto…

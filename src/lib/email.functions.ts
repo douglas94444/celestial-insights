@@ -13,6 +13,12 @@ import { escapeHtml } from "@/lib/html-escape";
 import { cronTransitDigestSchema, sendTransitDigestInputSchema } from "@/lib/schemas/server-fns";
 import { jsonError, secretsMatchConstantTime, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
+import {
+  assertRolloutGate,
+  buildRolloutGatesForDay,
+  getRolloutDayIndexSp,
+  paidRolloutApplies,
+} from "@/lib/subscription-rollout";
 
 const SP_TZ = "America/Sao_Paulo";
 
@@ -158,7 +164,11 @@ export const sendTransitDigestEmailFn = createServerFn({ method: "POST" })
 
       const [{ data: profile, error: profileErr }, { data: authUser, error: authErr }] =
         await Promise.all([
-          supabase.from("profiles").select("email_notifications").eq("id", userId).single(),
+          supabase
+            .from("profiles")
+            .select("email_notifications, subscription_tier, created_at")
+            .eq("id", userId)
+            .single(),
           supabase.auth.getUser(),
         ]);
 
@@ -170,6 +180,10 @@ export const sendTransitDigestEmailFn = createServerFn({ method: "POST" })
           "Ative «Receber atualizações por email» nas Preferências para enviar o resumo.",
         );
       }
+      const tier = profile?.subscription_tier ?? "MENSAL";
+      const dayIdx = getRolloutDayIndexSp(profile?.created_at ?? new Date().toISOString());
+      const gates = buildRolloutGatesForDay(dayIdx);
+      assertRolloutGate(paidRolloutApplies(tier, dayIdx), gates.digestEmail, "digestEmail", dayIdx);
       if (authErr || !authUser.user?.email) {
         throw jsonError(400, "NO_EMAIL", "Não foi possível obter o email da sua conta.");
       }
@@ -263,7 +277,9 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
 
       const { data: profiles, error: profErr } = await supabaseAdmin
         .from("profiles")
-        .select("id, transit_digest_hour, transit_digest_weekdays, email_notifications")
+        .select(
+          "id, transit_digest_hour, transit_digest_weekdays, email_notifications, subscription_tier, created_at",
+        )
         .eq("transit_digest_auto", true)
         .eq("email_notifications", true);
 
@@ -279,6 +295,13 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
         }
         const days = row.transit_digest_weekdays ?? [];
         if (!days.includes(weekday)) {
+          skipped++;
+          continue;
+        }
+
+        const dIdx = getRolloutDayIndexSp(row.created_at);
+        const t = row.subscription_tier ?? "MENSAL";
+        if (paidRolloutApplies(t, dIdx) && !buildRolloutGatesForDay(dIdx).digestEmail) {
           skipped++;
           continue;
         }
@@ -330,7 +353,9 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
 
       const { data: momentProfiles, error: mpErr } = await supabaseAdmin
         .from("profiles")
-        .select("id, name, transit_digest_hour, transit_digest_weekdays, email_notifications")
+        .select(
+          "id, name, transit_digest_hour, transit_digest_weekdays, email_notifications, subscription_tier, created_at",
+        )
         .eq("moment_daily_email", true)
         .eq("email_notifications", true);
 
@@ -346,6 +371,13 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
         }
         const days = row.transit_digest_weekdays ?? [];
         if (!days.includes(weekday)) {
+          momentSkipped++;
+          continue;
+        }
+
+        const dIdxM = getRolloutDayIndexSp(row.created_at);
+        const tM = row.subscription_tier ?? "MENSAL";
+        if (paidRolloutApplies(tM, dIdxM) && !buildRolloutGatesForDay(dIdxM).digestEmail) {
           momentSkipped++;
           continue;
         }

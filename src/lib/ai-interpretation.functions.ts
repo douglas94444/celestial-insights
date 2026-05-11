@@ -62,6 +62,7 @@ import {
 } from "@/lib/user-astro-profile";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
+import { assertPaidRolloutAiAccess } from "@/lib/subscription-rollout";
 
 type Tier = Database["public"]["Enums"]["subscription_tier"];
 type InterpretationKind = Database["public"]["Enums"]["interpretation_ai_kind"];
@@ -287,13 +288,14 @@ export const generateNatalExecutiveSummaryFn = createServerFn({ method: "POST" }
       const kind: InterpretationKind = "natal_summary";
 
       const [{ data: profile, error: profileErr }, chart] = await Promise.all([
-        supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
+        supabase.from("profiles").select("subscription_tier, created_at").eq("id", userId).single(),
         fetchChartOwnedByUser(supabase, userId, data.chartId),
       ]);
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
 
       const tier = profile?.subscription_tier ?? "MENSAL";
+      const profileCreatedAt = profile?.created_at ?? new Date().toISOString();
       const fpPayload = buildNatalFingerprintPayload(chart, "natal_summary");
       const fingerprint = await sha256FingerprintHex(fpPayload);
 
@@ -313,6 +315,7 @@ export const generateNatalExecutiveSummaryFn = createServerFn({ method: "POST" }
           cached_at: cached.created_at ?? null,
         };
 
+      await assertPaidRolloutAiAccess(supabase, userId, tier, profileCreatedAt, kind);
       await assertAiGenerationAllowed(supabase, userId, tier);
 
       if (!resolveAiProvider()) {
@@ -392,13 +395,14 @@ export const generateNatalPlanetInsightFn = createServerFn({ method: "POST" })
       const kind: InterpretationKind = "natal_planet";
 
       const [{ data: profile, error: profileErr }, chart] = await Promise.all([
-        supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
+        supabase.from("profiles").select("subscription_tier, created_at").eq("id", userId).single(),
         fetchChartOwnedByUser(supabase, userId, data.chartId),
       ]);
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
 
       const tier = profile?.subscription_tier ?? "MENSAL";
+      const profileCreatedAt = profile?.created_at ?? new Date().toISOString();
       const fpPayload = buildNatalFingerprintPayload(chart, "natal_planet", data.planetKey);
       const fingerprint = await sha256FingerprintHex(fpPayload);
 
@@ -418,6 +422,7 @@ export const generateNatalPlanetInsightFn = createServerFn({ method: "POST" })
           cached_at: cached.created_at ?? null,
         };
 
+      await assertPaidRolloutAiAccess(supabase, userId, tier, profileCreatedAt, kind);
       await assertAiGenerationAllowed(supabase, userId, tier);
 
       if (!resolveAiProvider()) {
@@ -500,12 +505,13 @@ export const generateSynastryNarrativeFn = createServerFn({ method: "POST" })
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("subscription_tier")
+        .select("subscription_tier, created_at")
         .eq("id", userId)
         .single();
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
       const tier = profile?.subscription_tier ?? "MENSAL";
+      const profileCreatedAt = profile?.created_at ?? new Date().toISOString();
 
       const row = await fetchSynastryOwned(supabase, userId, data);
       if (!row) throw jsonError(404, "NOT_FOUND", "Sinastria não encontrada.");
@@ -534,6 +540,7 @@ export const generateSynastryNarrativeFn = createServerFn({ method: "POST" })
           cached_at: cached.created_at ?? null,
         };
 
+      await assertPaidRolloutAiAccess(supabase, userId, tier, profileCreatedAt, kind);
       await assertAiGenerationAllowed(supabase, userId, tier);
 
       if (!resolveAiProvider()) {
@@ -612,13 +619,14 @@ export const generateTransitDayNarrativeFn = createServerFn({ method: "POST" })
       const kind: InterpretationKind = "transit_day";
 
       const [{ data: profile, error: profileErr }, chart] = await Promise.all([
-        supabase.from("profiles").select("subscription_tier").eq("id", userId).single(),
+        supabase.from("profiles").select("subscription_tier, created_at").eq("id", userId).single(),
         fetchChartOwnedByUser(supabase, userId, data.chartId),
       ]);
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
 
       const tier = profile?.subscription_tier ?? "MENSAL";
+      const profileCreatedAt = profile?.created_at ?? new Date().toISOString();
       const chartData = chartRowToChartData(chart);
       const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
       const dayPayload = analyzeTransitDay(
@@ -648,6 +656,7 @@ export const generateTransitDayNarrativeFn = createServerFn({ method: "POST" })
           cached_at: cached.created_at ?? null,
         };
 
+      await assertPaidRolloutAiAccess(supabase, userId, tier, profileCreatedAt, kind);
       await assertAiGenerationAllowed(supabase, userId, tier);
 
       if (!resolveAiProvider()) {
@@ -729,7 +738,7 @@ export const generateMorningDeepMessageFn = createServerFn({ method: "POST" })
         supabase
           .from("profiles")
           .select(
-            "subscription_tier, name, personalization_gender, personalization_tone, personalization_focus_areas",
+            "subscription_tier, created_at, name, personalization_gender, personalization_tone, personalization_focus_areas",
           )
           .eq("id", userId)
           .single(),
@@ -739,6 +748,7 @@ export const generateMorningDeepMessageFn = createServerFn({ method: "POST" })
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
 
       const tier = profile?.subscription_tier ?? "MENSAL";
+      const profileCreatedAt = profile?.created_at ?? new Date().toISOString();
       const chartData = chartRowToChartData(chart);
       const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
       const dayPayload = analyzeTransitDay(
@@ -797,6 +807,7 @@ export const generateMorningDeepMessageFn = createServerFn({ method: "POST" })
           cached_at: cached?.created_at ?? null,
         };
 
+      await assertPaidRolloutAiAccess(supabase, userId, tier, profileCreatedAt, kind);
       await assertAiGenerationAllowed(supabase, userId, tier);
 
       if (!resolveAiProvider()) {
@@ -886,7 +897,7 @@ export const generateNatalEssenceFn = createServerFn({ method: "POST" })
         supabase
           .from("profiles")
           .select(
-            "subscription_tier, personalization_gender, personalization_tone, personalization_focus_areas",
+            "subscription_tier, created_at, personalization_gender, personalization_tone, personalization_focus_areas",
           )
           .eq("id", userId)
           .single(),
@@ -896,6 +907,7 @@ export const generateNatalEssenceFn = createServerFn({ method: "POST" })
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
 
       const tier = profile?.subscription_tier ?? "MENSAL";
+      const profileCreatedAt = profile?.created_at ?? new Date().toISOString();
       const chartData = chartRowToChartData(chart);
       const patterns = deriveChartPatterns(chartData);
       const patternsCompact = patternsFingerprintCompact(patterns);
@@ -929,6 +941,7 @@ export const generateNatalEssenceFn = createServerFn({ method: "POST" })
           cached_at: cached?.created_at ?? null,
         };
 
+      await assertPaidRolloutAiAccess(supabase, userId, tier, profileCreatedAt, kind);
       await assertAiGenerationAllowed(supabase, userId, tier);
 
       if (!resolveAiProvider()) {
@@ -1016,13 +1029,14 @@ export const generateSynastryDeepNarrativeFn = createServerFn({ method: "POST" }
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
         .select(
-          "subscription_tier, personalization_gender, personalization_tone, personalization_focus_areas",
+          "subscription_tier, created_at, personalization_gender, personalization_tone, personalization_focus_areas",
         )
         .eq("id", userId)
         .single();
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
       const tier = profile?.subscription_tier ?? "MENSAL";
+      const profileCreatedAt = profile?.created_at ?? new Date().toISOString();
 
       const row = await fetchSynastryOwned(supabase, userId, data);
       if (!row) throw jsonError(404, "NOT_FOUND", "Sinastria não encontrada.");
@@ -1060,6 +1074,7 @@ export const generateSynastryDeepNarrativeFn = createServerFn({ method: "POST" }
           cached_at: cached?.created_at ?? null,
         };
 
+      await assertPaidRolloutAiAccess(supabase, userId, tier, profileCreatedAt, kind);
       await assertAiGenerationAllowed(supabase, userId, tier);
 
       if (!resolveAiProvider()) {
@@ -1155,11 +1170,12 @@ export const generateCompositeNarrativeFn = createServerFn({ method: "POST" })
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("subscription_tier")
+        .select("subscription_tier, created_at")
         .eq("id", userId)
         .single();
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
       const tier = profile?.subscription_tier ?? "MENSAL";
+      const profileCreatedAt = profile?.created_at ?? new Date().toISOString();
 
       const { data: rows, error: chartsErr } = await supabase
         .from("charts")
@@ -1201,6 +1217,7 @@ export const generateCompositeNarrativeFn = createServerFn({ method: "POST" })
         };
       }
 
+      await assertPaidRolloutAiAccess(supabase, userId, tier, profileCreatedAt, kind);
       await assertAiGenerationAllowed(supabase, userId, tier);
 
       if (!resolveAiProvider()) {

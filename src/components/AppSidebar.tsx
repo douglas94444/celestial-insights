@@ -29,6 +29,9 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserIsAdmin } from "@/hooks/use-user-is-admin";
 import { useProfile } from "@/hooks/use-profile";
+import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
+import type { RolloutGates } from "@/lib/subscription-rollout";
+import { rolloutLockedMessage } from "@/lib/subscription-rollout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -37,14 +40,15 @@ type NavItem = {
   url: string;
   icon: typeof Home;
   premium?: boolean;
+  rolloutGate?: keyof RolloutGates;
 };
 
 const items: NavItem[] = [
   { title: "Início", url: "/dashboard", icon: Home },
-  { title: "Momento", url: "/momento", icon: Coffee },
+  { title: "Momento", url: "/momento", icon: Coffee, rolloutGate: "transits" },
   { title: "Meus Mapas", url: "/mapas", icon: Stars },
-  { title: "Compatibilidade", url: "/compatibilidade", icon: Heart },
-  { title: "Trânsitos", url: "/transitos", icon: CalendarRange },
+  { title: "Compatibilidade", url: "/compatibilidade", icon: Heart, rolloutGate: "synastry" },
+  { title: "Trânsitos", url: "/transitos", icon: CalendarRange, rolloutGate: "transits" },
   { title: "Planos", url: "/premium", icon: Crown },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
@@ -57,6 +61,7 @@ export function AppSidebar() {
   const adminGate = useUserIsAdmin();
   const showAdmin = adminGate.data === true;
   const { data: profile } = useProfile();
+  const rollout = useSubscriptionRollout();
   const streak = profile?.moment_streak ?? 0;
 
   const navItems = useMemo(() => {
@@ -90,6 +95,11 @@ export function AppSidebar() {
                         ? path === "/admin" || path.startsWith("/admin/")
                         : path.startsWith(item.url);
                   const isMomento = item.url === "/momento";
+                  const gate = item.rolloutGate;
+                  const rolloutBlocked = !!rollout?.active && !!gate && !rollout.gates[gate];
+                  const rolloutTooltip = rolloutBlocked
+                    ? rolloutLockedMessage(gate, rollout.dayIndex)
+                    : null;
                   const expandedLink = (
                     <Link to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4 shrink-0" />
@@ -114,9 +124,49 @@ export function AppSidebar() {
                       <item.icon className="h-4 w-4 shrink-0" />
                     </Link>
                   );
+                  const expandedDisabled = (
+                    <span className="flex w-full cursor-not-allowed items-center gap-2 opacity-50">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className="flex-1 truncate">{item.title}</span>
+                      {isMomento && streak > 0 ? (
+                        <Badge className="ml-auto bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] px-1.5">
+                          {streak}🔥
+                        </Badge>
+                      ) : null}
+                    </span>
+                  );
+                  const collapsedDisabled = (
+                    <span className="flex items-center gap-2 opacity-50">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                    </span>
+                  );
                   return (
                     <SidebarMenuItem key={item.url}>
-                      {collapsed ? (
+                      {rolloutBlocked ? (
+                        collapsed ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <SidebarMenuButton isActive={false} className="pointer-events-none">
+                                {collapsedDisabled}
+                              </SidebarMenuButton>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              {rolloutTooltip}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <SidebarMenuButton isActive={false} className="pointer-events-none">
+                                {expandedDisabled}
+                              </SidebarMenuButton>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-xs">
+                              {rolloutTooltip}
+                            </TooltipContent>
+                          </Tooltip>
+                        )
+                      ) : collapsed ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <SidebarMenuButton asChild isActive={active}>

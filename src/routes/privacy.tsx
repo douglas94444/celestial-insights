@@ -4,7 +4,10 @@ export const Route = createFileRoute("/privacy")({
   head: () => ({
     meta: [
       { title: "Política de Privacidade — AstroMap" },
-      { name: "description", content: "Como o AstroMap coleta, usa e protege seus dados pessoais." },
+      {
+        name: "description",
+        content: "Como o AstroMap coleta, usa e protege seus dados pessoais.",
+      },
     ],
   }),
   component: PrivacyPage,
@@ -26,8 +29,9 @@ function PrivacyPage() {
           <section>
             <h2 className="font-display text-xl font-semibold">1. Quem somos</h2>
             <p className="mt-2 text-muted-foreground leading-relaxed">
-              O AstroMap é um serviço de astrologia psicológica digital. Neste documento, "AstroMap",
-              "nós" ou "nosso" refere-se ao responsável pelo tratamento dos seus dados pessoais.
+              O AstroMap é um serviço de astrologia psicológica digital. Neste documento,
+              "AstroMap", "nós" ou "nosso" refere-se ao responsável pelo tratamento dos seus dados
+              pessoais.
             </p>
           </section>
 
@@ -69,7 +73,9 @@ function PrivacyPage() {
           </section>
 
           <section>
-            <h2 className="font-display text-xl font-semibold">4. Uso de inteligência artificial</h2>
+            <h2 className="font-display text-xl font-semibold">
+              4. Uso de inteligência artificial
+            </h2>
             <p className="mt-2 text-muted-foreground leading-relaxed">
               As interpretações geradas por IA utilizam dados astrológicos (posições planetárias,
               aspectos, casas) derivados das suas informações de nascimento. Esses dados são
@@ -107,9 +113,10 @@ function PrivacyPage() {
           <section>
             <h2 className="font-display text-xl font-semibold">6. Segurança dos dados</h2>
             <p className="mt-2 text-muted-foreground leading-relaxed">
-              Seus dados são protegidos por Row Level Security (RLS) no banco de dados, garantindo
-              que apenas você acesse seus próprios mapas, interpretações e registros. As comunicações
-              são criptografadas via HTTPS/TLS. Senhas nunca são armazenadas em texto simples.
+              Apenas você acessa seus mapas, interpretações e registros: aplicam-se regras de acesso
+              no banco de dados (Row Level Security, RLS) para que outras contas não consigam
+              lê-los. As comunicações são criptografadas via HTTPS/TLS. Senhas nunca são armazenadas
+              em texto simples.
             </p>
           </section>
 
@@ -122,7 +129,9 @@ function PrivacyPage() {
               <li>Confirmar a existência de tratamento dos seus dados;</li>
               <li>Acessar seus dados pessoais;</li>
               <li>Corrigir dados incompletos, inexatos ou desatualizados;</li>
-              <li>Solicitar a exclusão dos seus dados (disponível em Configurações → Excluir conta);</li>
+              <li>
+                Solicitar a exclusão dos seus dados (disponível em Configurações → Excluir conta);
+              </li>
               <li>Revogar o consentimento a qualquer momento;</li>
               <li>Portabilidade dos dados (mediante solicitação por email).</li>
             </ul>
@@ -136,8 +145,8 @@ function PrivacyPage() {
             <h2 className="font-display text-xl font-semibold">8. Retenção dos dados</h2>
             <p className="mt-2 text-muted-foreground leading-relaxed">
               Seus dados são mantidos enquanto sua conta estiver ativa. Ao excluir sua conta, todos
-              os dados associados (mapas, interpretações, registros de humor) são removidos em até 30
-              dias. Logs técnicos podem ser mantidos por até 90 dias para fins de segurança.
+              os dados associados (mapas, interpretações, registros de humor) são removidos em até
+              30 dias. Logs técnicos podem ser mantidos por até 90 dias para fins de segurança.
             </p>
           </section>
 

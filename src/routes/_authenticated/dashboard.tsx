@@ -15,11 +15,14 @@ import { useDailyMoment } from "@/hooks/use-daily-moment";
 import { useAuth } from "@/hooks/use-auth";
 import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS } from "@/lib/engagement";
 import { usePageEngagement } from "@/hooks/use-page-engagement";
+import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
 import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
 import { generateAnnualForecastFn } from "@/lib/annual-forecast.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { GenerateAnnualForecastFnResult } from "@/lib/types/server-fn-results";
+import { rolloutLockedMessage } from "@/lib/subscription-rollout";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -80,6 +83,7 @@ function Dashboard() {
 
   const currentYear = useMemo(() => new Date().getUTCFullYear(), []);
   const currentMonth = useMemo(() => new Date().getUTCMonth() + 1, []);
+  const rollout = useSubscriptionRollout();
 
   const annualForecastQuery = useQuery<GenerateAnnualForecastFnResult>({
     queryKey: ["annual-forecast", primary?.id, currentYear],
@@ -90,7 +94,7 @@ function Dashboard() {
         ...withSupabaseAuth(session),
       });
     },
-    enabled: !!session && !!primary?.id,
+    enabled: !!session && !!primary?.id && rollout !== null && rollout.gates.annualForecast,
     staleTime: 24 * 60 * 60 * 1000,
     retry: false,
   });
@@ -99,6 +103,9 @@ function Dashboard() {
     if (!annualForecastQuery.data?.months) return null;
     return annualForecastQuery.data.months.find((m) => m.month === currentMonth) ?? null;
   }, [annualForecastQuery.data, currentMonth]);
+
+  const showDashTransits = !rollout || !rollout.active || rollout.gates.transits;
+  const blockExtraMap = charts.length >= 1 && rollout?.active && !rollout.gates.extraCharts;
 
   function handleNewMap() {
     navigate({ to: "/mapas/novo" });
@@ -114,6 +121,12 @@ function Dashboard() {
         <Button
           type="button"
           onClick={handleNewMap}
+          disabled={blockExtraMap}
+          title={
+            blockExtraMap && rollout
+              ? rolloutLockedMessage("extraCharts", rollout.dayIndex)
+              : undefined
+          }
           className="bg-mystical text-white hover:opacity-90"
         >
           <Plus className="mr-1 h-4 w-4" /> Novo mapa
@@ -221,7 +234,7 @@ function Dashboard() {
               </div>
             ) : null}
 
-            {dashShareExtras ? (
+            {dashShareExtras && showDashTransits ? (
               <div className="rounded-md border border-violet-500/20 bg-violet-500/5 p-3">
                 <Badge variant="outline" className="mb-2 text-[10px] uppercase">
                   Igual ao cartão Momento
@@ -246,7 +259,7 @@ function Dashboard() {
               </div>
             ) : null}
 
-            {transitToday && (
+            {transitToday && showDashTransits ? (
               <div className="rounded-lg border border-primary/15 bg-primary/5 p-3 text-foreground">
                 <Badge variant="secondary" className="mb-2 bg-primary/15 text-primary">
                   Personalizado · trânsitos × seu mapa
@@ -303,9 +316,16 @@ function Dashboard() {
                   ) : null}
                 </div>
               </div>
-            )}
+            ) : rollout?.active && !rollout.gates.transits ? (
+              <Alert className="border-primary/25 bg-primary/5">
+                <AlertTitle>Trânsitos no painel em breve</AlertTitle>
+                <AlertDescription>
+                  {rolloutLockedMessage("transits", rollout.dayIndex)}
+                </AlertDescription>
+              </Alert>
+            ) : null}
 
-            {transitWeek.length > 0 ? (
+            {transitWeek.length > 0 && showDashTransits ? (
               <div className="border-t border-border/60 pt-3">
                 <p className="mb-2 text-[10px] font-medium uppercase text-muted-foreground">
                   Esta semana (7 dias)
@@ -341,7 +361,7 @@ function Dashboard() {
               um resumo por email quando o servidor tiver Resend configurado.
             </p>
 
-            {currentMonthForecast ? (
+            {currentMonthForecast && showDashTransits ? (
               <div className="rounded-lg border border-primary/15 bg-primary/5 p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-medium uppercase text-muted-foreground">

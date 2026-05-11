@@ -17,18 +17,18 @@ interface Props {
 const PREMIUM_BENEFITS = [
   "Mapas ilimitados (família, amigos, parceiros)",
   "Sinastria e mapa composto entre quaisquer dois mapas",
-  "Interpretações IA ilimitadas (vs. 3/mês no plano gratuito)",
+  "Interpretações IA ilimitadas após a primeira semana guiada",
   "Previsão anual completa com picos e retrogradações",
   "Exportação PDF e cartão Instagram personalizados",
 ];
 
-/** Modal quando usuário FREE tenta criar um segundo mapa (paywall placeholder). */
+/** Modal quando o utilizador tenta criar um segundo mapa antes do desbloqueio (paywall placeholder). */
 export function UpgradeMapModal({ open, onOpenChange }: Props) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle className="font-display">Mais mapas com Premium</AlertDialogTitle>
+          <AlertDialogTitle className="font-display">Mais mapas nos planos</AlertDialogTitle>
         </AlertDialogHeader>
 
         <ul className="space-y-2 py-1">
@@ -50,7 +50,7 @@ export function UpgradeMapModal({ open, onOpenChange }: Props) {
           </Button>
           <Button asChild className="bg-mystical text-white">
             <Link to="/premium" onClick={() => onOpenChange(false)}>
-              Ver planos Premium
+              Ver planos
             </Link>
           </Button>
         </AlertDialogFooter>

@@ -7,6 +7,7 @@ import { saveSynastryInputSchema } from "@/lib/schemas/server-fns";
 import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
+import { assertRolloutGate, fetchProfileRolloutState } from "@/lib/subscription-rollout";
 
 export function birthInputFromChartRow(chart: ChartRow): CalculateInput {
   const offset =
@@ -32,6 +33,9 @@ export const calculateCompositeFn = createServerFn({ method: "POST" })
     timedServerFn("calculateCompositeFn", async ({ data, context }) => {
       const supabase = context.supabase;
       const userId = context.userId;
+
+      const rollout = await fetchProfileRolloutState(supabase, userId);
+      assertRolloutGate(rollout.applies, rollout.gates.composite, "composite", rollout.dayIndex);
 
       if (data.chart1Id === data.chart2Id) {
         throw jsonError(400, "SAME", "Escolha dois mapas diferentes.");

@@ -47,6 +47,9 @@ import { AiButton } from "@/components/AiButton";
 import { AiTextCard } from "@/components/AiTextCard";
 import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
 import { useAiQuota } from "@/hooks/use-ai-quota";
+import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
+import { rolloutLockedMessage } from "@/lib/subscription-rollout";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export const Route = createFileRoute("/_authenticated/momento")({
   component: MomentoPage,
@@ -60,6 +63,7 @@ function MomentoPage() {
   const [showWheel, setShowWheel] = useState(true);
   const [highQuality, setHighQuality] = useState(false);
   const aiQuota = useAiQuota();
+  const rollout = useSubscriptionRollout();
   const [streak, setStreak] = useState(() => readMomentStreak().streak);
   const [historyList, setHistoryList] = useState<MomentHistorySnapshot[]>(() =>
     typeof window !== "undefined" ? loadMomentHistory() : [],
@@ -403,6 +407,18 @@ function MomentoPage() {
     );
   }
 
+  if (rollout?.active && !rollout.gates.transits) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-10 md:max-w-xl">
+        <BackToDashboardLink buttonClassName="mb-4" />
+        <Alert className="border-primary/25 bg-primary/5">
+          <AlertTitle>Momento disponível em breve</AlertTitle>
+          <AlertDescription>{rolloutLockedMessage("transits", rollout.dayIndex)}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   if (!wheelData || !personalizedInsights) {
     return (
       <div className="mx-auto max-w-md px-4 py-16 text-center text-muted-foreground">
@@ -558,10 +574,19 @@ function MomentoPage() {
           {isTodayView ? (
             <div className="flex flex-col gap-2">
               {aiQuota && !aiQuota.isPremium ? (
-                <p className={`text-xs ${aiQuota.nearLimit ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"}`}>
-                  {aiQuota.remaining === 0
-                    ? <>Limite mensal atingido · <Link to="/premium" className="text-primary underline underline-offset-2">Upgrade para ilimitado</Link></>
-                    : `${aiQuota.used}/${aiQuota.limit} interpretações mensais usadas`}
+                <p
+                  className={`text-xs ${aiQuota.nearLimit ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"}`}
+                >
+                  {aiQuota.remaining === 0 ? (
+                    <>
+                      Limite mensal atingido ·{" "}
+                      <Link to="/premium" className="text-primary underline underline-offset-2">
+                        Upgrade para ilimitado
+                      </Link>
+                    </>
+                  ) : (
+                    `${aiQuota.used}/${aiQuota.limit} interpretações mensais usadas`
+                  )}
                 </p>
               ) : null}
               <AiButton

@@ -7,6 +7,12 @@ import { chartGeometryToSupabaseJson } from "@/lib/schemas/chart-payload";
 import { chartIdSchema, recalculateChartInputSchema } from "@/lib/schemas/server-fns";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
+import {
+  assertRolloutGate,
+  buildRolloutGatesForDay,
+  getRolloutDayIndexSp,
+  paidRolloutApplies,
+} from "@/lib/subscription-rollout";
 import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
 
 /** Cria mapa natal no banco após cálculo no servidor. */
@@ -24,7 +30,7 @@ export const createChartFn = createServerFn({ method: "POST" })
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("house_system")
+        .select("house_system, subscription_tier, created_at")
         .eq("id", userId)
         .single();
 
@@ -38,6 +44,13 @@ export const createChartFn = createServerFn({ method: "POST" })
       if (countErr) throw jsonError(500, "COUNT", countErr.message);
 
       const existing = count ?? 0;
+
+      const tier = profile?.subscription_tier ?? "MENSAL";
+      const createdAt = profile?.created_at ?? new Date().toISOString();
+      const dayIndex = getRolloutDayIndexSp(createdAt);
+      const gates = buildRolloutGatesForDay(dayIndex);
+      const applies = paidRolloutApplies(tier, dayIndex);
+      assertRolloutGate(applies, gates.extraCharts || existing === 0, "extraCharts", dayIndex);
 
       const birthTime = data.birthTimeKnown ? data.birthTime : "12:00";
       const houseSystem = (profile?.house_system as HouseSystemId | undefined) ?? "placidus";

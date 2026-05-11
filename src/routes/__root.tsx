@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { MetaPixel } from "@/components/MetaPixel";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -106,6 +107,7 @@ function RootComponent() {
             <Outlet />
           </ErrorBoundary>
           <Toaster />
+          <MetaPixel />
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

@@ -7,6 +7,7 @@ import { chartRowToChartData } from "@/lib/chart-from-row";
 import { saveSynastryInputSchema } from "@/lib/schemas/server-fns";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
+import { assertRolloutGate, fetchProfileRolloutState } from "@/lib/subscription-rollout";
 
 /** Calcula sinastria entre dois mapas do utilizador e persiste em `synastries`. */
 export const calculateAndSaveSynastryFn = createServerFn({ method: "POST" })
@@ -20,6 +21,9 @@ export const calculateAndSaveSynastryFn = createServerFn({ method: "POST" })
     timedServerFn("calculateAndSaveSynastryFn", async ({ data, context }) => {
       const supabase = context.supabase;
       const userId = context.userId;
+
+      const rollout = await fetchProfileRolloutState(supabase, userId);
+      assertRolloutGate(rollout.applies, rollout.gates.synastry, "synastry", rollout.dayIndex);
 
       if (data.chart1Id === data.chart2Id) {
         throw jsonError(400, "SAME_CHART", "Escolha dois mapas diferentes.");

@@ -1,10 +1,16 @@
 import type { ServerFnErrorBody } from "@/lib/server-fn-http";
 
 const IA_QUOTA_CODES = new Set(["PREMIUM_REQUIRED", "RATE_LIMIT", "MONTHLY_LIMIT"]);
+const ROLLOUT_CODES = new Set(["ROLLOUT_LOCKED", "ROLLOUT_AI_MONTHLY"]);
 
 function appendIaQuotaPremiumHint(message: string, code?: string): string {
   if (!code || !IA_QUOTA_CODES.has(code)) return message;
   return `${message} Para planos Premium ou mais uso, vá a /premium.`;
+}
+
+function appendRolloutHint(message: string, code?: string): string {
+  if (!code || !ROLLOUT_CODES.has(code)) return message;
+  return `${message} Nos primeiros 7 dias, o AstroMap liberta recursos aos poucos (contagem em dias, fuso São Paulo).`;
 }
 
 /** Mensagem e código JSON quando a falha veio de uma Response de server function. */
@@ -29,5 +35,6 @@ export async function getServerFnErrorDetails(
 /** Extrai mensagem de erro de falhas de server function (Response ou Error). */
 export async function getServerFnErrorMessage(err: unknown): Promise<string> {
   const d = await getServerFnErrorDetails(err);
-  return appendIaQuotaPremiumHint(d.message, d.code);
+  const withRollout = appendRolloutHint(d.message, d.code);
+  return appendIaQuotaPremiumHint(withRollout, d.code);
 }

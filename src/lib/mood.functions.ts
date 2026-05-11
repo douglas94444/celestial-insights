@@ -6,6 +6,7 @@ import { chartRowToChartData } from "@/lib/chart-from-row";
 import { getMoodHistoryInputSchema, upsertMoodInputSchema } from "@/lib/schemas/server-fns";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
+import { fetchProfileRolloutState } from "@/lib/subscription-rollout";
 import type { HouseSystemId } from "@/lib/astrology/calculate";
 
 function eachYmdInClosedRange(startYmd: string, endYmd: string): string[] {
@@ -101,6 +102,8 @@ export const getMoodHistoryFn = createServerFn({ method: "POST" })
       const supabase = context.supabase;
       const userId = context.userId;
 
+      const rollout = await fetchProfileRolloutState(supabase, userId);
+
       const startMs = Date.parse(`${data.startYmd}T12:00:00.000Z`);
       const endMs = Date.parse(`${data.endYmd}T12:00:00.000Z`);
       if (Number.isNaN(startMs) || Number.isNaN(endMs) || endMs < startMs) {
@@ -121,15 +124,17 @@ export const getMoodHistoryFn = createServerFn({ method: "POST" })
 
       const ymRange = eachYmdInClosedRange(data.startYmd, data.endYmd);
       const intensityByYmd: Record<string, number> = {};
-      for (const ymd of ymRange) {
-        const day = analyzeTransitDay(
-          ymd,
-          chartData.planets,
-          chartData.houses,
-          ascendant,
-          houseSystem,
-        );
-        intensityByYmd[ymd] = day.intensity;
+      if (rollout.gates.transits || !rollout.applies) {
+        for (const ymd of ymRange) {
+          const day = analyzeTransitDay(
+            ymd,
+            chartData.planets,
+            chartData.houses,
+            ascendant,
+            houseSystem,
+          );
+          intensityByYmd[ymd] = day.intensity;
+        }
       }
 
       const { data: rows, error: qErr } = await supabase
@@ -150,10 +155,13 @@ export const getMoodHistoryFn = createServerFn({ method: "POST" })
           note: r.note ?? null,
         })) ?? [];
 
-      const correlationNote = correlationBlurb(
-        entries.map((e) => ({ ymd: e.ymd, mood_score: e.mood_score })),
-        intensityByYmd,
-      );
+      const correlationNote =
+        rollout.applies && !rollout.gates.moodAdvanced
+          ? null
+          : correlationBlurb(
+              entries.map((e) => ({ ymd: e.ymd, mood_score: e.mood_score })),
+              intensityByYmd,
+            );
 
       return {
         entries,

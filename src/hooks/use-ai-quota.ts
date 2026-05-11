@@ -2,6 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useProfile } from "@/hooks/use-profile";
+import {
+  buildRolloutGatesForDay,
+  getRolloutDayIndexSp,
+  paidRolloutApplies,
+} from "@/lib/subscription-rollout";
 
 const FREE_MONTHLY_LIMIT = 3;
 
@@ -33,7 +38,11 @@ export function useAiQuota(): AiQuota | null {
   const { data: profile } = useProfile();
 
   const tier = profile?.subscription_tier;
-  const isPremium = tier === "MENSAL" || tier === "ANUAL" || tier === "PREMIUM";
+  const tierStr = tier ?? "MENSAL";
+  const dayIdx = profile ? getRolloutDayIndexSp(profile.created_at) : 0;
+  const gates = buildRolloutGatesForDay(dayIdx);
+  const earlyPaidRamp = !!profile && paidRolloutApplies(tierStr, dayIdx) && !gates.aiFullKinds;
+  const isPremium = (tier === "MENSAL" || tier === "ANUAL" || tier === "PREMIUM") && !earlyPaidRamp;
 
   const { data: used = 0 } = useQuery({
     queryKey: ["ai-quota-month", user?.id],

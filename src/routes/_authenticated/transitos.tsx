@@ -55,10 +55,13 @@ import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, recordAiEngagement } from "@/lib/engagement";
 import { usePageEngagement } from "@/hooks/use-page-engagement";
+import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
+import { rolloutLockedMessage } from "@/lib/subscription-rollout";
 import { AiButton } from "@/components/AiButton";
 import { AiTextCard } from "@/components/AiTextCard";
 import { TransitScoreBadges } from "@/components/TransitScoreBadges";
 import { EmptyFeatureState } from "@/components/EmptyFeatureState";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import {
   filterAspectsByFastTransit,
@@ -101,6 +104,7 @@ function TransitosPage() {
   }, [rangePreset]);
 
   const { data: charts = [] } = useChartsListQuery();
+  const rollout = useSubscriptionRollout();
 
   useEffect(() => {
     if (!chartId && charts.length) {
@@ -118,7 +122,8 @@ function TransitosPage() {
         ...withSupabaseAuth(session),
       });
     },
-    enabled: !!session && !!chartId && mainTab === "periodo",
+    enabled:
+      !!session && !!chartId && mainTab === "periodo" && rollout !== null && rollout.gates.transits,
     staleTime: 60_000,
   });
 
@@ -131,7 +136,12 @@ function TransitosPage() {
         ...withSupabaseAuth(session),
       });
     },
-    enabled: !!session && !!chartId && mainTab === "ano",
+    enabled:
+      !!session &&
+      !!chartId &&
+      mainTab === "ano" &&
+      rollout !== null &&
+      rollout.gates.annualForecast,
     staleTime: 120_000,
   });
 
@@ -190,6 +200,10 @@ function TransitosPage() {
   }, [qc, chartId, startDate, endDate]);
 
   async function exportPdf() {
+    if (rollout?.active && !rollout.gates.pdfExport) {
+      toast.error(rolloutLockedMessage("pdfExport", rollout.dayIndex));
+      return;
+    }
     if (!transitsQuery.data || days.length === 0) {
       toast.error("Calcule o período primeiro.");
       return;
@@ -235,6 +249,12 @@ function TransitosPage() {
     onError: (e) => void toastServerFnError(e),
   });
 
+  useEffect(() => {
+    if (rollout?.active && !rollout.gates.annualForecast && mainTab === "ano") {
+      setMainTab("periodo");
+    }
+  }, [rollout, mainTab]);
+
   return (
     <div className="container mx-auto max-w-6xl p-4 pb-10 sm:p-6">
       <BackToDashboardLink buttonClassName="mb-4" />
@@ -270,254 +290,288 @@ function TransitosPage() {
         >
           <TabsList className="mb-6 grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="periodo">Período</TabsTrigger>
-            <TabsTrigger value="ano">Ano</TabsTrigger>
+            <TabsTrigger
+              value="ano"
+              disabled={!!(rollout?.active && !rollout.gates.annualForecast)}
+            >
+              Ano
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="periodo" className="mt-0">
-            <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="font-display text-base">Mapa & período</CardTitle>
+            {rollout?.active && !rollout.gates.transits ? (
+              <Alert className="border-primary/25 bg-primary/5">
+                <AlertTitle>Trânsitos em breve</AlertTitle>
+                <AlertDescription>
+                  {rolloutLockedMessage("transits", rollout.dayIndex)}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+                <div className="space-y-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="font-display text-base">Mapa & período</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Mapa natal</Label>
+                        <Select value={chartId} onValueChange={setChartId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Escolha o mapa" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {charts.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Janela em torno de hoje</Label>
+                        <ToggleGroup
+                          type="single"
+                          value={rangePreset}
+                          onValueChange={(v) => v && setRangePreset(v as "30" | "60" | "90")}
+                          className="flex flex-wrap justify-start"
+                        >
+                          <ToggleGroupItem value="30" aria-label="±30 dias">
+                            ±30 d
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="60" aria-label="±60 dias">
+                            ±60 d
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="90" aria-label="±90 dias">
+                            ±90 d
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                        <p className="text-[11px] text-muted-foreground">
+                          {startDate} → {endDate} (até 186 dias por pedido)
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 [&_button]:min-h-10 sm:[&_button]:min-h-9">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          disabled={
+                            !chartId ||
+                            transitsQuery.isFetching ||
+                            !!(rollout?.active && !rollout.gates.transits)
+                          }
+                          onClick={handleRefreshTransits}
+                        >
+                          <RefreshCw
+                            className={`mr-1 h-4 w-4 ${transitsQuery.isFetching ? "animate-spin" : ""}`}
+                          />
+                          Atualizar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            days.length === 0 || !!(rollout?.active && !rollout.gates.pdfExport)
+                          }
+                          onClick={exportPdf}
+                        >
+                          <Download className="mr-1 h-4 w-4" /> PDF
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={
+                            !chartId ||
+                            emailMutation.isPending ||
+                            !!(rollout?.active && !rollout.gates.digestEmail)
+                          }
+                          onClick={() => emailMutation.mutate()}
+                        >
+                          {emailMutation.isPending ? (
+                            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Mail className="mr-1 h-4 w-4" />
+                          )}
+                          Email hoje
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="font-display text-base">Calendário</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={(d) => setSelectedDate(d)}
+                        modifiers={{
+                          intense: (date) => intenseDates.has(format(date, "yyyy-MM-dd")),
+                        }}
+                        modifiersClassNames={{
+                          intense:
+                            "relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:h-1 after:w-1 after:rounded-full after:bg-primary",
+                        }}
+                        className="rounded-md border"
+                      />
+                      <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                        Marcador: dias com intensidade ≥ 45 (mais aspectos / mais «peso»).
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card className="min-h-[420px]">
+                  <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="font-display text-lg">
+                      {selectedPayload
+                        ? formatTransitDayTitle(selectedPayload.date)
+                        : "Escolha um dia"}
+                    </CardTitle>
+                    {selectedPayload ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="secondary">
+                          Lua trânsito: {selectedPayload.transitMoonSign || "—"}
+                        </Badge>
+                        <Badge variant="outline">Intensidade {selectedPayload.intensity}/100</Badge>
+                      </div>
+                    ) : null}
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Mapa natal</Label>
-                      <Select value={chartId} onValueChange={setChartId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Escolha o mapa" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {charts.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Janela em torno de hoje</Label>
-                      <ToggleGroup
-                        type="single"
-                        value={rangePreset}
-                        onValueChange={(v) => v && setRangePreset(v as "30" | "60" | "90")}
-                        className="flex flex-wrap justify-start"
-                      >
-                        <ToggleGroupItem value="30" aria-label="±30 dias">
-                          ±30 d
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value="60" aria-label="±60 dias">
-                          ±60 d
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value="90" aria-label="±90 dias">
-                          ±90 d
-                        </ToggleGroupItem>
-                      </ToggleGroup>
-                      <p className="text-[11px] text-muted-foreground">
-                        {startDate} → {endDate} (até 186 dias por pedido)
+                    {transitsQuery.isLoading ? (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 className="h-5 w-5 animate-spin" /> Carregando trânsitos…
+                      </div>
+                    ) : transitsQuery.isError ? (
+                      <p className="text-sm text-destructive">
+                        {(transitsQuery.error as Error)?.message ?? "Erro ao calcular."}
                       </p>
-                    </div>
+                    ) : !selectedPayload ? (
+                      <p className="text-sm text-muted-foreground">
+                        Este dia está fora do intervalo calculado. Ajuste o dia no calendário ou
+                        alargue a janela.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Filter className="h-4 w-4 text-muted-foreground" />
+                          <Button
+                            variant={majorOnly ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8"
+                            onClick={() => setMajorOnly(!majorOnly)}
+                          >
+                            Só aspectos com planetas pessoais
+                          </Button>
+                          <Button
+                            variant={fastTransitOnly ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8"
+                            onClick={() => setFastTransitOnly(!fastTransitOnly)}
+                          >
+                            Só trânsitos rápidos (Sol–Marte)
+                          </Button>
+                          <Button
+                            variant={natalPersonalOnly ? "secondary" : "ghost"}
+                            size="sm"
+                            className="h-8"
+                            onClick={() => setNatalPersonalOnly(!natalPersonalOnly)}
+                          >
+                            Só pontos natais pessoais
+                          </Button>
+                        </div>
 
-                    <div className="flex flex-wrap gap-2 [&_button]:min-h-10 sm:[&_button]:min-h-9">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled={!chartId || transitsQuery.isFetching}
-                        onClick={handleRefreshTransits}
-                      >
-                        <RefreshCw
-                          className={`mr-1 h-4 w-4 ${transitsQuery.isFetching ? "animate-spin" : ""}`}
-                        />
-                        Atualizar
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={days.length === 0}
-                        onClick={exportPdf}
-                      >
-                        <Download className="mr-1 h-4 w-4" /> PDF
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={!chartId || emailMutation.isPending}
-                        onClick={() => emailMutation.mutate()}
-                      >
-                        {emailMutation.isPending ? (
-                          <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                        ) : (
-                          <Mail className="mr-1 h-4 w-4" />
-                        )}
-                        Email hoje
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                        <TransitScoreBadges scores={selectedPayload.scores} />
 
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="font-display text-base">Calendário</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex flex-col items-center">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(d) => setSelectedDate(d)}
-                      modifiers={{
-                        intense: (date) => intenseDates.has(format(date, "yyyy-MM-dd")),
-                      }}
-                      modifiersClassNames={{
-                        intense:
-                          "relative after:absolute after:bottom-1 after:left-1/2 after:-translate-x-1/2 after:h-1 after:w-1 after:rounded-full after:bg-primary",
-                      }}
-                      className="rounded-md border"
-                    />
-                    <p className="mt-2 text-center text-[11px] text-muted-foreground">
-                      Marcador: dias com intensidade ≥ 45 (mais aspectos / mais «peso»).
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card className="min-h-[420px]">
-                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
-                  <CardTitle className="font-display text-lg">
-                    {selectedPayload
-                      ? formatTransitDayTitle(selectedPayload.date)
-                      : "Escolha um dia"}
-                  </CardTitle>
-                  {selectedPayload ? (
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="secondary">
-                        Lua trânsito: {selectedPayload.transitMoonSign || "—"}
-                      </Badge>
-                      <Badge variant="outline">Intensidade {selectedPayload.intensity}/100</Badge>
-                    </div>
-                  ) : null}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {transitsQuery.isLoading ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Loader2 className="h-5 w-5 animate-spin" /> Carregando trânsitos…
-                    </div>
-                  ) : transitsQuery.isError ? (
-                    <p className="text-sm text-destructive">
-                      {(transitsQuery.error as Error)?.message ?? "Erro ao calcular."}
-                    </p>
-                  ) : !selectedPayload ? (
-                    <p className="text-sm text-muted-foreground">
-                      Este dia está fora do intervalo calculado. Ajuste o dia no calendário ou
-                      alargue a janela.
-                    </p>
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Filter className="h-4 w-4 text-muted-foreground" />
-                        <Button
-                          variant={majorOnly ? "secondary" : "ghost"}
-                          size="sm"
-                          className="h-8"
-                          onClick={() => setMajorOnly(!majorOnly)}
-                        >
-                          Só aspectos com planetas pessoais
-                        </Button>
-                        <Button
-                          variant={fastTransitOnly ? "secondary" : "ghost"}
-                          size="sm"
-                          className="h-8"
-                          onClick={() => setFastTransitOnly(!fastTransitOnly)}
-                        >
-                          Só trânsitos rápidos (Sol–Marte)
-                        </Button>
-                        <Button
-                          variant={natalPersonalOnly ? "secondary" : "ghost"}
-                          size="sm"
-                          className="h-8"
-                          onClick={() => setNatalPersonalOnly(!natalPersonalOnly)}
-                        >
-                          Só pontos natais pessoais
-                        </Button>
-                      </div>
-
-                      <TransitScoreBadges scores={selectedPayload.scores} />
-
-                      <div className="rounded-lg bg-muted/40 p-4 space-y-2">
-                        <p className="text-xs font-medium uppercase text-muted-foreground">
-                          Leitura rápida
-                        </p>
-                        <ul className="list-disc pl-4 text-sm space-y-1 text-foreground/90">
-                          {selectedPayload.narrative.map((line, i) => (
-                            <li key={i}>{line}</li>
-                          ))}
-                        </ul>
-                      </div>
-
-                      {selectedPayload.interpretiveHints.length > 0 ? (
-                        <div className="rounded-lg border border-primary/15 bg-primary/5 p-4 space-y-2">
+                        <div className="rounded-lg bg-muted/40 p-4 space-y-2">
                           <p className="text-xs font-medium uppercase text-muted-foreground">
-                            Sugestões para reflexão
+                            Leitura rápida
                           </p>
                           <ul className="list-disc pl-4 text-sm space-y-1 text-foreground/90">
-                            {selectedPayload.interpretiveHints.slice(0, 4).map((line, i) => (
+                            {selectedPayload.narrative.map((line, i) => (
                               <li key={i}>{line}</li>
                             ))}
                           </ul>
                         </div>
-                      ) : null}
 
-                      <div className="rounded-lg border border-muted bg-muted/20 p-4 space-y-3">
-                        <p className="text-xs font-medium uppercase text-muted-foreground">
-                          Linguagem simples (IA)
-                        </p>
-                        <p className="text-xs text-muted-foreground leading-relaxed">
-                          Complementa a leitura rápida acima; em caso de erro, continue a usar as
-                          listas estáticas.
-                        </p>
-                        <AiButton
-                          isPending={transitAiMutation.isPending}
-                          onClick={() => transitAiMutation.mutate()}
-                          label="Explicar este dia em linguagem simples"
-                          aria-label="Pedir explicação em linguagem simples para o dia seleccionado"
-                          variant="secondary"
-                        />
-                        {transitAiText ? (
-                          <AiTextCard
-                            text={transitAiText}
-                            badge={<AiCacheAgeBadgeFromResult result={transitAiMutation.data} />}
-                            className="space-y-2 border-t border-border/60 pt-3 text-sm"
-                          />
+                        {selectedPayload.interpretiveHints.length > 0 ? (
+                          <div className="rounded-lg border border-primary/15 bg-primary/5 p-4 space-y-2">
+                            <p className="text-xs font-medium uppercase text-muted-foreground">
+                              Sugestões para reflexão
+                            </p>
+                            <ul className="list-disc pl-4 text-sm space-y-1 text-foreground/90">
+                              {selectedPayload.interpretiveHints.slice(0, 4).map((line, i) => (
+                                <li key={i}>{line}</li>
+                              ))}
+                            </ul>
+                          </div>
                         ) : null}
-                      </div>
 
-                      <div>
-                        <p className="text-xs font-medium uppercase text-muted-foreground mb-2">
-                          Aspectos ({filteredAspects.length})
-                        </p>
-                        <ul className="max-h-[52vh] space-y-2 overflow-y-auto pr-1 text-sm">
-                          {filteredAspects.map((a, idx) => (
-                            <li
-                              key={`${a.planet1}-${a.planet2}-${a.type}-${idx}`}
-                              className="rounded-md border border-border/60 bg-card/50 px-3 py-2"
-                            >
-                              <span className="font-medium">{getPlanetName(a.planet1)}</span> em
-                              trânsito <span className="text-primary">{ASPECT_LABELS[a.type]}</span>{" "}
-                              <span className="font-medium">{getPlanetName(a.planet2)}</span> natal
-                              <span className="text-muted-foreground"> · orbe {a.orb}°</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                        <div className="rounded-lg border border-muted bg-muted/20 p-4 space-y-3">
+                          <p className="text-xs font-medium uppercase text-muted-foreground">
+                            Linguagem simples (IA)
+                          </p>
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Complementa a leitura rápida acima; em caso de erro, continue a usar as
+                            listas estáticas.
+                          </p>
+                          <AiButton
+                            isPending={transitAiMutation.isPending}
+                            onClick={() => transitAiMutation.mutate()}
+                            label="Explicar este dia em linguagem simples"
+                            aria-label="Pedir explicação em linguagem simples para o dia seleccionado"
+                            variant="secondary"
+                          />
+                          {transitAiText ? (
+                            <AiTextCard
+                              text={transitAiText}
+                              badge={<AiCacheAgeBadgeFromResult result={transitAiMutation.data} />}
+                              className="space-y-2 border-t border-border/60 pt-3 text-sm"
+                            />
+                          ) : null}
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-medium uppercase text-muted-foreground mb-2">
+                            Aspectos ({filteredAspects.length})
+                          </p>
+                          <ul className="max-h-[52vh] space-y-2 overflow-y-auto pr-1 text-sm">
+                            {filteredAspects.map((a, idx) => (
+                              <li
+                                key={`${a.planet1}-${a.planet2}-${a.type}-${idx}`}
+                                className="rounded-md border border-border/60 bg-card/50 px-3 py-2"
+                              >
+                                <span className="font-medium">{getPlanetName(a.planet1)}</span> em
+                                trânsito{" "}
+                                <span className="text-primary">{ASPECT_LABELS[a.type]}</span>{" "}
+                                <span className="font-medium">{getPlanetName(a.planet2)}</span>{" "}
+                                natal
+                                <span className="text-muted-foreground"> · orbe {a.orb}°</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="ano" className="mt-0 space-y-6">
+            {rollout?.active && !rollout.gates.annualForecast ? (
+              <Alert className="border-primary/25 bg-primary/5">
+                <AlertTitle>Previsão anual em breve</AlertTitle>
+                <AlertDescription>
+                  {rolloutLockedMessage("annualForecast", rollout.dayIndex)}
+                </AlertDescription>
+              </Alert>
+            ) : null}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="font-display text-base">

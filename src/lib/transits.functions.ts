@@ -5,6 +5,7 @@ import { chartRowToChartData } from "@/lib/chart-from-row";
 import { calculateTransitsInputSchema } from "@/lib/schemas/server-fns";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
+import { assertRolloutGate, fetchProfileRolloutState } from "@/lib/subscription-rollout";
 
 /** Limite de dias no intervalo [startDate, endDate] (inclusive). */
 const MAX_RANGE_DAYS = 186;
@@ -35,6 +36,9 @@ export const calculateTransitsFn = createServerFn({ method: "POST" })
           `O intervalo pode ter no máximo ${MAX_RANGE_DAYS} dias (inclusive). Reduza a janela.`,
         );
       }
+
+      const rollout = await fetchProfileRolloutState(supabase, userId);
+      assertRolloutGate(rollout.applies, rollout.gates.transits, "transits", rollout.dayIndex);
 
       const { data: chart, error } = await supabase
         .from("charts")

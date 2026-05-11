@@ -610,9 +610,11 @@ function TransitosPage() {
               <p className="text-sm text-destructive">
                 {(annualForecastQuery.error as Error)?.message ?? "Erro ao calcular a vista anual."}
               </p>
+            ) : !annualForecastQuery.data?.months?.length ? (
+              <p className="text-sm text-muted-foreground">Sem dados para o ano selecionado.</p>
             ) : (
               <Accordion type="multiple" className="w-full border rounded-lg px-2">
-                {annualForecastQuery.data!.months.map((m) => (
+                {annualForecastQuery.data.months.map((m) => (
                   <AccordionItem key={m.month} value={`m-${m.month}`}>
                     <AccordionTrigger className="text-left hover:no-underline">
                       <span className="flex flex-1 flex-wrap items-center gap-3">

@@ -180,19 +180,55 @@ async function completeOpenAI(
 }
 
 /**
- * Completa um turno chat (system + user). Usa Anthropic ou OpenAI conforme env.
+ * Completa um turno chat (system + user). Usa o provedor primário (Anthropic ou OpenAI
+ * conforme env) e, em caso de falha, tenta automaticamente o outro provedor se a
+ * respectiva API key estiver configurada.
  */
 export async function completeChat(
   system: string,
   user: string,
   opts?: CompleteChatOptions,
 ): Promise<CompleteChatResult> {
-  const provider = resolveAiProvider();
-  if (!provider) {
+  const primary = resolveAiProvider();
+  if (!primary) {
     throw new Error(
       "LLM não configurado: defina ANTHROPIC_API_KEY ou OPENAI_API_KEY (e opcionalmente AI_PROVIDER).",
     );
   }
-  if (provider === "anthropic") return completeAnthropic(system, user, opts);
-  return completeOpenAI(system, user, opts);
+
+  const fallback: AiProviderId | null =
+    primary === "anthropic" && process.env.OPENAI_API_KEY
+      ? "openai"
+      : primary === "openai" && process.env.ANTHROPIC_API_KEY
+        ? "anthropic"
+        : null;
+
+  const run = (p: AiProviderId) =>
+    p === "anthropic"
+      ? completeAnthropic(system, user, opts)
+      : completeOpenAI(system, user, opts);
+
+  try {
+    return await run(primary);
+  } catch (primaryErr) {
+    if (!fallback) throw primaryErr;
+    const primaryMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+    console.warn(
+      JSON.stringify({
+        aiFallback: true,
+        from: primary,
+        to: fallback,
+        reason: primaryMsg.slice(0, 200),
+      }),
+    );
+    try {
+      return await run(fallback);
+    } catch (fallbackErr) {
+      const fallbackMsg =
+        fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+      throw new Error(
+        `Ambos provedores falharam — ${primary}: ${primaryMsg} | ${fallback}: ${fallbackMsg}`,
+      );
+    }
+  }
 }

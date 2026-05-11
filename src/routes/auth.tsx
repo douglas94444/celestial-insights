@@ -26,13 +26,12 @@ async function signInWithGoogle() {
 
 function AuthPage() {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (!loading && user) {
-      navigate({ to: "/dashboard" });
+      window.location.replace("/dashboard");
     }
-  }, [user, loading, navigate]);
+  }, [user, loading]);
 
   return (
     <div className="min-h-screen bg-cosmic text-white starfield grid place-items-center px-4 py-10">
@@ -100,7 +99,6 @@ function SignInForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -123,7 +121,7 @@ function SignInForm() {
       return;
     }
     toast.success("Bem-vindo de volta!");
-    navigate({ to: "/dashboard", replace: true });
+    window.location.assign("/dashboard");
   }
 
   return (

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getSupabaseUrl } from "@/integrations/supabase/public-config";
 import { jsonError } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
 
@@ -9,7 +10,7 @@ export const deleteAccountFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(
     timedServerFn("deleteAccountFn", async ({ context }) => {
-      const url = process.env.SUPABASE_URL;
+      const url = getSupabaseUrl();
       const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
       if (!url || !serviceKey) {

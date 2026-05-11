@@ -1,4 +1,5 @@
 import { createServerOnlyFn } from "@tanstack/react-start";
+import { getSupabasePublishableKey, getSupabaseUrl } from "@/integrations/supabase/public-config";
 import type { Database } from "@/integrations/supabase/types";
 
 /**
@@ -11,8 +12,8 @@ export const hasSupabaseSessionCookie = createServerOnlyFn(async (): Promise<boo
     import("@tanstack/react-start/server"),
   ]);
 
-  const url = process.env.SUPABASE_URL ?? "";
-  const key = process.env.SUPABASE_PUBLISHABLE_KEY ?? "";
+  const url = getSupabaseUrl();
+  const key = getSupabasePublishableKey();
   if (!url || !key) return false;
 
   const supabase = createServerClient<Database>(url, key, {

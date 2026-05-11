@@ -44,7 +44,7 @@ Matriz auth por função: [docs/server-fn-auth-matrix.md](server-fn-auth-matrix.
 - `npm run build`
 - `npx playwright test` — smoke público (sobe `npm run dev:e2e` na porta **5173**); com `SKIP_AUTH_E2E=1` no GitHub Actions os testes opcionais logados são ignorados.
 
-No GitHub Actions, configure secrets opcionais `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` se não quiser usar os placeholders do `playwright.config.ts`.
+No GitHub Actions, o job de CI define `VITE_SUPABASE_URL` e `VITE_SUPABASE_PUBLISHABLE_KEY` no workflow (projecto `fxcoxnqqjgvqfukasfjb`). Em local, o `playwright.config.ts` repete os mesmos fallbacks de `src/integrations/supabase/public-config.ts` quando essas variáveis não estão definidas; podes sobrescrevê-las no ambiente se precisares de outro projecto.
 
 ## Digest automático de trânsitos (`processTransitDigestCronFn`)
 

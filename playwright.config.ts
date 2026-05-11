@@ -1,4 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
+import {
+  SUPABASE_PUBLIC_PUBLISHABLE_KEY,
+  SUPABASE_PUBLIC_URL,
+} from "./src/integrations/supabase/public-config";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:5173";
 
@@ -20,10 +24,9 @@ export default defineConfig({
     timeout: 240_000,
     env: {
       ...process.env,
-      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ?? "https://placeholder.supabase.co",
+      VITE_SUPABASE_URL: process.env.VITE_SUPABASE_URL ?? SUPABASE_PUBLIC_URL,
       VITE_SUPABASE_PUBLISHABLE_KEY:
-        process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder",
+        process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? SUPABASE_PUBLIC_PUBLISHABLE_KEY,
     },
   },
 });

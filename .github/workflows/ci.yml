@@ -11,8 +11,9 @@ jobs:
     env:
       SKIP_AUTH_E2E: "1"
       CI: "true"
-      VITE_SUPABASE_URL: https://placeholder.supabase.co
-      VITE_SUPABASE_PUBLISHABLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.placeholder
+      # Mesmo projecto que em src/integrations/supabase/public-config.ts (chave publishable, não secret)
+      VITE_SUPABASE_URL: https://fxcoxnqqjgvqfukasfjb.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4Y294bnFxamd2cWZ1a2FzZmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzODc5OTUsImV4cCI6MjA5Mzk2Mzk5NX0.PaG0jrPfZQPxmysHZAZ8ZA1WWrYabLywvzrLmOiACFI
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

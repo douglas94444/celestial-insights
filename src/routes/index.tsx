@@ -80,24 +80,13 @@ const FOR_WHO = [
   "Quem acompanha o céu e quer dados sérios em vez de posts motivacionais com estrelas",
 ];
 
-const FREE_FEATURES = [
-  "1 mapa natal salvo na conta",
-  "Todos os planetas, casas e aspectos com roda interativa",
-  "3 interpretações com IA por mês",
-  "Painel com destaques diários",
-  "Momento com o Céu (ritual do dia)",
-];
-
-const PREMIUM_FEATURES = [
-  "Mapas ilimitados para você e quem quiser",
+const PAID_PLAN_FEATURES = [
+  "Mapas ilimitados (família, amigos, parceiros)",
+  "Sinastria e mapa composto",
   "Interpretações com IA ilimitadas",
-  "Sinastria completa com narrativa IA",
-  "Trânsitos personalizados com histórico",
-  "Previsão anual de trânsitos",
-  "Padrões avançados (Grand Trine, Yod…)",
+  "Trânsitos e previsão anual",
+  "Exportação PDF e cartão Instagram personalizados",
   "Diário de humor com correlações",
-  "Carta composta de relacionamentos",
-  "Export PDF e cartão Instagram",
 ];
 
 function Landing() {
@@ -117,7 +106,7 @@ function Landing() {
               <Link to="/auth">Entrar</Link>
             </Button>
             <Button asChild size="sm" className="bg-mystical text-white hover:opacity-90">
-              <Link to="/auth">Começar grátis</Link>
+              <Link to="/auth">Assinar agora</Link>
             </Button>
           </div>
         </div>
@@ -139,7 +128,7 @@ function Landing() {
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
             Mapa natal completo com 13 corpos celestes, interpretações com IA, sinastria, trânsitos
-            diários e rituais personalizados. Gratuito para começar — sem horóscopo genérico.
+            diários e rituais personalizados — sem horóscopo genérico.
           </p>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Button
@@ -157,7 +146,7 @@ function Landing() {
             </Button>
           </div>
           <p className="mt-6 text-xs text-muted-foreground">
-            Sem cartão de crédito · Cadastro em 30 segundos · Dados protegidos
+            Checkout em breve — acesso completo enquanto ativamos pagamentos · Dados protegidos
           </p>
         </div>
       </section>
@@ -219,38 +208,14 @@ function Landing() {
           <div className="text-center">
             <h2 className="font-display text-3xl font-bold md:text-4xl">Planos</h2>
             <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-              O universo cobrou R$&nbsp;10.000.000,00 para escrever o seu mapa astral.
-              <br />
-              Mas a gente não é o universo. Comece de graça.
+              Dois planos com o mesmo conjunto de recursos. O anual oferece o melhor custo por mês
+              quando o checkout estiver ativo.
             </p>
           </div>
           <div className="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-2">
-            {/* Free */}
             <div className="rounded-2xl border bg-card p-8">
-              <h3 className="font-display text-2xl font-semibold">Free</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Para sentir o céu do seu mapa</p>
-              <p className="mt-6 font-display text-4xl font-bold">R$ 0</p>
-              <p className="mt-1 text-xs text-muted-foreground">Para sempre, sem truques</p>
-              <ul className="mt-6 space-y-3 text-sm">
-                {FREE_FEATURES.map((t) => (
-                  <li key={t} className="flex items-start gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    {t}
-                  </li>
-                ))}
-              </ul>
-              <Button asChild className="mt-8 w-full" variant="outline">
-                <Link to="/auth">Começar grátis</Link>
-              </Button>
-            </div>
-
-            {/* Premium */}
-            <div className="relative rounded-2xl border-2 border-primary bg-card p-8 shadow-mystical">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-mystical px-3 py-1 text-xs font-semibold text-white">
-                TUDO O QUE O CÉU PODE DAR
-              </div>
-              <h3 className="font-display text-2xl font-semibold">Premium</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Toda a profundidade do céu</p>
+              <h3 className="font-display text-2xl font-semibold">Mensal</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Flexibilidade mês a mês</p>
               <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-500/90">
                 Checkout em preparação — sem cobrança até ativarmos pagamentos.
               </p>
@@ -258,11 +223,8 @@ function Landing() {
                 <p className="font-display text-4xl font-bold">R$&nbsp;24,90</p>
                 <span className="text-base font-normal text-muted-foreground">/mês</span>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground line-through opacity-50">
-                R$ 10.000.000,00 (preço do universo)
-              </p>
               <ul className="mt-6 space-y-3 text-sm">
-                {PREMIUM_FEATURES.map((t) => (
+                {PAID_PLAN_FEATURES.map((t) => (
                   <li key={t} className="flex items-start gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     {t}
@@ -270,10 +232,39 @@ function Landing() {
                 ))}
               </ul>
               <Button asChild className="mt-8 w-full bg-mystical text-white hover:opacity-90">
-                <Link to="/auth">Entrar para ver planos na conta</Link>
+                <Link to="/auth">Assinar mensal</Link>
+              </Button>
+            </div>
+
+            <div className="relative rounded-2xl border-2 border-primary bg-card p-8 shadow-mystical">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-mystical px-3 py-1 text-xs font-semibold text-white">
+                MAIS POPULAR
+              </div>
+              <h3 className="font-display text-2xl font-semibold">Anual</h3>
+              <p className="mt-1 text-sm text-muted-foreground">Melhor valor ao longo do ano</p>
+              <p className="mt-2 text-xs font-medium text-amber-700 dark:text-amber-500/90">
+                Checkout em preparação — sem cobrança até ativarmos pagamentos.
+              </p>
+              <div className="mt-4 flex items-baseline gap-1">
+                <p className="font-display text-4xl font-bold">R$&nbsp;147</p>
+                <span className="text-base font-normal text-muted-foreground">/ano</span>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                R$&nbsp;12,25/mês · economia de R$&nbsp;151,80 vs mensal
+              </p>
+              <ul className="mt-6 space-y-3 text-sm">
+                {PAID_PLAN_FEATURES.map((t) => (
+                  <li key={`anual-${t}`} className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    {t}
+                  </li>
+                ))}
+              </ul>
+              <Button asChild className="mt-8 w-full bg-mystical text-white hover:opacity-90">
+                <Link to="/auth">Assinar anual</Link>
               </Button>
               <p className="mt-2 text-center text-xs text-muted-foreground">
-                Após o login: menu «Planos Premium» com estado da assinatura.
+                Após o login: página «Planos» com o estado da sua assinatura.
               </p>
             </div>
           </div>
@@ -315,14 +306,13 @@ function Landing() {
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="4">
-              <AccordionTrigger>O que muda no plano Premium na prática?</AccordionTrigger>
+              <AccordionTrigger>Qual a diferença entre o plano Mensal e o Anual?</AccordionTrigger>
               <AccordionContent>
-                No Free você tem 1 mapa e 3 interpretações com IA por mês — suficiente para explorar
-                o seu próprio mapa com profundidade. No Premium você desbloqueie mapas ilimitados
-                (para família, amigos, parceiros), sinastria completa com narrativa IA, trânsitos
-                personalizados, previsão anual, padrões avançados de aspectos, diário de humor com
-                correlações e a carta composta de relacionamentos. É para quem quer o céu como
-                ferramenta de autoconhecimento contínua, não pontual.
+                São o mesmo produto: mapas ilimitados, sinastria e mapa composto, interpretações com
+                IA, trânsitos, previsão anual, exportações e diário de humor. O Mensal
+                (R$&nbsp;24,90 por mês) dá mais liberdade para cancelar ou mudar. O Anual
+                (R$&nbsp;147 por ano, equivalente a R$&nbsp;12,25 por mês) compensa se você pretende
+                usar o AstroMap durante todo o ano — a diferença é só financeira.
               </AccordionContent>
             </AccordionItem>
           </Accordion>
@@ -350,19 +340,27 @@ function Landing() {
             className="mt-10 bg-mystical text-white shadow-mystical hover:opacity-90"
           >
             <Link to="/auth">
-              Ver meu mapa agora — é grátis
+              Assinar agora
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
           <p className="mt-4 text-xs text-muted-foreground">
-            Para o universo: R$&nbsp;10.000.000,00. Para você: R$&nbsp;24,90/mês.
+            Mensal R$&nbsp;24,90/mês ou anual R$&nbsp;147/ano — checkout em breve.
           </p>
         </div>
       </section>
 
       <footer className="border-t py-10">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} AstroMap · Feito com as estrelas
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground space-y-2">
+          <p>© {new Date().getFullYear()} AstroMap · Feito com as estrelas</p>
+          <div className="flex justify-center gap-4 text-xs">
+            <Link to="/privacy" className="hover:text-primary hover:underline">
+              Política de Privacidade
+            </Link>
+            <Link to="/terms" className="hover:text-primary hover:underline">
+              Termos de Uso
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

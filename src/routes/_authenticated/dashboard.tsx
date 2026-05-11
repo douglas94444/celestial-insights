@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchChartsList } from "@/hooks/use-charts-list";
 import { fetchProfile } from "@/hooks/use-profile";
-import { Plus, Stars, Sparkles, CalendarRange } from "lucide-react";
+import { Plus, Stars, Sparkles, CalendarRange, Heart, BarChart2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,12 +11,15 @@ import { AiButton } from "@/components/AiButton";
 import { AiTextCard } from "@/components/AiTextCard";
 import { TransitScoreBadges } from "@/components/TransitScoreBadges";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
-import { UpgradeMapModal } from "@/components/UpgradeMapModal";
 import { useDailyMoment } from "@/hooks/use-daily-moment";
 import { useAuth } from "@/hooks/use-auth";
 import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS } from "@/lib/engagement";
 import { usePageEngagement } from "@/hooks/use-page-engagement";
 import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
+import { generateAnnualForecastFn } from "@/lib/annual-forecast.functions";
+import { withSupabaseAuth } from "@/lib/server-fn-client";
+import { Progress } from "@/components/ui/progress";
+import type { GenerateAnnualForecastFnResult } from "@/lib/types/server-fn-results";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -25,8 +28,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 function Dashboard() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const prefetchedRef = useRef(false);
 
   usePageEngagement(ENGAGEMENT_ROUTES.dashboard, ENGAGEMENT_TOPICS.dashboard_open);
@@ -48,7 +50,6 @@ function Dashboard() {
   }, [user?.id, qc]);
 
   const {
-    profile,
     charts,
     primary,
     planets,
@@ -62,6 +63,8 @@ function Dashboard() {
     moonSkyLine,
     dashTransitAi,
     dashTransitAiMutation,
+    morningDeep,
+    natalEssenceQuery,
     horoscopeSolarLine,
     moonNatalExcerpt,
     ascMicroLine,
@@ -75,11 +78,29 @@ function Dashboard() {
     return buildShareCardDailyExtras(sunSign, todayStr, fp);
   }, [primary, sunSign, todayStr, transitToday]);
 
+  const currentYear = useMemo(() => new Date().getUTCFullYear(), []);
+  const currentMonth = useMemo(() => new Date().getUTCMonth() + 1, []);
+
+  const annualForecastQuery = useQuery<GenerateAnnualForecastFnResult>({
+    queryKey: ["annual-forecast", primary?.id, currentYear],
+    queryFn: async () => {
+      if (!session) throw new Error("Sessão necessária.");
+      return generateAnnualForecastFn({
+        data: { chartId: primary!.id, year: currentYear },
+        ...withSupabaseAuth(session),
+      });
+    },
+    enabled: !!session && !!primary?.id,
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: false,
+  });
+
+  const currentMonthForecast = useMemo(() => {
+    if (!annualForecastQuery.data?.months) return null;
+    return annualForecastQuery.data.months.find((m) => m.month === currentMonth) ?? null;
+  }, [annualForecastQuery.data, currentMonth]);
+
   function handleNewMap() {
-    if (profile?.subscription_tier === "FREE" && charts.length >= 1) {
-      setUpgradeOpen(true);
-      return;
-    }
     navigate({ to: "/mapas/novo" });
   }
 
@@ -98,8 +119,6 @@ function Dashboard() {
           <Plus className="mr-1 h-4 w-4" /> Novo mapa
         </Button>
       </div>
-
-      <UpgradeMapModal open={upgradeOpen} onOpenChange={setUpgradeOpen} />
 
       {!primary && (
         <Card className="border-dashed">
@@ -150,6 +169,11 @@ function Dashboard() {
                     <div className="mt-1 font-display font-semibold">{houses[0]?.sign ?? "—"}</div>
                   </div>
                 </div>
+                {natalEssenceQuery.data?.essence ? (
+                  <p className="font-display text-sm italic text-foreground/75 leading-snug border-l-2 border-primary/30 pl-3">
+                    "{natalEssenceQuery.data.essence}"
+                  </p>
+                ) : null}
                 <Button asChild variant="outline" className="w-full border-accent/30">
                   <Link to="/mapas/$id" params={{ id: primary.id }}>
                     Ver detalhes
@@ -311,11 +335,61 @@ function Dashboard() {
               <CalendarRange className="h-5 w-5 text-primary" /> Trânsitos & calendário
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p>
               Veja uma janela de datas, marque dias intensos, filtre aspectos e exporte PDF. Envie
               um resumo por email quando o servidor tiver Resend configurado.
             </p>
+
+            {currentMonthForecast ? (
+              <div className="rounded-lg border border-primary/15 bg-primary/5 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium uppercase text-muted-foreground">
+                    Previsão do mês atual
+                  </p>
+                  <Badge variant="secondary" className="text-[10px]">
+                    Intensidade média {currentMonthForecast.avgIntensity}/100
+                  </Badge>
+                </div>
+                <Progress value={currentMonthForecast.avgIntensity} className="h-1.5" />
+                {currentMonthForecast.peakDays.slice(0, 2).length > 0 && (
+                  <p className="text-xs text-foreground/80">
+                    <span className="font-medium">Pico: </span>
+                    {currentMonthForecast.peakDays.slice(0, 2).map((d) => (
+                      <span key={d.date} className="mr-3">
+                        {new Date(d.date + "T12:00:00Z").toLocaleDateString("pt-BR", {
+                          day: "numeric",
+                          month: "short",
+                        })}{" "}
+                        ({d.intensity}/100)
+                      </span>
+                    ))}
+                  </p>
+                )}
+                {(currentMonthForecast.retrogradePeriods.length > 0 ||
+                  currentMonthForecast.ingresses.length > 0) && (
+                  <p className="text-xs text-foreground/75">
+                    {currentMonthForecast.retrogradePeriods.map((r) => (
+                      <span key={`${r.planet}-${r.startDate}`} className="mr-2">
+                        ⟲ {r.planet} retrógrado
+                      </span>
+                    ))}
+                    {currentMonthForecast.ingresses.map((i) => (
+                      <span key={`${i.planet}-${i.date}`} className="mr-2">
+                        ↗ {i.planet} em {i.intoSign}
+                      </span>
+                    ))}
+                  </p>
+                )}
+                <Link
+                  to="/transitos"
+                  className="inline-block text-xs font-medium text-primary underline-offset-4 hover:underline"
+                >
+                  Ver previsão anual completa →
+                </Link>
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap gap-2">
               <Button asChild className="bg-mystical text-white hover:opacity-90">
                 <Link to="/transitos">
@@ -331,6 +405,93 @@ function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {primary && (
+        <div>
+          <h2 className="mb-3 font-display text-xl font-semibold">Explorar</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Link to="/compatibilidade">
+              <Card className="h-full transition-all hover:border-primary hover:shadow-soft">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Heart className="h-5 w-5 text-primary" />
+                    {charts.length >= 2 ? (
+                      <Badge
+                        variant="secondary"
+                        className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400"
+                      >
+                        Pronto para usar
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-[10px]">
+                        2 mapas
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="font-display font-semibold text-sm">Sinastria</p>
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    Compare dois mapas e descubra compatibilidade de amor, trabalho e amizade.
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link to="/transitos">
+              <Card className="h-full transition-all hover:border-primary hover:shadow-soft">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <BarChart2 className="h-5 w-5 text-primary" />
+                    <Badge variant="secondary" className="text-[10px]">
+                      Anual
+                    </Badge>
+                  </div>
+                  <p className="font-display font-semibold text-sm">Previsão do ano</p>
+                  <p className="text-xs text-muted-foreground leading-snug">
+                    Veja meses de maior intensidade, retrogradações e ingressos planetários.
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {!morningDeep ? (
+              <Link to="/momento">
+                <Card className="h-full transition-all hover:border-primary hover:shadow-soft">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      <Badge variant="secondary" className="text-[10px]">
+                        Hoje
+                      </Badge>
+                    </div>
+                    <p className="font-display font-semibold text-sm">Carta do dia profunda</p>
+                    <p className="text-xs text-muted-foreground leading-snug">
+                      Mensagem personalizada com afirmação, tema do dia e dica prática.
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ) : (
+              <Link to="/momento">
+                <Card className="h-full transition-all hover:border-primary hover:shadow-soft border-primary/20 bg-primary/5">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                      <Badge variant="secondary" className="text-[10px] bg-primary/15 text-primary">
+                        Gerada hoje
+                      </Badge>
+                    </div>
+                    <p className="font-display font-semibold text-sm">Carta do dia</p>
+                    <p className="text-xs text-muted-foreground leading-snug italic">
+                      {morningDeep.main_message?.slice(0, 80)}
+                      {(morningDeep.main_message?.length ?? 0) > 80 ? "…" : ""}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
       {charts.length > 0 && (
         <div>

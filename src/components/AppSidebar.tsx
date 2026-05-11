@@ -28,6 +28,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserIsAdmin } from "@/hooks/use-user-is-admin";
+import { useProfile } from "@/hooks/use-profile";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -44,7 +45,7 @@ const items: NavItem[] = [
   { title: "Meus Mapas", url: "/mapas", icon: Stars },
   { title: "Compatibilidade", url: "/compatibilidade", icon: Heart },
   { title: "Trânsitos", url: "/transitos", icon: CalendarRange },
-  { title: "Planos Premium", url: "/premium", icon: Crown },
+  { title: "Planos", url: "/premium", icon: Crown },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
 
@@ -55,6 +56,8 @@ export function AppSidebar() {
   const { user, signOut } = useAuth();
   const adminGate = useUserIsAdmin();
   const showAdmin = adminGate.data === true;
+  const { data: profile } = useProfile();
+  const streak = profile?.moment_streak ?? 0;
 
   const navItems = useMemo(() => {
     const adminEntry: NavItem = { title: "Administração", url: "/admin", icon: Shield };
@@ -86,6 +89,7 @@ export function AppSidebar() {
                       : item.url === "/admin"
                         ? path === "/admin" || path.startsWith("/admin/")
                         : path.startsWith(item.url);
+                  const isMomento = item.url === "/momento";
                   const expandedLink = (
                     <Link to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4 shrink-0" />
@@ -96,6 +100,11 @@ export function AppSidebar() {
                           className="bg-accent/20 text-accent-foreground text-[10px]"
                         >
                           PRO
+                        </Badge>
+                      ) : null}
+                      {isMomento && streak > 0 ? (
+                        <Badge className="ml-auto bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] px-1.5">
+                          {streak}🔥
                         </Badge>
                       ) : null}
                     </Link>
@@ -114,7 +123,10 @@ export function AppSidebar() {
                               {collapsedLink}
                             </SidebarMenuButton>
                           </TooltipTrigger>
-                          <TooltipContent side="right">{item.title}</TooltipContent>
+                          <TooltipContent side="right">
+                            {item.title}
+                            {isMomento && streak > 0 ? ` · ${streak}🔥` : ""}
+                          </TooltipContent>
                         </Tooltip>
                       ) : (
                         <SidebarMenuButton asChild isActive={active}>
@@ -139,18 +151,18 @@ export function AppSidebar() {
                   size="icon"
                   className="w-full bg-mystical text-white hover:opacity-90"
                 >
-                  <Link to="/premium" aria-label="Planos Premium">
+                  <Link to="/premium" aria-label="Planos">
                     <Crown className="h-4 w-4" />
                   </Link>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Planos Premium</TooltipContent>
+              <TooltipContent side="right">Planos</TooltipContent>
             </Tooltip>
           ) : (
             <Button asChild variant="default" className="bg-mystical text-white hover:opacity-90">
               <Link to="/premium">
                 <Crown className="mr-1 h-4 w-4" />
-                Planos Premium
+                Planos
               </Link>
             </Button>
           )}

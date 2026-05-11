@@ -38,14 +38,48 @@ async function toPngBlob(
   return res.blob();
 }
 
-export async function captureMomentShareCardPng(el: HTMLElement): Promise<Blob> {
+async function serializeSvgsToImages(el: HTMLElement): Promise<() => void> {
+  const svgEls = Array.from(el.querySelectorAll("svg"));
+  const restoreFns: Array<() => void> = [];
+  for (const svg of svgEls) {
+    const parent = svg.parentElement;
+    if (!parent) continue;
+    const w = svg.clientWidth || 420;
+    const h = svg.clientHeight || 420;
+    const svgStr = new XMLSerializer().serializeToString(svg);
+    const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const img = document.createElement("img");
+    img.width = w;
+    img.height = h;
+    img.style.display = "block";
+    await new Promise<void>((res, rej) => {
+      img.onload = () => res();
+      img.onerror = rej;
+      img.src = url;
+    });
+    URL.revokeObjectURL(url);
+    parent.replaceChild(img, svg);
+    restoreFns.push(() => parent.replaceChild(svg, img));
+  }
+  return () => restoreFns.forEach((fn) => fn());
+}
+
+export async function captureMomentShareCardPng(
+  el: HTMLElement,
+  opts: { pixelRatio?: 1 | 2; backgroundColor?: string } = {},
+): Promise<Blob> {
+  const { pixelRatio = 1, backgroundColor = CARD_BG } = opts;
   await waitFonts();
   await waitTwoFrames();
-  await delay(120);
+  await delay(60);
+  const restoreSvgs = await serializeSvgsToImages(el);
   try {
-    return await toPngBlob(el);
+    return await toPngBlob(el, { pixelRatio, backgroundColor });
   } catch {
-    return await toPngBlob(el, { skipFonts: true });
+    return await toPngBlob(el, { pixelRatio, backgroundColor, skipFonts: true });
+  } finally {
+    restoreSvgs();
   }
 }
 

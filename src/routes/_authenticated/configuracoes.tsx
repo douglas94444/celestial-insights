@@ -1,10 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProfile } from "@/hooks/use-profile";
 import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Sparkles, Trash2, Upload } from "lucide-react";
+import { Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -62,6 +62,13 @@ const FOCUS_AREA_LABELS: Record<FocusAreaKey, string> = {
   ESPIRITUALIDADE: "Espiritualidade & sentido",
 };
 
+const SUBSCRIPTION_TIER_LABEL: Record<string, string> = {
+  MENSAL: "Mensal",
+  ANUAL: "Anual",
+  PREMIUM: "Premium (legado)",
+  FREE: "Mensal",
+};
+
 function Settings() {
   const { user, session, signOut } = useAuth();
   const navigate = useNavigate();
@@ -69,6 +76,10 @@ function Settings() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: profile } = useProfile();
+  const tierRaw = profile?.subscription_tier ?? "MENSAL";
+  const tierLabel = SUBSCRIPTION_TIER_LABEL[tierRaw] ?? "Mensal";
+  const tierBadgeVariant =
+    tierRaw === "MENSAL" || tierRaw === "ANUAL" || tierRaw === "PREMIUM" ? "default" : "secondary";
 
   const nameForm = useForm({
     resolver: zodResolver(profileNameSchema),
@@ -304,17 +315,15 @@ function Settings() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 Plano atual
-                <Badge variant={profile?.subscription_tier === "PREMIUM" ? "default" : "secondary"}>
-                  {profile?.subscription_tier ?? "FREE"}
-                </Badge>
+                <Badge variant={tierBadgeVariant}>{tierLabel}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Assinatura paga ainda não disponível — em breve!
+                Checkout (mensal ou anual) ainda não disponível — em breve.
               </p>
-              <Button disabled className="bg-mystical text-white">
-                <Sparkles className="mr-1 h-4 w-4" /> Assinar Premium · R$ 24,90/mês
+              <Button asChild variant="outline" className="w-full sm:w-auto">
+                <Link to="/premium">Ver planos e preços</Link>
               </Button>
             </CardContent>
           </Card>

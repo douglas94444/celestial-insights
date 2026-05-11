@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Eye, MoreVertical, Pencil, Plus, Sparkles, Star, Trash2 } from "lucide-react";
+import { Eye, MoreVertical, Pencil, Plus, Star, Stars, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyFeatureState } from "@/components/EmptyFeatureState";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -143,26 +144,13 @@ function MapasList() {
       </Dialog>
 
       {charts.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-            <Sparkles className="h-12 w-12 text-primary" />
-            <div className="space-y-1">
-              <p className="font-display text-lg font-semibold">Nenhum mapa guardado</p>
-              <p className="max-w-md text-sm text-muted-foreground">
-                Crie o seu primeiro mapa natal — demora menos de um minuto — ou volte ao onboarding
-                se preferir o passo a passo inicial.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button asChild className="bg-mystical text-white">
-                <Link to="/onboarding">Começar pelo onboarding</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to="/mapas/novo">Novo mapa direto</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <EmptyFeatureState
+          icon={Stars}
+          title="Nenhum mapa guardado"
+          description="Crie o seu primeiro mapa natal — demora menos de um minuto. Use o onboarding guiado ou adicione diretamente."
+          primaryCta={{ label: "Começar pelo onboarding", to: "/onboarding" }}
+          secondaryCta={{ label: "Novo mapa direto", to: "/mapas/novo", variant: "outline" }}
+        />
       ) : (
         <div className="grid gap-4 md:grid-cols-3">
           {charts.map((c) => (

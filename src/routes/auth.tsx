@@ -244,8 +244,19 @@ function SignUpForm() {
         disabled={busy}
         className="w-full bg-mystical text-white hover:opacity-90"
       >
-        {busy ? "Criando..." : "Criar conta grátis"}
+        {busy ? "Criando..." : "Criar conta"}
       </Button>
+      <p className="text-center text-[11px] text-white/50 leading-relaxed">
+        Ao criar conta você concorda com os{" "}
+        <Link to="/terms" className="underline hover:text-white/80">
+          Termos de Uso
+        </Link>{" "}
+        e a{" "}
+        <Link to="/privacy" className="underline hover:text-white/80">
+          Política de Privacidade
+        </Link>
+        .
+      </p>
     </form>
   );
 }

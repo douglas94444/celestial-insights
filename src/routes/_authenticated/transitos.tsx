@@ -1,10 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
+  CalendarRange,
   ChevronLeft,
   ChevronRight,
   Download,
@@ -57,6 +58,7 @@ import { usePageEngagement } from "@/hooks/use-page-engagement";
 import { AiButton } from "@/components/AiButton";
 import { AiTextCard } from "@/components/AiTextCard";
 import { TransitScoreBadges } from "@/components/TransitScoreBadges";
+import { EmptyFeatureState } from "@/components/EmptyFeatureState";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import {
   filterAspectsByFastTransit,
@@ -252,14 +254,14 @@ function TransitosPage() {
       </div>
 
       {!user ? null : charts.length === 0 ? (
-        <Card className="border-dashed mb-6">
-          <CardContent className="py-8 text-center text-muted-foreground">
-            Crie um mapa para ver trânsitos.{" "}
-            <Link to="/onboarding" className="text-primary underline">
-              Ir ao onboarding
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="mb-6">
+          <EmptyFeatureState
+            icon={CalendarRange}
+            title="Nenhum mapa encontrado"
+            description="Crie o seu mapa natal para ver trânsitos personalizados, calendário de intensidade e previsão anual."
+            primaryCta={{ label: "Criar meu mapa", to: "/onboarding" }}
+          />
+        </div>
       ) : (
         <Tabs
           value={mainTab}

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Loader2, Sparkles, Share2, Download, Copy } from "lucide-react";
 import { toast } from "sonner";
@@ -13,7 +13,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AiCacheAgeBadge, AiCacheAgeBadgeFromResult } from "@/components/AiCacheAgeBadge";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ShareableMomentCard } from "@/components/ShareableMomentCard";
+import { ShareableMomentCard, CARD_THEMES, type CardTheme } from "@/components/ShareableMomentCard";
 const MoodWidget = lazy(() =>
   import("@/components/MoodWidget").then((m) => ({ default: m.MoodWidget })),
 );
@@ -46,6 +46,7 @@ import { usePageEngagement } from "@/hooks/use-page-engagement";
 import { AiButton } from "@/components/AiButton";
 import { AiTextCard } from "@/components/AiTextCard";
 import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
+import { useAiQuota } from "@/hooks/use-ai-quota";
 
 export const Route = createFileRoute("/_authenticated/momento")({
   component: MomentoPage,
@@ -55,6 +56,10 @@ function MomentoPage() {
   const navigate = useNavigate();
   const cardRef = useRef<HTMLDivElement>(null);
   const [exporting, setExporting] = useState(false);
+  const [cardTheme, setCardTheme] = useState<CardTheme>("noturno");
+  const [showWheel, setShowWheel] = useState(true);
+  const [highQuality, setHighQuality] = useState(false);
+  const aiQuota = useAiQuota();
   const [streak, setStreak] = useState(() => readMomentStreak().streak);
   const [historyList, setHistoryList] = useState<MomentHistorySnapshot[]>(() =>
     typeof window !== "undefined" ? loadMomentHistory() : [],
@@ -113,6 +118,17 @@ function MomentoPage() {
     setStreak(out.streak);
     void persistMomentStreakToProfile(user.id, out.streak, out.lastVisitYmd);
   }, [chartsLoading, primary, profile, user?.id]);
+
+  useEffect(() => {
+    if (streak <= 0) return;
+    const MILESTONES = [7, 14, 30, 60, 100];
+    if (!MILESTONES.includes(streak)) return;
+    const key = `astromap_streak_milestone_${streak}`;
+    if (typeof window !== "undefined" && !localStorage.getItem(key)) {
+      localStorage.setItem(key, "1");
+      toast.success(`${streak} dias de conexão com o céu! Continue assim. 🌙`);
+    }
+  }, [streak]);
 
   const sma = useMemo(() => primarySunMoonAsc(planets, houses), [planets, houses]);
 
@@ -327,7 +343,10 @@ function MomentoPage() {
     try {
       const { captureMomentShareCardPng, sharePngIfPossible, downloadBlob } =
         await import("@/lib/share-card-export");
-      const blob = await captureMomentShareCardPng(cardRef.current);
+      const blob = await captureMomentShareCardPng(cardRef.current, {
+        pixelRatio: highQuality ? 2 : 1,
+        backgroundColor: CARD_THEMES[cardTheme].bg,
+      });
       const filename = `astro-moment-${viewYmd}.png`;
       const shared = await sharePngIfPossible(blob, filename, "Meu momento com o céu — AstroMap");
       if (!shared) await downloadBlob(blob, filename);
@@ -344,7 +363,10 @@ function MomentoPage() {
     setExporting(true);
     try {
       const { captureMomentShareCardPng, downloadBlob } = await import("@/lib/share-card-export");
-      const blob = await captureMomentShareCardPng(cardRef.current);
+      const blob = await captureMomentShareCardPng(cardRef.current, {
+        pixelRatio: highQuality ? 2 : 1,
+        backgroundColor: CARD_THEMES[cardTheme].bg,
+      });
       await downloadBlob(blob, `astro-moment-${viewYmd}.png`);
       toast.success("Imagem guardada");
     } catch {
@@ -435,32 +457,35 @@ function MomentoPage() {
         </div>
       ) : null}
 
-      {historyList.length > 0 ? (
-        <div className="mb-6 flex flex-wrap items-center justify-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={isTodayView ? "secondary" : "outline"}
-            onClick={() => setPickedYmd(null)}
-          >
-            Hoje
-          </Button>
-          {historyList
-            .filter((h) => h.visitYmd !== todayStr)
-            .slice(0, 14)
-            .map((h) => (
-              <Button
-                key={h.visitYmd}
-                type="button"
-                size="sm"
-                variant={viewYmd === h.visitYmd ? "secondary" : "outline"}
-                onClick={() => setPickedYmd(h.visitYmd)}
-              >
-                {format(parseISO(`${h.visitYmd}T12:00:00.000Z`), "d MMM", { locale: ptBR })}
-              </Button>
-            ))}
-        </div>
-      ) : null}
+      <div className="mb-6 flex flex-wrap items-center justify-center gap-1.5">
+        <Button
+          type="button"
+          size="sm"
+          variant={isTodayView ? "secondary" : "outline"}
+          onClick={() => setPickedYmd(null)}
+          className="text-xs h-8"
+        >
+          Hoje
+        </Button>
+        {Array.from({ length: 14 }, (_, i) => {
+          const d = subDays(parseISO(`${todayStr}T12:00:00.000Z`), i + 1);
+          const ymd = format(d, "yyyy-MM-dd");
+          const hasData = historyList.some((h) => h.visitYmd === ymd);
+          return (
+            <Button
+              key={ymd}
+              type="button"
+              size="sm"
+              variant={viewYmd === ymd ? "secondary" : hasData ? "outline" : "ghost"}
+              onClick={() => setPickedYmd(ymd)}
+              className={`text-xs h-8 ${!hasData ? "opacity-40" : ""}`}
+              title={hasData ? "Dados guardados" : "Sem dados para este dia"}
+            >
+              {format(d, "d MMM", { locale: ptBR })}
+            </Button>
+          );
+        })}
+      </div>
 
       {!isTodayView && !histEntry ? (
         <p className="mb-6 text-center text-sm text-muted-foreground">
@@ -532,6 +557,13 @@ function MomentoPage() {
 
           {isTodayView ? (
             <div className="flex flex-col gap-2">
+              {aiQuota && !aiQuota.isPremium ? (
+                <p className={`text-xs ${aiQuota.nearLimit ? "text-amber-600 dark:text-amber-400 font-medium" : "text-muted-foreground"}`}>
+                  {aiQuota.remaining === 0
+                    ? <>Limite mensal atingido · <Link to="/premium" className="text-primary underline underline-offset-2">Upgrade para ilimitado</Link></>
+                    : `${aiQuota.used}/${aiQuota.limit} interpretações mensais usadas`}
+                </p>
+              ) : null}
               <AiButton
                 isPending={dashTransitAiMutation.isPending}
                 onClick={() => dashTransitAiMutation.mutate()}
@@ -608,8 +640,51 @@ function MomentoPage() {
           trânsitos em tempo real seguem apenas o dia de hoje.
         </p>
 
+        <div className="mx-auto max-w-md rounded-lg border border-border/40 bg-muted/10 p-4 space-y-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Personalizar cartão
+          </p>
+          <div className="space-y-2">
+            <Label className="text-xs font-medium uppercase text-muted-foreground">Tema</Label>
+            <div className="flex gap-4">
+              {(Object.keys(CARD_THEMES) as CardTheme[]).map((key) => {
+                const t = CARD_THEMES[key];
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    aria-label={t.label}
+                    title={t.label}
+                    onClick={() => setCardTheme(key)}
+                    className={`flex flex-col items-center gap-1 transition-opacity ${cardTheme === key ? "opacity-100" : "opacity-55 hover:opacity-80"}`}
+                  >
+                    <span
+                      className={`block h-9 w-9 rounded-full border-2 transition-colors ${cardTheme === key ? "border-primary" : "border-transparent ring-1 ring-border"}`}
+                      style={{ backgroundColor: t.bg }}
+                    />
+                    <span className="text-[10px] text-muted-foreground">{t.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="show-wheel" className="text-sm">
+              Mostrar roda natal
+            </Label>
+            <Switch id="show-wheel" checked={showWheel} onCheckedChange={setShowWheel} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="high-quality" className="text-sm">
+              Qualidade alta (2×)
+            </Label>
+            <Switch id="high-quality" checked={highQuality} onCheckedChange={setHighQuality} />
+          </div>
+        </div>
+
         <div className="flex justify-center overflow-x-auto pb-8 pt-2">
           <div
+            className="relative"
             style={{
               transform: `scale(${previewScale})`,
               transformOrigin: "top center",
@@ -641,7 +716,15 @@ function MomentoPage() {
               shareCtaUrl={sharePublicUrl || undefined}
               wheelData={wheelData}
               wheelSize={400}
+              theme={CARD_THEMES[cardTheme]}
+              showWheel={showWheel}
             />
+            {exporting ? (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-md bg-black/60">
+                <Loader2 className="h-8 w-8 animate-spin text-white" />
+                <p className="text-xs text-white">Gerando imagem...</p>
+              </div>
+            ) : null}
           </div>
         </div>
 

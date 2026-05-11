@@ -9,7 +9,7 @@ import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
 import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
 
-/** Cria mapa natal no banco após cálculo no servidor; respeita limite FREE (1 mapa). */
+/** Cria mapa natal no banco após cálculo no servidor. */
 export const createChartFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => {
@@ -24,13 +24,11 @@ export const createChartFn = createServerFn({ method: "POST" })
 
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("subscription_tier, house_system")
+        .select("house_system")
         .eq("id", userId)
         .single();
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-
-      const tier = profile?.subscription_tier ?? "FREE";
 
       const { count, error: countErr } = await supabase
         .from("charts")
@@ -40,13 +38,6 @@ export const createChartFn = createServerFn({ method: "POST" })
       if (countErr) throw jsonError(500, "COUNT", countErr.message);
 
       const existing = count ?? 0;
-      if (tier === "FREE" && existing >= 1) {
-        throw jsonError(
-          403,
-          "FREE_LIMIT",
-          "No plano gratuito você pode ter apenas um mapa. Faça upgrade para criar mais.",
-        );
-      }
 
       const birthTime = data.birthTimeKnown ? data.birthTime : "12:00";
       const houseSystem = (profile?.house_system as HouseSystemId | undefined) ?? "placidus";

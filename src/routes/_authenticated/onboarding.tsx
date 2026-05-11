@@ -58,7 +58,7 @@ function Onboarding() {
       await supabase.from("profiles").update({ name: displayName }).eq("id", user.id);
     }
     toast.success("Seu mapa está pronto!");
-    navigate({ to: "/mapas/$id", params: { id: chartId } });
+    navigate({ to: "/mapas/$id", params: { id: chartId }, search: { new: true } });
   }
 
   return (

@@ -3,7 +3,16 @@ import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Heart, Loader2, Sparkles, Trash2 } from "lucide-react";
+import {
+  Briefcase,
+  ChevronDown,
+  Heart,
+  Home,
+  Loader2,
+  MessageCircle,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -428,23 +437,60 @@ function CompatibilidadePage() {
       ) : null}
 
       {!chartsLoading && !canSynastry && (
-        <Alert className="mb-6">
-          <Sparkles className="h-4 w-4" />
-          <AlertTitle>São necessários pelo menos dois mapas</AlertTitle>
-          <AlertDescription className="flex flex-wrap gap-3 items-center mt-2">
-            <span>
-              No plano gratuito só pode existir um mapa por conta — convide outra conta de teste ou,
-              quando o checkout estiver ativo, faça upgrade em{" "}
-              <Link to="/premium" className="font-medium text-primary underline underline-offset-2">
-                Planos Premium
-              </Link>
-              .
-            </span>
-            <Button asChild size="sm" variant="secondary">
-              <Link to="/mapas/novo">Novo mapa</Link>
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <Card className="mb-8 border-primary/20 bg-primary/5">
+          <CardContent className="p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-3">
+                <div className="h-10 w-10 rounded-full bg-primary/30 border-2 border-background flex items-center justify-center">
+                  <span className="text-lg">🔵</span>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-violet-400/30 border-2 border-background flex items-center justify-center">
+                  <span className="text-lg">🟣</span>
+                </div>
+              </div>
+              <div>
+                <h3 className="font-display font-semibold">Descubra a dinâmica entre dois mapas</h3>
+                <p className="text-xs text-muted-foreground">Sinastria e mapa composto</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-muted-foreground">
+              A sinastria mostra como dois mapas natais interagem — onde há harmonia, onde há tensão
+              criativa e como duas pessoas se complementam em diferentes áreas da vida.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {[
+                { icon: Heart, label: "Amor & atração" },
+                { icon: MessageCircle, label: "Amizade & diálogo" },
+                { icon: Briefcase, label: "Trabalho & metas" },
+                { icon: Home, label: "Convivência diária" },
+              ].map(({ icon: Icon, label }) => (
+                <div
+                  key={label}
+                  className="flex flex-col items-center gap-1.5 rounded-lg border border-primary/15 bg-background/60 p-3 text-center"
+                >
+                  <Icon className="h-4 w-4 text-primary" />
+                  <span className="text-xs text-muted-foreground leading-tight">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button asChild size="sm" className="bg-mystical text-white hover:opacity-90">
+                <Link to="/premium">Ver planos</Link>
+              </Button>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/mapas/novo">Criar segundo mapa</Link>
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              A sinastria compara dois mapas guardados na sua conta. Crie outro mapa em «Mapas →
+              Novo» e volte aqui para escolher os dois perfis.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       <Card className="mb-8">

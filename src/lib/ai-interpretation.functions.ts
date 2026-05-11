@@ -135,25 +135,26 @@ async function fetchChartOwnedByUser(
   return chart;
 }
 
+function isPaidSubscriptionTier(tier: Tier): boolean {
+  return tier === "PREMIUM" || tier === "MENSAL" || tier === "ANUAL";
+}
+
 async function assertAiGenerationAllowed(
   supabase: SupabaseClient<Database>,
   userId: string,
   tier: Tier,
 ): Promise<void> {
   const requirePremium = process.env.AI_INTERPRETATION_REQUIRE_PREMIUM === "true";
-  if (requirePremium && tier !== "PREMIUM") {
+  if (requirePremium && !isPaidSubscriptionTier(tier)) {
     throw jsonError(
       403,
       "PREMIUM_REQUIRED",
-      "As interpretações geradas por IA estão disponíveis para usuários Premium.",
+      "As interpretações geradas por IA estão disponíveis para assinantes.",
     );
   }
 
   const since24h = new Date(Date.now() - 86_400_000).toISOString();
-  const max24 =
-    tier === "PREMIUM"
-      ? parsePositiveInt(process.env.AI_INTERPRETATION_MAX_PER_24H_PREMIUM, 40)
-      : parsePositiveInt(process.env.AI_INTERPRETATION_MAX_PER_24H_FREE, 8);
+  const max24 = parsePositiveInt(process.env.AI_INTERPRETATION_MAX_PER_24H_PREMIUM, 40);
 
   const { count: c24, error: e24 } = await supabase
     .from("interpretation_ai_cache")
@@ -168,27 +169,6 @@ async function assertAiGenerationAllowed(
       "RATE_LIMIT",
       "Limite de gerações nas últimas 24 horas atingido. Volta a tentar mais tarde.",
     );
-  }
-
-  if (tier === "FREE" && !requirePremium) {
-    const monthStart = new Date();
-    monthStart.setUTCDate(1);
-    monthStart.setUTCHours(0, 0, 0, 0);
-    const maxMonth = parsePositiveInt(process.env.AI_INTERPRETATION_FREE_TRIES_PER_MONTH, 3);
-    const { count: cm, error: em } = await supabase
-      .from("interpretation_ai_cache")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .gte("created_at", monthStart.toISOString());
-
-    if (em) throw jsonError(500, "QUOTA", em.message);
-    if ((cm ?? 0) >= maxMonth) {
-      throw jsonError(
-        403,
-        "MONTHLY_LIMIT",
-        `No plano gratuito há um limite de ${maxMonth} interpretações novas por mês (cache repetido não conta).`,
-      );
-    }
   }
 }
 
@@ -313,7 +293,7 @@ export const generateNatalExecutiveSummaryFn = createServerFn({ method: "POST" }
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
 
-      const tier = profile?.subscription_tier ?? "FREE";
+      const tier = profile?.subscription_tier ?? "MENSAL";
       const fpPayload = buildNatalFingerprintPayload(chart, "natal_summary");
       const fingerprint = await sha256FingerprintHex(fpPayload);
 
@@ -418,7 +398,7 @@ export const generateNatalPlanetInsightFn = createServerFn({ method: "POST" })
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
 
-      const tier = profile?.subscription_tier ?? "FREE";
+      const tier = profile?.subscription_tier ?? "MENSAL";
       const fpPayload = buildNatalFingerprintPayload(chart, "natal_planet", data.planetKey);
       const fingerprint = await sha256FingerprintHex(fpPayload);
 
@@ -525,7 +505,7 @@ export const generateSynastryNarrativeFn = createServerFn({ method: "POST" })
         .single();
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-      const tier = profile?.subscription_tier ?? "FREE";
+      const tier = profile?.subscription_tier ?? "MENSAL";
 
       const row = await fetchSynastryOwned(supabase, userId, data);
       if (!row) throw jsonError(404, "NOT_FOUND", "Sinastria não encontrada.");
@@ -638,7 +618,7 @@ export const generateTransitDayNarrativeFn = createServerFn({ method: "POST" })
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
 
-      const tier = profile?.subscription_tier ?? "FREE";
+      const tier = profile?.subscription_tier ?? "MENSAL";
       const chartData = chartRowToChartData(chart);
       const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
       const dayPayload = analyzeTransitDay(
@@ -758,7 +738,7 @@ export const generateMorningDeepMessageFn = createServerFn({ method: "POST" })
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
 
-      const tier = profile?.subscription_tier ?? "FREE";
+      const tier = profile?.subscription_tier ?? "MENSAL";
       const chartData = chartRowToChartData(chart);
       const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
       const dayPayload = analyzeTransitDay(
@@ -915,7 +895,7 @@ export const generateNatalEssenceFn = createServerFn({ method: "POST" })
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
 
-      const tier = profile?.subscription_tier ?? "FREE";
+      const tier = profile?.subscription_tier ?? "MENSAL";
       const chartData = chartRowToChartData(chart);
       const patterns = deriveChartPatterns(chartData);
       const patternsCompact = patternsFingerprintCompact(patterns);
@@ -1042,7 +1022,7 @@ export const generateSynastryDeepNarrativeFn = createServerFn({ method: "POST" }
         .single();
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-      const tier = profile?.subscription_tier ?? "FREE";
+      const tier = profile?.subscription_tier ?? "MENSAL";
 
       const row = await fetchSynastryOwned(supabase, userId, data);
       if (!row) throw jsonError(404, "NOT_FOUND", "Sinastria não encontrada.");
@@ -1179,7 +1159,7 @@ export const generateCompositeNarrativeFn = createServerFn({ method: "POST" })
         .eq("id", userId)
         .single();
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
-      const tier = profile?.subscription_tier ?? "FREE";
+      const tier = profile?.subscription_tier ?? "MENSAL";
 
       const { data: rows, error: chartsErr } = await supabase
         .from("charts")

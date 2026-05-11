@@ -1,18 +1,26 @@
 import {
   AlertDialog,
   AlertDialogContent,
-  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
+import { CheckCircle2 } from "lucide-react";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+const PREMIUM_BENEFITS = [
+  "Mapas ilimitados (família, amigos, parceiros)",
+  "Sinastria e mapa composto entre quaisquer dois mapas",
+  "Interpretações IA ilimitadas (vs. 3/mês no plano gratuito)",
+  "Previsão anual completa com picos e retrogradações",
+  "Exportação PDF e cartão Instagram personalizados",
+];
 
 /** Modal quando usuário FREE tenta criar um segundo mapa (paywall placeholder). */
 export function UpgradeMapModal({ open, onOpenChange }: Props) {
@@ -21,19 +29,28 @@ export function UpgradeMapModal({ open, onOpenChange }: Props) {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="font-display">Mais mapas com Premium</AlertDialogTitle>
-          <AlertDialogDescription>
-            No plano gratuito você pode guardar um mapa natal. Para criar perfis adicionais
-            (família, estudos, etc.), o Premium será ativado quando ligarmos o checkout — na página
-            Planos Premium você vê o resumo honesto do que já existe e do que virá.
-          </AlertDialogDescription>
         </AlertDialogHeader>
+
+        <ul className="space-y-2 py-1">
+          {PREMIUM_BENEFITS.map((benefit) => (
+            <li key={benefit} className="flex items-start gap-2 text-sm text-muted-foreground">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              {benefit}
+            </li>
+          ))}
+        </ul>
+
+        <p className="text-xs text-muted-foreground">
+          Checkout em preparação — em breve disponível na página de planos.
+        </p>
+
         <AlertDialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Fechar
           </Button>
           <Button asChild className="bg-mystical text-white">
             <Link to="/premium" onClick={() => onOpenChange(false)}>
-              Ver benefícios Premium
+              Ver planos Premium
             </Link>
           </Button>
         </AlertDialogFooter>

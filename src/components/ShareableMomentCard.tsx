@@ -2,6 +2,29 @@ import { forwardRef, memo } from "react";
 import type { ChartData } from "@/lib/astrology/calculate";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
 
+export type CardTheme = "noturno" | "crepusculo" | "cosmos";
+
+export const CARD_THEMES: Record<CardTheme, { label: string; bg: string; gradient: string }> = {
+  noturno: {
+    label: "Noturno",
+    bg: "#0f0a1a",
+    gradient:
+      "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(147,112,219,0.35), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 80%, rgba(14,165,233,0.18), transparent 50%)",
+  },
+  crepusculo: {
+    label: "Crepúsculo",
+    bg: "#150a1f",
+    gradient:
+      "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(219,112,147,0.35), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 80%, rgba(251,191,36,0.18), transparent 50%)",
+  },
+  cosmos: {
+    label: "Cosmos",
+    bg: "#050d1a",
+    gradient:
+      "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(56,189,248,0.30), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 80%, rgba(52,211,153,0.20), transparent 50%)",
+  },
+};
+
 export type ShareableMomentCardProps = {
   displayName: string;
   identityLine: string;
@@ -20,6 +43,8 @@ export type ShareableMomentCardProps = {
   shareCtaUrl?: string;
   wheelData: ChartData;
   wheelSize?: number;
+  theme?: { label: string; bg: string; gradient: string };
+  showWheel?: boolean;
 };
 
 /** Dimensões típicas feed Instagram 4:5 (export PNG). */
@@ -42,27 +67,28 @@ const ShareableMomentCardInner = forwardRef<HTMLDivElement, ShareableMomentCardP
       shareCtaUrl,
       wheelData,
       wheelSize = 420,
+      theme,
+      showWheel = true,
     },
     ref,
   ) {
+    const resolvedTheme = theme ?? CARD_THEMES.noturno;
     return (
       <div
         ref={ref}
-        className="relative flex flex-col overflow-hidden rounded-none border border-white/10 bg-[#0f0a1a] text-white shadow-2xl"
+        className="relative flex flex-col overflow-hidden rounded-none border border-white/10 text-white shadow-2xl"
         style={{
           width: SHARE_CARD_WIDTH,
           height: SHARE_CARD_HEIGHT,
           boxSizing: "border-box",
           fontFamily: "system-ui, 'Segoe UI', sans-serif",
+          backgroundColor: resolvedTheme.bg,
         }}
       >
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.55]"
           aria-hidden
-          style={{
-            background:
-              "radial-gradient(ellipse 80% 60% at 50% -10%, rgba(147, 112, 219, 0.35), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 80%, rgba(14, 165, 233, 0.18), transparent 50%)",
-          }}
+          style={{ background: resolvedTheme.gradient }}
         />
 
         <div className="relative z-[1] flex flex-1 flex-col px-14 pb-12 pt-14">
@@ -89,9 +115,11 @@ const ShareableMomentCardInner = forwardRef<HTMLDivElement, ShareableMomentCardP
           ) : null}
 
           <div className="mt-10 flex flex-1 flex-col items-center justify-start">
-            <div className="rounded-full bg-black/25 p-4 ring-2 ring-white/15 shadow-inner">
-              <NatalChartWheel data={wheelData} size={wheelSize} reduceMotion />
-            </div>
+            {showWheel ? (
+              <div className="rounded-full bg-black/25 p-4 ring-2 ring-white/15 shadow-inner">
+                <NatalChartWheel data={wheelData} size={wheelSize} reduceMotion />
+              </div>
+            ) : null}
 
             {quoteLines.length > 0 ? (
               <blockquote className="mt-10 max-w-[920px] text-center font-display text-[34px] font-normal italic leading-[1.35] text-violet-100/95">

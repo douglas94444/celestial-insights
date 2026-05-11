@@ -23,5 +23,6 @@ export function useChartsListQuery() {
     queryKey: [...chartsQueryKeyBase, user?.id] as const,
     queryFn: fetchChartsList,
     enabled: !!user,
+    staleTime: 60_000,
   });
 }

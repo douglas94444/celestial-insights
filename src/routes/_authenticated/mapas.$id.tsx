@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useProfile } from "@/hooks/use-profile";
@@ -59,6 +59,7 @@ import {
 import { deleteChartFn, recalculateChartFn } from "@/lib/charts.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
+import { useAiQuota } from "@/hooks/use-ai-quota";
 import { tryParseStoredChartGeometry } from "@/lib/schemas/chart-payload";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, recordAiEngagement } from "@/lib/engagement";
@@ -370,10 +371,14 @@ const AspectosTab = memo(function AspectosTab({
 
 export const Route = createFileRoute("/_authenticated/mapas/$id")({
   component: ChartView,
+  validateSearch: (search: Record<string, unknown>): { new?: boolean } => ({
+    ...(search.new != null ? { new: search.new === true || search.new === "true" } : {}),
+  }),
 });
 
 function ChartView() {
   const { id } = Route.useParams();
+  const { new: isNewChart } = useSearch({ from: "/_authenticated/mapas/$id" });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session, user } = useAuth();
@@ -387,6 +392,7 @@ function ChartView() {
   );
 
   const { data: profile } = useProfile();
+  const aiQuota = useAiQuota();
 
   const [aspectFilter, setAspectFilter] = useState<"todos" | "harmonicos" | "desafiadores">(
     "todos",
@@ -644,6 +650,40 @@ function ChartView() {
     <div className="container mx-auto p-6 max-w-6xl">
       <BackToDashboardLink buttonClassName="mb-4" />
 
+      {isNewChart && (
+        <Card className="mb-6 border-primary/30 bg-primary/5">
+          <CardContent className="p-4">
+            <p className="font-display font-semibold text-sm mb-3 flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Mapa criado! O que fazer agora:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <Button asChild variant="outline" size="sm" className="justify-start">
+                <Link to="/transitos">
+                  <ChevronDown className="mr-1 h-4 w-4 rotate-270 text-primary" />
+                  Ver trânsitos do dia
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="justify-start">
+                <Link to="/momento">
+                  <Sparkles className="mr-1 h-4 w-4 text-primary" />
+                  Abrir Momento e partilhar
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="justify-start"
+                onClick={() => setAiExecOpen(true)}
+              >
+                <Sparkles className="mr-1 h-4 w-4 text-primary" />
+                Interpretar mapa com IA
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
           <h1 className="font-display text-3xl font-bold">{chart.name}</h1>
@@ -738,14 +778,16 @@ function ChartView() {
             <CollapsibleContent className="mt-4 space-y-3">
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Camada opcional que complementa os textos fixos desta página. Se o serviço de IA
-                falhar, continue a usar as interpretações estáticas.{" "}
-                {profile?.subscription_tier === "FREE" ? (
-                  <span>
-                    No plano gratuito aplicam-se limites mensais de gerações novas (consulte a
-                    documentação do ambiente).
-                  </span>
-                ) : null}
+                falhar, continue a usar as interpretações estáticas.
               </p>
+              {aiQuota && !aiQuota.isPremium ? (
+                <p className={`text-xs font-medium ${aiQuota.nearLimit ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                  {aiQuota.used}/{aiQuota.limit} interpretações mensais usadas
+                  {aiQuota.remaining === 0 ? (
+                    <> · <Link to="/premium" className="text-primary underline underline-offset-2">Upgrade para ilimitado</Link></>
+                  ) : null}
+                </p>
+              ) : null}
               <AiButton
                 isPending={aiExecutiveMutation.isPending}
                 onClick={() => aiExecutiveMutation.mutate()}

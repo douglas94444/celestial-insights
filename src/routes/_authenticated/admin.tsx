@@ -8,6 +8,7 @@ import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserIsAdmin } from "@/hooks/use-user-is-admin";
+import { AdminInstagramSignCards } from "@/components/AdminInstagramSignCards";
 
 const SUPABASE_PROJECT_REF =
   import.meta.env.VITE_SUPABASE_URL?.replace(/^https?:\/\//, "").split(".")[0] ?? "";
@@ -151,6 +152,8 @@ function AdminPage() {
           <p className="text-sm text-muted-foreground">Não foi possível carregar as métricas.</p>
         )}
       </div>
+
+      <AdminInstagramSignCards />
     </div>
   );
 }

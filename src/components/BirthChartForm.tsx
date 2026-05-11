@@ -112,7 +112,6 @@ export interface BirthChartFormProps {
   setPrimary: boolean;
   defaultName?: string;
   onSuccess: (chartId: string, displayName: string) => void | Promise<void>;
-  onBusinessError?: (code: string, message: string) => void;
   onSubmittingChange?: (loading: boolean) => void;
 }
 
@@ -122,7 +121,6 @@ export function BirthChartForm({
   setPrimary,
   defaultName = "",
   onSuccess,
-  onBusinessError,
   onSubmittingChange,
 }: BirthChartFormProps) {
   const form = useForm<FormValues>({
@@ -157,18 +155,6 @@ export function BirthChartForm({
       await onSuccess(result.chart.id, values.name.trim());
     } catch (e: unknown) {
       const msg = await getServerFnErrorMessage(e);
-      let code = "";
-      if (e instanceof Response) {
-        try {
-          const j = (await e.clone().json()) as { code?: string };
-          code = j.code ?? "";
-        } catch {
-          /* ignore */
-        }
-      }
-      if (code === "FREE_LIMIT") {
-        onBusinessError?.(code, msg);
-      }
       toast.error(msg);
     } finally {
       onSubmittingChange?.(false);

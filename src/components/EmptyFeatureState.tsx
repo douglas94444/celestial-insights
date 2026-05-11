@@ -40,7 +40,9 @@ export function EmptyFeatureState({
               <Button
                 asChild
                 variant={primaryCta.variant ?? "default"}
-                className={primaryCta.variant == null ? "bg-mystical text-white hover:opacity-90" : ""}
+                className={
+                  primaryCta.variant == null ? "bg-mystical text-white hover:opacity-90" : ""
+                }
               >
                 <Link to={primaryCta.to}>{primaryCta.label}</Link>
               </Button>

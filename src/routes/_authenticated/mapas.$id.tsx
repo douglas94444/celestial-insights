@@ -538,6 +538,8 @@ function ChartView() {
         ...withSupabaseAuth(session),
       });
     },
+    onMutate: () => toast.loading("Gerando sua leitura...", { id: "ai-gen" }),
+    onSettled: () => toast.dismiss("ai-gen"),
     onSuccess: (r) => {
       setAiExecutiveText(r.content);
       setAiExecutiveCachedAt(r.cached ? (r.cached_at ?? null) : null);
@@ -781,10 +783,18 @@ function ChartView() {
                 falhar, continue a usar as interpretações estáticas.
               </p>
               {aiQuota && !aiQuota.isPremium ? (
-                <p className={`text-xs font-medium ${aiQuota.nearLimit ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
+                <p
+                  className={`text-xs font-medium ${aiQuota.nearLimit ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}
+                >
                   {aiQuota.used}/{aiQuota.limit} interpretações mensais usadas
                   {aiQuota.remaining === 0 ? (
-                    <> · <Link to="/premium" className="text-primary underline underline-offset-2">Upgrade para ilimitado</Link></>
+                    <>
+                      {" "}
+                      ·{" "}
+                      <Link to="/premium" className="text-primary underline underline-offset-2">
+                        Upgrade para ilimitado
+                      </Link>
+                    </>
                   ) : null}
                 </p>
               ) : null}

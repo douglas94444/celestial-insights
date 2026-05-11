@@ -171,6 +171,8 @@ function TransitosPage() {
         ...withSupabaseAuth(session),
       });
     },
+    onMutate: () => toast.loading("Gerando sua leitura...", { id: "ai-gen" }),
+    onSettled: () => toast.dismiss("ai-gen"),
     onSuccess: (r) => {
       setTransitAiText(r.content);
       recordAiEngagement(supabase, user?.id, {

@@ -96,7 +96,7 @@ function Dashboard() {
     },
     enabled: !!session && !!primary?.id && rollout !== null && rollout.gates.annualForecast,
     staleTime: 24 * 60 * 60 * 1000,
-    retry: false,
+    retry: 1,
   });
 
   const currentMonthForecast = useMemo(() => {

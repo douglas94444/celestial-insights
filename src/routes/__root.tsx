@@ -22,6 +22,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Descubra seu mapa astral, interpretações dos planetas, casas e aspectos. Astrologia moderna em português.",
       },
+      { property: "og:title", content: "AstroMap — Seu Mapa Astral Completo" },
+      { name: "twitter:title", content: "AstroMap — Seu Mapa Astral Completo" },
+      { name: "description", content: "A modern astrology platform for detailed birth charts, compatibility analysis, and planetary transit tracking." },
+      { property: "og:description", content: "A modern astrology platform for detailed birth charts, compatibility analysis, and planetary transit tracking." },
+      { name: "twitter:description", content: "A modern astrology platform for detailed birth charts, compatibility analysis, and planetary transit tracking." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ce4c0761-7274-484b-9faf-89110fb77a8e/id-preview-6a518360--d4e8693b-554a-4129-b5e5-8110d5012555.lovable.app-1778457821294.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ce4c0761-7274-484b-9faf-89110fb77a8e/id-preview-6a518360--d4e8693b-554a-4129-b5e5-8110d5012555.lovable.app-1778457821294.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:type", content: "website" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

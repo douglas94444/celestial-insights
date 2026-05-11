@@ -447,7 +447,7 @@ function ChartView() {
             </TabsList>
 
             <TabsContent value="essencia" className="space-y-5 mt-4">
-              {chartEssence!.sun && (
+              {chartEssence?.sun && (
                 <Card>
                   <CardContent className="p-5">
                     <h3 className="font-display text-lg font-semibold">
@@ -462,7 +462,7 @@ function ChartView() {
                   </CardContent>
                 </Card>
               )}
-              {chartEssence!.moon && (
+              {chartEssence?.moon && (
                 <Card>
                   <CardContent className="p-5">
                     <h3 className="font-display text-lg font-semibold">

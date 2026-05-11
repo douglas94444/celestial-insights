@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchChartsList } from "@/hooks/use-charts-list";
 import { fetchProfile } from "@/hooks/use-profile";
@@ -10,7 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { AiButton } from "@/components/AiButton";
 import { AiTextCard } from "@/components/AiTextCard";
 import { TransitScoreBadges } from "@/components/TransitScoreBadges";
-import { NatalChartWheel } from "@/components/NatalChartWheel";
+import { Skeleton } from "@/components/ui/skeleton";
+const NatalChartWheel = lazy(() =>
+  import("@/components/NatalChartWheel").then((m) => ({ default: m.NatalChartWheel })),
+);
 import { useDailyMoment } from "@/hooks/use-daily-moment";
 import { useAuth } from "@/hooks/use-auth";
 import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS } from "@/lib/engagement";
@@ -155,7 +158,9 @@ function Dashboard() {
             </CardHeader>
             <CardContent className="flex flex-col gap-6 md:flex-row md:items-start">
               <div className="mx-auto shrink-0 origin-top scale-[0.92] md:mx-0 md:scale-100">
-                <NatalChartWheel data={wheelData} size={280} />
+                <Suspense fallback={<Skeleton className="size-[280px] rounded-full" />}>
+                  <NatalChartWheel data={wheelData} size={280} />
+                </Suspense>
               </div>
               <div className="flex-1 space-y-3">
                 <p className="font-display text-xl font-semibold">{primary.name}</p>

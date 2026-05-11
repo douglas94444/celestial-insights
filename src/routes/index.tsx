@@ -31,6 +31,7 @@ export const Route = createFileRoute("/")({
           "Mapa natal, trânsitos personalizados e sinastria com leituras em PT-BR. Planos Mensal e Anual; checkout em preparação.",
       },
     ],
+    links: [{ rel: "prefetch", href: "/auth" }],
   }),
   component: Landing,
 });

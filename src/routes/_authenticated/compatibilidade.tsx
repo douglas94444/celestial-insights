@@ -32,7 +32,10 @@ import {
 } from "@/components/ui/select";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AiCacheAgeBadgeFromResult } from "@/components/AiCacheAgeBadge";
-import { SynastryBiWheel } from "@/components/SynastryBiWheel";
+import { Skeleton } from "@/components/ui/skeleton";
+const SynastryBiWheel = lazy(() =>
+  import("@/components/SynastryBiWheel").then((m) => ({ default: m.SynastryBiWheel })),
+);
 import { supabase } from "@/integrations/supabase/client";
 import type { ChartData } from "@/lib/astrology/calculate";
 import type {
@@ -611,11 +614,17 @@ function CompatibilidadePage() {
               <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
                 <div className="space-y-4">
                   <div className="-mx-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:overflow-visible">
-                    <SynastryBiWheel
-                      baseChart={activeView.baseChart}
-                      overlayChart={activeView.overlayChart}
-                      synastryAspects={activeView.analysis.aspects}
-                    />
+                    <Suspense
+                      fallback={
+                        <Skeleton className="aspect-square w-full max-w-[380px] rounded-full" />
+                      }
+                    >
+                      <SynastryBiWheel
+                        baseChart={activeView.baseChart}
+                        overlayChart={activeView.overlayChart}
+                        synastryAspects={activeView.analysis.aspects}
+                      />
+                    </Suspense>
                   </div>
                   <p className="text-center text-xs text-muted-foreground">
                     Círculos claros com contorno lilás: primeiro mapa · Círculos esverdeados:

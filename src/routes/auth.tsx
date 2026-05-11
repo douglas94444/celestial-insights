@@ -105,14 +105,25 @@ function SignInForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) {
-      toast.error(error.message);
+      if (error.message.toLowerCase().includes("email not confirmed")) {
+        toast.error("Confirme o seu email antes de entrar", {
+          description: "Abra o link enviado para o seu email. Verifique também o spam.",
+          duration: 10000,
+        });
+      } else {
+        toast.error(error.message);
+      }
+      return;
+    }
+    if (!data.session) {
+      toast.error("Sessão não criada. Tente novamente.");
       return;
     }
     toast.success("Bem-vindo de volta!");
-    navigate({ to: "/dashboard" });
+    navigate({ to: "/dashboard", replace: true });
   }
 
   return (

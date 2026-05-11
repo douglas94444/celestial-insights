@@ -612,7 +612,7 @@ function TransitosPage() {
               </p>
             ) : (
               <Accordion type="multiple" className="w-full border rounded-lg px-2">
-                {annualForecastQuery.data.months.map((m) => (
+                {annualForecastQuery.data!.months.map((m) => (
                   <AccordionItem key={m.month} value={`m-${m.month}`}>
                     <AccordionTrigger className="text-left hover:no-underline">
                       <span className="flex flex-1 flex-wrap items-center gap-3">

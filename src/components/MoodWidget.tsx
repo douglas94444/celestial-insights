@@ -212,8 +212,8 @@ export function MoodWidget({ chartId, todayStr, viewYmd }: MoodWidgetProps) {
                   <YAxis domain={[1, 10]} tick={{ fontSize: 10 }} width={28} />
                   <Tooltip
                     contentStyle={{ fontSize: 12 }}
-                    formatter={(value: number | undefined, name: string) => [
-                      value ?? "—",
+                    formatter={(value, name) => [
+                      (value as number | undefined) ?? "—",
                       name === "humor" ? "Humor" : "Trânsitos /10",
                     ]}
                   />

@@ -57,7 +57,7 @@ export function AppSidebar() {
   const showAdmin = adminGate.data === true;
 
   const navItems = useMemo(() => {
-    const adminEntry = { title: "Administração", url: "/admin", icon: Shield };
+    const adminEntry: NavItem = { title: "Administração", url: "/admin", icon: Shield };
     return [...items.slice(0, 5), ...(showAdmin ? [adminEntry] : []), ...items.slice(5)];
   }, [showAdmin]);
 

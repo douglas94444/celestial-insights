@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type Props = {
+interface Props {
   /** Texto após a seta (ex.: «Voltar»). */
   label?: string;
   className?: string;
@@ -14,7 +14,7 @@ type Props = {
   size?: ComponentProps<typeof Button>["size"];
   /** Se false, não usa `Button` — só o link estilizado (ex.: Momento). */
   asButton?: boolean;
-};
+}
 
 /** Link consistente para o painel principal (`/dashboard`). */
 export function BackToDashboardLink({

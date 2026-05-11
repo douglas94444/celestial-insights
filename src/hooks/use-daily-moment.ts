@@ -1,4 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useChartsListQuery } from "@/hooks/use-charts-list";
+import { useProfile } from "@/hooks/use-profile";
 import { useEffect, useMemo, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -60,31 +62,9 @@ export function useDailyMoment() {
   const [dashTransitAiCachedAt, setDashTransitAiCachedAt] = useState<string | null>(null);
   const [morningDeepCachedAt, setMorningDeepCachedAt] = useState<string | null>(null);
 
-  const { data: profile } = useQuery({
-    queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user!.id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: profile } = useProfile();
 
-  const { data: charts = [], isLoading: chartsLoading } = useQuery({
-    queryKey: ["charts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("charts").select("*").order("created_at", {
-        ascending: false,
-      });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: charts = [], isLoading: chartsLoading } = useChartsListQuery();
 
   const primary = charts.find((c) => c.is_primary) ?? charts[0];
 
@@ -305,3 +285,5 @@ export function useDailyMoment() {
     formatWeekdayShort: formatTransitWeekdayShort,
   };
 }
+
+export type DailyMomentResult = ReturnType<typeof useDailyMoment>;

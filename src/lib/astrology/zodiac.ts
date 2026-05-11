@@ -55,3 +55,7 @@ export function formatDegree(lon: number): string {
   const m = Math.floor((deg - d) * 60);
   return `${d}° ${m.toString().padStart(2, "0")}'`;
 }
+
+export function getPlanetName(key: PlanetKey): string {
+  return PLANETS.find((p) => p.key === key)?.name ?? key;
+}

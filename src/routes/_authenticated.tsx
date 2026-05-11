@@ -8,15 +8,34 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { hasSupabaseSessionCookie } from "@/lib/supabase-auth-server";
 
+function AuthenticatedErrorFallback() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
+      <p className="text-muted-foreground">Não foi possível carregar a sessão.</p>
+      <a href="/" className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground">
+        Voltar ao início
+      </a>
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/_authenticated")({
+  errorComponent: AuthenticatedErrorFallback,
   beforeLoad: async () => {
-    if (typeof window !== "undefined") {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) throw redirect({ to: "/auth" });
-      return;
+    try {
+      if (typeof window !== "undefined") {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) throw redirect({ to: "/auth" });
+        return;
+      }
+      const ok = await hasSupabaseSessionCookie();
+      if (!ok) throw redirect({ to: "/auth" });
+    } catch (e) {
+      // Re-throw TanStack Router redirect objects
+      if (e != null && typeof e === "object" && ("href" in e || "statusCode" in e)) throw e;
+      // Network or unexpected error → redirect to auth
+      throw redirect({ to: "/auth" });
     }
-    const ok = await hasSupabaseSessionCookie();
-    if (!ok) throw redirect({ to: "/auth" });
   },
   component: AuthenticatedLayout,
 });

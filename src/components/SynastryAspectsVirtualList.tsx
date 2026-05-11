@@ -3,19 +3,14 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { SynastryAspectRow } from "@/components/SynastryAspectRow";
 import { ASPECT_LABELS, aspectMood } from "@/data/chart-detail-interpretations";
 import type { SynastryCrossAspect } from "@/lib/astrology/synastry";
-import { PLANETS } from "@/lib/astrology/zodiac";
-import type { PlanetKey } from "@/lib/astrology/zodiac";
+import { getPlanetName } from "@/lib/astrology/zodiac";
 
 const ROW_ESTIMATE_PX = 72;
 
-function planetLabel(key: PlanetKey) {
-  return PLANETS.find((p) => p.key === key)?.name ?? key;
-}
-
-type Props = {
+interface Props {
   aspects: SynastryCrossAspect[];
   className?: string;
-};
+}
 
 export function SynastryAspectsVirtualList({ aspects, className }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
@@ -44,8 +39,8 @@ export function SynastryAspectsVirtualList({ aspects, className }: Props) {
               style={{ transform: `translateY(${vi.start}px)` }}
             >
               <SynastryAspectRow
-                planet1Label={planetLabel(a.planet1)}
-                planet2Label={planetLabel(a.planet2)}
+                planet1Label={getPlanetName(a.planet1)}
+                planet2Label={getPlanetName(a.planet2)}
                 typeLabel={label}
                 orb={a.orb}
                 mood={mood}

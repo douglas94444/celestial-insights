@@ -84,7 +84,3 @@ export function upsertMomentHistory(entry: MomentHistorySnapshot): void {
     /* quota */
   }
 }
-
-export function getMomentHistoryEntry(visitYmd: string): MomentHistorySnapshot | undefined {
-  return loadMomentHistory().find((e) => e.visitYmd === visitYmd);
-}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
-import { useEffect } from "react";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -26,12 +25,13 @@ async function signInWithGoogle() {
 
 function AuthPage() {
   const { user, loading } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!loading && user) {
-      window.location.replace("/dashboard");
+      void navigate({ to: "/dashboard", replace: true });
     }
-  }, [user, loading]);
+  }, [user, loading, navigate]);
 
   return (
     <div className="min-h-screen bg-cosmic text-white starfield grid place-items-center px-4 py-10">
@@ -99,6 +99,7 @@ function SignInForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -125,7 +126,7 @@ function SignInForm() {
       .from("charts")
       .select("id", { count: "exact", head: true })
       .eq("user_id", data.session.user.id);
-    window.location.assign((count ?? 0) > 0 ? "/dashboard" : "/onboarding");
+    void navigate({ to: (count ?? 0) > 0 ? "/dashboard" : "/onboarding", replace: true });
   }
 
   return (

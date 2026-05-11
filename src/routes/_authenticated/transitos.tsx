@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -52,12 +52,11 @@ import { calculateTransitsFn } from "@/lib/transits.functions";
 import { sendTransitDigestEmailFn } from "@/lib/email.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
-import {
-  ENGAGEMENT_ROUTES,
-  ENGAGEMENT_TOPICS,
-  insertEngagementEventDeduped,
-  recordAiEngagement,
-} from "@/lib/engagement";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, recordAiEngagement } from "@/lib/engagement";
+import { usePageEngagement } from "@/hooks/use-page-engagement";
+import { AiButton } from "@/components/AiButton";
+import { AiTextCard } from "@/components/AiTextCard";
+import { TransitScoreBadges } from "@/components/TransitScoreBadges";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import {
   filterAspectsByFastTransit,
@@ -65,7 +64,7 @@ import {
   formatTransitDayTitle,
 } from "@/lib/astrology/transits";
 import { ASPECT_LABELS } from "@/data/chart-detail-interpretations";
-import { PLANETS } from "@/lib/astrology/zodiac";
+import { getPlanetName } from "@/lib/astrology/zodiac";
 import type { PlanetKey } from "@/lib/astrology/zodiac";
 
 export const Route = createFileRoute("/_authenticated/transitos")({
@@ -74,21 +73,11 @@ export const Route = createFileRoute("/_authenticated/transitos")({
 
 const PERSONAL: PlanetKey[] = ["sun", "moon", "mercury", "venus", "mars"];
 
-function planetLabel(key: PlanetKey) {
-  return PLANETS.find((p) => p.key === key)?.name ?? key;
-}
-
 function TransitosPage() {
   const { session, user } = useAuth();
   const qc = useQueryClient();
 
-  useEffect(() => {
-    if (!user?.id) return;
-    insertEngagementEventDeduped(supabase, user.id, {
-      route_key: ENGAGEMENT_ROUTES.transitos,
-      topic_key: ENGAGEMENT_TOPICS.transitos_open,
-    });
-  }, [user?.id]);
+  usePageEngagement(ENGAGEMENT_ROUTES.transitos, ENGAGEMENT_TOPICS.transitos_open);
 
   const [chartId, setChartId] = useState("");
   const [rangePreset, setRangePreset] = useState<"30" | "60" | "90">("30");
@@ -193,6 +182,10 @@ function TransitosPage() {
     if (natalPersonalOnly) list = filterAspectsByPersonalNatal(list);
     return list;
   }, [selectedPayload, majorOnly, fastTransitOnly, natalPersonalOnly]);
+
+  const handleRefreshTransits = useCallback(() => {
+    qc.invalidateQueries({ queryKey: ["transits", chartId, startDate, endDate] });
+  }, [qc, chartId, startDate, endDate]);
 
   async function exportPdf() {
     if (!transitsQuery.data || days.length === 0) {
@@ -330,11 +323,7 @@ function TransitosPage() {
                         variant="secondary"
                         size="sm"
                         disabled={!chartId || transitsQuery.isFetching}
-                        onClick={() =>
-                          qc.invalidateQueries({
-                            queryKey: ["transits", chartId, startDate, endDate],
-                          })
-                        }
+                        onClick={handleRefreshTransits}
                       >
                         <RefreshCw
                           className={`mr-1 h-4 w-4 ${transitsQuery.isFetching ? "animate-spin" : ""}`}
@@ -451,17 +440,7 @@ function TransitosPage() {
                         </Button>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="text-[10px]">
-                          Humor {selectedPayload.scores.humor}/100
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px]">
-                          Relações {selectedPayload.scores.amor}/100
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px]">
-                          Trabalho {selectedPayload.scores.trabalho}/100
-                        </Badge>
-                      </div>
+                      <TransitScoreBadges scores={selectedPayload.scores} />
 
                       <div className="rounded-lg bg-muted/40 p-4 space-y-2">
                         <p className="text-xs font-medium uppercase text-muted-foreground">
@@ -495,26 +474,19 @@ function TransitosPage() {
                           Complementa a leitura rápida acima; em caso de erro, continue a usar as
                           listas estáticas.
                         </p>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          disabled={transitAiMutation.isPending}
-                          aria-label="Pedir explicação em linguagem simples para o dia seleccionado"
+                        <AiButton
+                          isPending={transitAiMutation.isPending}
                           onClick={() => transitAiMutation.mutate()}
-                        >
-                          {transitAiMutation.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Sparkles className="mr-2 h-4 w-4" />
-                          )}
-                          Explicar este dia em linguagem simples
-                        </Button>
+                          label="Explicar este dia em linguagem simples"
+                          aria-label="Pedir explicação em linguagem simples para o dia seleccionado"
+                          variant="secondary"
+                        />
                         {transitAiText ? (
-                          <article className="space-y-2 border-t border-border/60 pt-3 text-sm leading-relaxed whitespace-pre-wrap text-foreground/90">
-                            <AiCacheAgeBadgeFromResult result={transitAiMutation.data} />
-                            {transitAiText}
-                          </article>
+                          <AiTextCard
+                            text={transitAiText}
+                            badge={<AiCacheAgeBadgeFromResult result={transitAiMutation.data} />}
+                            className="space-y-2 border-t border-border/60 pt-3 text-sm"
+                          />
                         ) : null}
                       </div>
 
@@ -528,9 +500,9 @@ function TransitosPage() {
                               key={`${a.planet1}-${a.planet2}-${a.type}-${idx}`}
                               className="rounded-md border border-border/60 bg-card/50 px-3 py-2"
                             >
-                              <span className="font-medium">{planetLabel(a.planet1)}</span> em
+                              <span className="font-medium">{getPlanetName(a.planet1)}</span> em
                               trânsito <span className="text-primary">{ASPECT_LABELS[a.type]}</span>{" "}
-                              <span className="font-medium">{planetLabel(a.planet2)}</span> natal
+                              <span className="font-medium">{getPlanetName(a.planet2)}</span> natal
                               <span className="text-muted-foreground"> · orbe {a.orb}°</span>
                             </li>
                           ))}
@@ -611,7 +583,10 @@ function TransitosPage() {
                 {(annualForecastQuery.error as Error)?.message ?? "Erro ao calcular a vista anual."}
               </p>
             ) : !annualForecastQuery.data?.months?.length ? (
-              <p className="text-sm text-muted-foreground">Sem dados para o ano selecionado.</p>
+              <p className="text-sm text-muted-foreground">
+                Não foi possível gerar a previsão anual para este mapa e ano. Verifique se o mapa
+                tem data de nascimento completa e tente recalcular.
+              </p>
             ) : (
               <Accordion type="multiple" className="w-full border rounded-lg px-2">
                 {annualForecastQuery.data.months.map((m) => (
@@ -657,8 +632,8 @@ function TransitosPage() {
                           <ul className="text-sm space-y-1">
                             {m.ingresses.map((ing) => (
                               <li key={`${ing.planet}-${ing.date}`}>
-                                <span className="font-medium">{planetLabel(ing.planet)}</span> entra
-                                em {ing.intoSign}{" "}
+                                <span className="font-medium">{getPlanetName(ing.planet)}</span>{" "}
+                                entra em {ing.intoSign}{" "}
                                 <span className="text-muted-foreground">
                                   (
                                   {format(new Date(`${ing.date}T12:00:00.000Z`), "d MMM", {
@@ -679,7 +654,7 @@ function TransitosPage() {
                           <ul className="text-sm space-y-1">
                             {m.retrogradePeriods.map((r, idx) => (
                               <li key={`${r.planet}-${r.startDate}-${idx}`}>
-                                <span className="font-medium">{planetLabel(r.planet)}</span>:{" "}
+                                <span className="font-medium">{getPlanetName(r.planet)}</span>:{" "}
                                 {r.startDate === r.endDate ? (
                                   r.startDate
                                 ) : (

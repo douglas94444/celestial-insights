@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { addDays, format, parseISO, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -26,15 +26,19 @@ import { toastServerFnError } from "@/lib/toast-server-fn-error";
 
 const EMOTIONS = ["calmo", "ansioso", "energizado", "cansado", "focado", "melancólico"] as const;
 
-type MoodWidgetProps = {
+interface MoodWidgetProps {
   chartId: string;
   /** Dia civil SP «hoje» — ancora da janela de histórico. */
   todayStr: string;
   /** Dia que o utilizador está a ver no Momento (pode ser histórico). */
   viewYmd: string;
-};
+}
 
-export function MoodWidget({ chartId, todayStr, viewYmd }: MoodWidgetProps) {
+export const MoodWidget = memo(function MoodWidget({
+  chartId,
+  todayStr,
+  viewYmd,
+}: MoodWidgetProps) {
   const { session } = useAuth();
   const qc = useQueryClient();
   const [score, setScore] = useState([5]);
@@ -116,9 +120,9 @@ export function MoodWidget({ chartId, todayStr, viewYmd }: MoodWidgetProps) {
 
   const showChart = chartWindow.moodCount14 >= 7;
 
-  function toggleChip(e: string) {
+  const toggleChip = useCallback((e: string) => {
     setChips((prev) => (prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]));
-  }
+  }, []);
 
   const isTodayView = viewYmd === todayStr;
 
@@ -255,4 +259,4 @@ export function MoodWidget({ chartId, todayStr, viewYmd }: MoodWidgetProps) {
       </CardContent>
     </Card>
   );
-}
+});

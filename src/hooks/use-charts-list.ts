@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
 import type { Database } from "@/integrations/supabase/types";
 
 export type ChartRow = Database["public"]["Tables"]["charts"]["Row"];
 
-export const chartsListQueryKey = ["charts-list"] as const;
+export const chartsQueryKeyBase = ["charts"] as const;
 
 export async function fetchChartsList(): Promise<ChartRow[]> {
   const { data, error } = await supabase
@@ -15,10 +16,12 @@ export async function fetchChartsList(): Promise<ChartRow[]> {
   return data;
 }
 
-/** Lista global de mapas (mesma key em mapas, compatibilidade, trânsitos). */
+/** Lista global de mapas — chave inclui userId para isolar cache entre sessões. */
 export function useChartsListQuery() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: chartsListQueryKey,
+    queryKey: [...chartsQueryKeyBase, user?.id] as const,
     queryFn: fetchChartsList,
+    enabled: !!user,
   });
 }

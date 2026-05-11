@@ -33,8 +33,11 @@ export function monthYmds(year: number, month: number): string[] {
 }
 
 function addDaysToYmd(ymd: string, deltaDays: number): string {
-  const [y, m, d] = ymd.split("-").map(Number);
-  const t = Date.UTC(y!, m! - 1, d! + deltaDays);
+  const parts = ymd.split("-").map(Number);
+  const y = parts[0] ?? 2000;
+  const m = parts[1] ?? 1;
+  const d = parts[2] ?? 1;
+  const t = Date.UTC(y, m - 1, d + deltaDays);
   const dt = new Date(t);
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }

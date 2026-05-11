@@ -1,5 +1,5 @@
 import type { Aspect, AspectType, ChartData, PlanetPosition } from "@/lib/astrology/calculate";
-import { PLANETS, SIGNS, type PlanetKey, type SignName } from "@/lib/astrology/zodiac";
+import { getPlanetName, SIGNS, type PlanetKey, type SignName } from "@/lib/astrology/zodiac";
 
 export type DominantElement = "FOGO" | "TERRA" | "AR" | "ÁGUA";
 export type DominantModality = "CARDINAL" | "FIXO" | "MUTÁVEL";
@@ -132,7 +132,7 @@ export function findStelliums(planets: PlanetPosition[]): StelliumInfo[] {
 }
 
 /** Heurística simples de ocupação em longitude e hemisférios pelo Ascendente. */
-export function chartShapeLabel(data: ChartData): string {
+function chartShapeLabel(data: ChartData): string {
   const asc = data.ascendant;
   const westernStart = (asc + 90) % 360;
   const easternEnd = (asc + 270) % 360;
@@ -179,7 +179,7 @@ function mcSign(data: ChartData): SignName {
   return SIGNS[idx].name;
 }
 
-export function lifePurposeHeuristic(data: ChartData): string {
+function lifePurposeHeuristic(data: ChartData): string {
   const nn = planet(data, "north_node");
   const mc = mcSign(data);
   if (nn) {
@@ -196,7 +196,7 @@ function isSoft(t: Aspect["type"]): boolean {
   return t === "trigono" || t === "sextil";
 }
 
-export function mainChallengesFromAspects(aspects: Aspect[], limit = 5): string[] {
+function mainChallengesFromAspects(aspects: Aspect[], limit = 5): string[] {
   const scored = aspects.filter((a) => isHard(a.type)).sort((a, b) => a.orb - b.orb);
   const lines: string[] = [];
   const seen = new Set<string>();
@@ -212,7 +212,7 @@ export function mainChallengesFromAspects(aspects: Aspect[], limit = 5): string[
   return lines;
 }
 
-export function naturalTalentsFromAspects(aspects: Aspect[], limit = 5): string[] {
+function naturalTalentsFromAspects(aspects: Aspect[], limit = 5): string[] {
   const scored = aspects.filter((a) => isSoft(a.type)).sort((a, b) => a.orb - b.orb);
   const lines: string[] = [];
   const seen = new Set<string>();
@@ -324,7 +324,7 @@ export function detectGrandTrines(
   return out;
 }
 
-export function detectTSquares(aspects: Aspect[], planetKeys: PlanetKey[]): TSquarePattern[] {
+function detectTSquares(aspects: Aspect[], planetKeys: PlanetKey[]): TSquarePattern[] {
   const lookup = buildAspectLookup(aspects);
   const keys = [...new Set(planetKeys)];
   const seen = new Set<string>();
@@ -361,7 +361,7 @@ function angularSepDegrees(lon1: number, lon2: number): number {
 const YOD_QUINCUNX_ORB = 3;
 const YOD_SEXTILE_ORB = 4;
 
-export function detectYods(planets: PlanetPosition[]): YodPattern[] {
+function detectYods(planets: PlanetPosition[]): YodPattern[] {
   const keys = planets.map((p) => p.key);
   const lon = (k: PlanetKey) => planets.find((p) => p.key === k)?.longitude ?? 0;
   const seen = new Set<string>();
@@ -407,10 +407,7 @@ function permutations4(arr: PlanetKey[]): PlanetKey[][] {
   return permuteKeys(arr);
 }
 
-export function detectGrandCrosses(
-  aspects: Aspect[],
-  planetKeys: PlanetKey[],
-): GrandCrossPattern[] {
+function detectGrandCrosses(aspects: Aspect[], planetKeys: PlanetKey[]): GrandCrossPattern[] {
   const lookup = buildAspectLookup(aspects);
   const uniq = [...new Set(planetKeys)].sort((x, y) => x.localeCompare(y));
   const seen = new Set<string>();
@@ -453,7 +450,7 @@ export function detectGrandCrosses(
 }
 
 export function planetKeysLabelPt(keys: PlanetKey[]): string {
-  return keys.map((k) => PLANETS.find((p) => p.key === k)?.name ?? k).join(", ");
+  return keys.map(getPlanetName).join(", ");
 }
 
 export const SPECIAL_GEOMETRY_BLURBS = {

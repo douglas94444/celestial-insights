@@ -29,9 +29,11 @@ export async function completeChat(system, user, opts?) {
   if (!primary) throw new Error("LLM não configurado: defina ANTHROPIC_API_KEY ou OPENAI_API_KEY.");
 
   const fallback: AiProviderId | null =
-    primary === "anthropic" && process.env.OPENAI_API_KEY ? "openai"
-    : primary === "openai" && process.env.ANTHROPIC_API_KEY ? "anthropic"
-    : null;
+    primary === "anthropic" && process.env.OPENAI_API_KEY
+      ? "openai"
+      : primary === "openai" && process.env.ANTHROPIC_API_KEY
+        ? "anthropic"
+        : null;
 
   const run = (p: AiProviderId) =>
     p === "anthropic" ? completeAnthropic(system, user, opts) : completeOpenAI(system, user, opts);
@@ -40,10 +42,14 @@ export async function completeChat(system, user, opts?) {
     return await run(primary);
   } catch (primaryErr) {
     if (!fallback) throw primaryErr;
-    console.warn(JSON.stringify({
-      aiFallback: true, from: primary, to: fallback,
-      reason: (primaryErr as Error)?.message?.slice(0, 200),
-    }));
+    console.warn(
+      JSON.stringify({
+        aiFallback: true,
+        from: primary,
+        to: fallback,
+        reason: (primaryErr as Error)?.message?.slice(0, 200),
+      }),
+    );
     try {
       return await run(fallback);
     } catch (fallbackErr) {

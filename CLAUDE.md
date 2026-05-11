@@ -45,22 +45,22 @@ TanStack Router with file-based routes. **`src/routeTree.gen.ts` is auto-generat
 
 Rotas em `src/routes/`. Textos de UI em **PT-BR**. Nome comercial na app: **AstroMap**.
 
-| Rota | Ficheiro | O que faz |
-|------|----------|-----------|
-| `/` | `index.tsx` | Landing: marketing, CTAs para registo, lista de funcionalidades. |
-| `/auth` | `auth.tsx` | Separadores Entrar / Criar conta (email+senha), OAuth Google; redirect após sessão (`emailRedirectTo` pode incluir `/onboarding`). |
-| `/reset-password` | `reset-password.tsx` | Fluxo de recuperação de palavra-passe (Supabase). |
-| `/dashboard` | `_authenticated/dashboard.tsx` | Resumo: mapa principal (`NatalChartWheel`), horóscopo do dia, trânsitos vs natal, link para Momento / mapa. Limite FREE para número de mapas + modal upgrade. |
-| `/onboarding` | `_authenticated/onboarding.tsx` | Primeiro mapa via `BirthChartForm`; redirect para detalhe do mapa ou dashboard se já existir mapa. |
-| `/mapas` | `_authenticated/mapas.tsx` | Lista de mapas do utilizador; badge «Primário»; menu tornar primário (update em cascata); links para novo mapa e detalhe. |
-| `/mapas/novo` | `_authenticated/mapas.novo.tsx` | Criar mapa adicional (mesmo fluxo de formulário + upgrade FREE). |
-| `/mapas/$id` | `_authenticated/mapas.$id.tsx` | Detalhe do mapa: roda natal, separadores Essência (Sol/Lua/Asc + **Configurações especiais**: Grand Trine, T-Square, Grand Cross, Yod), Planetas (interpretações + IA por planeta), Casas (planeta-em-casa), Aspectos (filtro + lista virtualizada). Ações: recalcular geometria, excluir mapa; IA resumo executivo. |
-| `/transitos` | `_authenticated/transitos.tsx` | Separadores **Período** (janela ±30/60/90 dias, calendário, lista do dia, filtros de aspectos, IA do dia, PDF, email digest) e **Ano** (previsão anual: `generateAnnualForecastFn`). |
-| `/compatibilidade` | `_authenticated/compatibilidade.tsx` | Dois mapas: sinastria (`calculateAndSaveSynastryFn`), biwheel, scores por área, destaques, lista «Todos os aspectos cruzados» (virtualizada), IA sinastria / sinastria profunda; separador **Mapa composto** (`calculateCompositeFn`, roda composta, IA `composite`). Histórico paginado de sinastrias guardadas. |
-| `/momento` | `_authenticated/momento.tsx` | Dia civil (SP): cartão partilhável, streak, histórico local, IA «Momento», export PNG do cartão, **MoodWidget** (humor + gráfico vs intensidade). |
-| `/configuracoes` | `_authenticated/configuracoes.tsx` | Perfil (nome, género, avatar), sistema de casas, preferências; gestão de conta / eliminar conta (server fn). |
-| `/premium` | `_authenticated/premium.tsx` | Planos / upgrade PREMIUM. |
-| `/admin` | `_authenticated/admin.tsx` | Painel operacional só para utilizadores com papel `admin` em `user_roles`: métricas agregadas (RPC `admin_overview_metrics`), atalhos Supabase/docs; não expõe linhas com dados pessoais. |
+| Rota               | Ficheiro                             | O que faz                                                                                                                                                                                                                                                                                                            |
+| ------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                | `index.tsx`                          | Landing: marketing, CTAs para registo, lista de funcionalidades.                                                                                                                                                                                                                                                     |
+| `/auth`            | `auth.tsx`                           | Separadores Entrar / Criar conta (email+senha), OAuth Google; redirect após sessão (`emailRedirectTo` pode incluir `/onboarding`).                                                                                                                                                                                   |
+| `/reset-password`  | `reset-password.tsx`                 | Fluxo de recuperação de palavra-passe (Supabase).                                                                                                                                                                                                                                                                    |
+| `/dashboard`       | `_authenticated/dashboard.tsx`       | Resumo: mapa principal (`NatalChartWheel`), horóscopo do dia, trânsitos vs natal, link para Momento / mapa. Limite FREE para número de mapas + modal upgrade.                                                                                                                                                        |
+| `/onboarding`      | `_authenticated/onboarding.tsx`      | Primeiro mapa via `BirthChartForm`; redirect para detalhe do mapa ou dashboard se já existir mapa.                                                                                                                                                                                                                   |
+| `/mapas`           | `_authenticated/mapas.tsx`           | Lista de mapas do utilizador; badge «Primário»; menu tornar primário (update em cascata); links para novo mapa e detalhe.                                                                                                                                                                                            |
+| `/mapas/novo`      | `_authenticated/mapas.novo.tsx`      | Criar mapa adicional (mesmo fluxo de formulário + upgrade FREE).                                                                                                                                                                                                                                                     |
+| `/mapas/$id`       | `_authenticated/mapas.$id.tsx`       | Detalhe do mapa: roda natal, separadores Essência (Sol/Lua/Asc + **Configurações especiais**: Grand Trine, T-Square, Grand Cross, Yod), Planetas (interpretações + IA por planeta), Casas (planeta-em-casa), Aspectos (filtro + lista virtualizada). Ações: recalcular geometria, excluir mapa; IA resumo executivo. |
+| `/transitos`       | `_authenticated/transitos.tsx`       | Separadores **Período** (janela ±30/60/90 dias, calendário, lista do dia, filtros de aspectos, IA do dia, PDF, email digest) e **Ano** (previsão anual: `generateAnnualForecastFn`).                                                                                                                                 |
+| `/compatibilidade` | `_authenticated/compatibilidade.tsx` | Dois mapas: sinastria (`calculateAndSaveSynastryFn`), biwheel, scores por área, destaques, lista «Todos os aspectos cruzados» (virtualizada), IA sinastria / sinastria profunda; separador **Mapa composto** (`calculateCompositeFn`, roda composta, IA `composite`). Histórico paginado de sinastrias guardadas.    |
+| `/momento`         | `_authenticated/momento.tsx`         | Dia civil (SP): cartão partilhável, streak, histórico local, IA «Momento», export PNG do cartão, **MoodWidget** (humor + gráfico vs intensidade).                                                                                                                                                                    |
+| `/configuracoes`   | `_authenticated/configuracoes.tsx`   | Perfil (nome, género, avatar), sistema de casas, preferências; gestão de conta / eliminar conta (server fn).                                                                                                                                                                                                         |
+| `/premium`         | `_authenticated/premium.tsx`         | Planos / upgrade PREMIUM.                                                                                                                                                                                                                                                                                            |
+| `/admin`           | `_authenticated/admin.tsx`           | Painel operacional só para utilizadores com papel `admin` em `user_roles`: métricas agregadas (RPC `admin_overview_metrics`), atalhos Supabase/docs; não expõe linhas com dados pessoais.                                                                                                                            |
 
 **Server functions** (`src/lib/*.functions.ts`): `astrology.functions.ts` — `calculateChartFn` (pré-visualização de mapa, rate limit `chart_preview_calc_events`); `charts.functions.ts` — CRUD mapas, recalcular geometria; `transits.functions.ts` — trânsitos por intervalo; `annual-forecast.functions.ts`; `synastry.functions.ts`; `composite.functions.ts`; `ai-interpretation.functions.ts` (IAs em cache); `mood.functions.ts`; `email.functions.ts` (digest trânsitos); `profile.functions.ts`; `admin.functions.ts` — `adminOverviewFn` (métricas globais após `assertAdminUser`). Cliente: `withSupabaseAuth(session)`. Erros: `server-fn-http.ts`; quotas IA: `assertAiGenerationAllowed`.
 
@@ -157,19 +157,19 @@ Toast notifications via `sonner`. All user-facing strings are in Portuguese (PT-
 
 ### Environment Variables
 
-| Variable                                              | Where used                                           |
-| ----------------------------------------------------- | ---------------------------------------------------- |
-| `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` | Client-side (build-time)                             |
-| `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY`           | Server-side (SSR/Worker)                             |
-| `SUPABASE_SERVICE_ROLE_KEY`                           | `deleteAccountFn` only                               |
-| `AI_PROVIDER`                                         | `"anthropic"` or `"openai"` (auto-detect if omitted) |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`                | LLM calls                                            |
-| `AI_ANTHROPIC_MODEL`                                  | Default: `claude-sonnet-4-20250514`                  |
-| `AI_OPENAI_MODEL`                                     | Default: `gpt-4o-mini`                               |
-| `AI_INTERPRETATION_REQUIRE_PREMIUM`                   | `"true"` to gate AI behind PREMIUM                   |
-| `AI_INTERPRETATION_MAX_PER_24H_PREMIUM` / `_FREE`     | Rolling 24h quotas                                   |
-| `AI_INTERPRETATION_FREE_TRIES_PER_MONTH`              | Monthly limit for FREE users                         |
-| `CALCULATE_CHART_MAX_PER_USER_PER_HOUR`               | Default: 90                                          |
-| `VITE_APP_INSTAGRAM_HANDLE` / `VITE_APP_SHARE_URL`    | Branding (Instagram card)                            |
+| Variable                                              | Where used                                             |
+| ----------------------------------------------------- | ------------------------------------------------------ |
+| `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` | Client-side (build-time)                               |
+| `SUPABASE_URL` / `SUPABASE_PUBLISHABLE_KEY`           | Server-side (SSR/Worker)                               |
+| `SUPABASE_SERVICE_ROLE_KEY`                           | `deleteAccountFn` only                                 |
+| `AI_PROVIDER`                                         | `"anthropic"` or `"openai"` (auto-detect if omitted)   |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`                | LLM calls                                              |
+| `AI_ANTHROPIC_MODEL`                                  | Default: `claude-sonnet-4-20250514`                    |
+| `AI_OPENAI_MODEL`                                     | Default: `gpt-4o-mini`                                 |
+| `AI_INTERPRETATION_REQUIRE_PREMIUM`                   | `"true"` to gate AI behind PREMIUM                     |
+| `AI_INTERPRETATION_MAX_PER_24H_PREMIUM` / `_FREE`     | Rolling 24h quotas                                     |
+| `AI_INTERPRETATION_FREE_TRIES_PER_MONTH`              | Monthly limit for FREE users                           |
+| `CALCULATE_CHART_MAX_PER_USER_PER_HOUR`               | Default: 90                                            |
+| `VITE_APP_INSTAGRAM_HANDLE` / `VITE_APP_SHARE_URL`    | Branding (Instagram card)                              |
 | `VITE_APP_GITHUB_URL`                                 | Opcional; link «Repositório GitHub» no painel `/admin` |
-| `TRANSIT_DIGEST_CRON_SECRET`                          | Edge function auth                                   |
+| `TRANSIT_DIGEST_CRON_SECRET`                          | Edge function auth                                     |

@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useProfile } from "@/hooks/use-profile";
 import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -67,19 +68,7 @@ function Settings() {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const { data: profile } = useQuery({
-    queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user!.id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: profile } = useProfile();
 
   const nameForm = useForm({
     resolver: zodResolver(profileNameSchema),
@@ -181,6 +170,10 @@ function Settings() {
     const extRaw = raw.name.split(".").pop()?.toLowerCase();
     if (!extRaw || !["jpg", "jpeg", "png", "webp", "gif"].includes(extRaw)) {
       toast.error("Use JPG, PNG, WebP ou GIF.");
+      return;
+    }
+    if (raw.size > 5 * 1024 * 1024) {
+      toast.error("Arquivo muito grande. Use uma imagem com menos de 5 MB.");
       return;
     }
     const file = await shrinkImageForAvatar(raw);

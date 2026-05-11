@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
@@ -76,5 +77,26 @@ export const calculateAndSaveSynastryFn = createServerFn({ method: "POST" })
         baseChart: payload1,
         overlayChart: payload2,
       };
+    }),
+  );
+
+/** Remove uma sinastria guardada (apenas o dono). */
+export const deleteSynastryFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    const parsed = z.string().uuid().safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
+    return parsed.data;
+  })
+  .handler(
+    timedServerFn("deleteSynastryFn", async ({ data: synastryId, context }) => {
+      const { supabase, userId } = context;
+      const { error } = await supabase
+        .from("synastries")
+        .delete()
+        .eq("id", synastryId)
+        .eq("user_id", userId);
+      if (error) throw jsonError(500, "DELETE", error.message);
+      return { ok: true };
     }),
   );

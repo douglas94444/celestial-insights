@@ -2,7 +2,7 @@ import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import { formatTransitDayTitle } from "@/lib/astrology/transits";
 import { ASPECT_LABELS } from "@/data/chart-detail-interpretations";
-import { PLANETS } from "@/lib/astrology/zodiac";
+import { getPlanetName } from "@/lib/astrology/zodiac";
 
 const styles = StyleSheet.create({
   page: { padding: 40, fontSize: 10, fontFamily: "Helvetica" },
@@ -12,10 +12,6 @@ const styles = StyleSheet.create({
   row: { marginBottom: 3 },
   box: { marginTop: 8, padding: 8, backgroundColor: "#f4f0fb", borderRadius: 4 },
 });
-
-function planetName(key: string) {
-  return PLANETS.find((p) => p.key === key)?.name ?? key;
-}
 
 interface Props {
   chartName: string;
@@ -56,8 +52,8 @@ export function TransitReportPdf({ chartName, startDate, endDate, days }: Props)
             <View style={styles.box}>
               {day.aspects.slice(0, 10).map((a, i) => (
                 <Text key={i} style={styles.row}>
-                  {planetName(a.planet1)} trans. {ASPECT_LABELS[a.type]} {planetName(a.planet2)}{" "}
-                  natal ({a.orb}°)
+                  {getPlanetName(a.planet1)} trans. {ASPECT_LABELS[a.type]}{" "}
+                  {getPlanetName(a.planet2)} natal ({a.orb}°)
                 </Text>
               ))}
               {day.aspects.length > 10 ? (

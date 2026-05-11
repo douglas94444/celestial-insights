@@ -10,6 +10,8 @@ interface Props {
   onPlanetClick?: (planet: string) => void;
   /** Para capturas PNG estáveis (sem animação de entrada). */
   reduceMotion?: boolean;
+  /** Rótulo acessível para leitores de ecrã. */
+  ariaLabel?: string;
 }
 
 const ASPECT_COLOR: Record<string, string> = {
@@ -26,6 +28,7 @@ function NatalChartWheelComponent({
   highlightPlanet,
   onPlanetClick,
   reduceMotion,
+  ariaLabel = "Mapa natal — roda com planetas, signos e casas",
 }: Props) {
   const cx = size / 2;
   const cy = size / 2;
@@ -73,6 +76,8 @@ function NatalChartWheelComponent({
       initial={reduceMotion ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: reduceMotion ? 0 : 0.6, ease: "easeOut" }}
+      role="img"
+      aria-label={ariaLabel}
       viewBox={`0 0 ${size} ${size}`}
       className="w-full h-auto max-w-[600px]"
     >

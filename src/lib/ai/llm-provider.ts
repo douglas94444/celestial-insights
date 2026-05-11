@@ -204,9 +204,7 @@ export async function completeChat(
         : null;
 
   const run = (p: AiProviderId) =>
-    p === "anthropic"
-      ? completeAnthropic(system, user, opts)
-      : completeOpenAI(system, user, opts);
+    p === "anthropic" ? completeAnthropic(system, user, opts) : completeOpenAI(system, user, opts);
 
   try {
     return await run(primary);
@@ -224,8 +222,7 @@ export async function completeChat(
     try {
       return await run(fallback);
     } catch (fallbackErr) {
-      const fallbackMsg =
-        fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+      const fallbackMsg = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
       throw new Error(
         `Ambos provedores falharam — ${primary}: ${primaryMsg} | ${fallback}: ${fallbackMsg}`,
       );

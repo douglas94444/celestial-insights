@@ -1,15 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Heart, Loader2, Sparkles } from "lucide-react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Heart, Loader2, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { CompositeChartWheel } from "@/components/CompositeChartWheel";
+const CompositeChartWheel = lazy(() =>
+  import("@/components/CompositeChartWheel").then((m) => ({ default: m.CompositeChartWheel })),
+);
 import { SynastryAspectsVirtualList } from "@/components/SynastryAspectsVirtualList";
 import {
   Select,
@@ -41,14 +44,22 @@ import type {
   SynastryDeepNarrativeFnResult,
 } from "@/lib/types/server-fn-results";
 import type { SynastryDeepOutput } from "@/lib/schemas/personalization-ai";
-import {
-  ENGAGEMENT_ROUTES,
-  ENGAGEMENT_TOPICS,
-  insertEngagementEventDeduped,
-  recordAiEngagement,
-} from "@/lib/engagement";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, recordAiEngagement } from "@/lib/engagement";
+import { usePageEngagement } from "@/hooks/use-page-engagement";
+import { AiButton } from "@/components/AiButton";
+import { AiTextCard } from "@/components/AiTextCard";
 import { calculateCompositeFn } from "@/lib/composite.functions";
-import { calculateAndSaveSynastryFn } from "@/lib/synastry.functions";
+import { calculateAndSaveSynastryFn, deleteSynastryFn } from "@/lib/synastry.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
@@ -127,6 +138,7 @@ function CompatibilidadePage() {
   const [compositeAiText, setCompositeAiText] = useState<string | null>(null);
   const [compatSubview, setCompatSubview] = useState<"sinastria" | "composto">("sinastria");
   const [historyVisibleCount, setHistoryVisibleCount] = useState(COMPAT_HISTORY_PAGE_SIZE);
+  const [deleteSynastryId, setDeleteSynastryId] = useState<string | null>(null);
 
   const {
     data: charts = [],
@@ -183,14 +195,15 @@ function CompatibilidadePage() {
     if (!chart1Id || !chart2Id || chart1Id === chart2Id) setCompatSubview("sinastria");
   }, [chart1Id, chart2Id]);
 
-  useEffect(() => {
-    if (!activeView?.synastryId || !user?.id) return;
-    insertEngagementEventDeduped(supabase, user.id, {
-      route_key: ENGAGEMENT_ROUTES.compatibilidade,
-      topic_key: ENGAGEMENT_TOPICS.synastry_view,
-      meta: { synastry_id: activeView.synastryId },
-    });
-  }, [activeView?.synastryId, user?.id]);
+  usePageEngagement(
+    ENGAGEMENT_ROUTES.compatibilidade,
+    ENGAGEMENT_TOPICS.synastry_view,
+    {
+      enabled: !!activeView?.synastryId,
+      meta: { synastry_id: activeView?.synastryId },
+    },
+    [activeView?.synastryId],
+  );
 
   const synastryAiMutation = useMutation<AiInterpretationFnResult, Error, void>({
     mutationFn: async () => {
@@ -296,6 +309,24 @@ function CompatibilidadePage() {
     },
     onError: (e) => void toastServerFnError(e),
   });
+
+  async function confirmDeleteSynastry() {
+    if (!deleteSynastryId) return;
+    try {
+      await deleteSynastryFn({ data: deleteSynastryId, ...withSupabaseAuth(session) });
+      qc.invalidateQueries({ queryKey: ["synastries-list"] });
+      if (activeView?.synastryId === deleteSynastryId) setActiveView(null);
+      toast.success("Sinastria removida do histórico.");
+    } catch (e) {
+      await toastServerFnError(e);
+    } finally {
+      setDeleteSynastryId(null);
+    }
+  }
+
+  const handleDeleteDialogChange = useCallback((open: boolean) => {
+    if (!open) setDeleteSynastryId(null);
+  }, []);
 
   const loadFromHistory = useCallback(
     (row: (typeof history)[number]) => {
@@ -559,42 +590,26 @@ function CompatibilidadePage() {
                         <p className="text-xs text-muted-foreground leading-relaxed">
                           Opcional — não substitui os destaques numéricos nem uma leitura humana.
                         </p>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          className="w-full"
-                          disabled={synastryAiMutation.isPending}
+                        <AiButton
+                          isPending={synastryAiMutation.isPending}
                           onClick={() => synastryAiMutation.mutate()}
-                        >
-                          {synastryAiMutation.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Sparkles className="mr-2 h-4 w-4" />
-                          )}
-                          Gerar análise narrativa
-                        </Button>
-                        {synastryAiText ? (
-                          <article className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed whitespace-pre-wrap">
-                            <AiCacheAgeBadgeFromResult result={synastryAiMutation.data} />
-                            {synastryAiText}
-                          </article>
-                        ) : null}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
+                          label="Gerar análise narrativa"
+                          variant="secondary"
                           className="w-full"
-                          disabled={synastryDeepMutation.isPending}
+                        />
+                        {synastryAiText ? (
+                          <AiTextCard
+                            text={synastryAiText}
+                            badge={<AiCacheAgeBadgeFromResult result={synastryAiMutation.data} />}
+                            className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm"
+                          />
+                        ) : null}
+                        <AiButton
+                          isPending={synastryDeepMutation.isPending}
                           onClick={() => synastryDeepMutation.mutate()}
-                        >
-                          {synastryDeepMutation.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Sparkles className="mr-2 h-4 w-4" />
-                          )}
-                          Análise profunda (JSON)
-                        </Button>
+                          label="Análise profunda (JSON)"
+                          className="w-full"
+                        />
                         {synastryDeep ? (
                           <article className="max-h-[520px] overflow-y-auto rounded-lg border border-primary/15 bg-background/40 p-3 text-xs leading-relaxed space-y-3">
                             <AiCacheAgeBadgeFromResult result={synastryDeepMutation.data} />
@@ -696,6 +711,11 @@ function CompatibilidadePage() {
                   </Collapsible>
                 </div>
               </div>
+            ) : calcMutation.isPending ? (
+              <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed p-10 text-muted-foreground">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-sm">A calcular sinastria…</p>
+              </div>
             ) : (
               <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground leading-relaxed">
                 Use «Calcular e guardar» acima para gerar a sinastria e ver o biwheel, pontuações e
@@ -716,7 +736,17 @@ function CompatibilidadePage() {
             ) : compositeQuery.data ? (
               <div className="space-y-6">
                 <div className="-mx-1 flex justify-center overflow-x-auto px-1 pb-1 sm:mx-0 sm:overflow-visible">
-                  <CompositeChartWheel data={compositeQuery.data.composite} size={520} />
+                  <ErrorBoundary
+                    fallback={
+                      <p className="text-center text-xs text-muted-foreground py-4">
+                        Roda composta indisponível.
+                      </p>
+                    }
+                  >
+                    <Suspense fallback={null}>
+                      <CompositeChartWheel data={compositeQuery.data.composite} size={520} />
+                    </Suspense>
+                  </ErrorBoundary>
                 </div>
                 <p className="mx-auto max-w-xl text-center text-xs text-muted-foreground">
                   Mapa composto por midpoint entre «{compositeQuery.data.chart1Name}» e «
@@ -729,25 +759,18 @@ function CompatibilidadePage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      disabled={compositeAiMutation.isPending}
+                    <AiButton
+                      isPending={compositeAiMutation.isPending}
                       onClick={() => compositeAiMutation.mutate()}
-                    >
-                      {compositeAiMutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="mr-2 h-4 w-4" />
-                      )}
-                      Gerar texto do mapa composto
-                    </Button>
+                      label="Gerar texto do mapa composto"
+                      variant="secondary"
+                    />
                     {compositeAiText ? (
-                      <article className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm leading-relaxed whitespace-pre-wrap">
-                        <AiCacheAgeBadgeFromResult result={compositeAiMutation.data} />
-                        {compositeAiText}
-                      </article>
+                      <AiTextCard
+                        text={compositeAiText}
+                        badge={<AiCacheAgeBadgeFromResult result={compositeAiMutation.data} />}
+                        className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm"
+                      />
                     ) : null}
                   </CardContent>
                 </Card>
@@ -777,25 +800,36 @@ function CompatibilidadePage() {
                 {visibleHistory.map((row) => {
                   const p = parseStoredPayload(row.compatibility_data);
                   return (
-                    <button
-                      key={row.id}
-                      type="button"
-                      data-row-id={String(row.id)}
-                      className="w-full text-left rounded-lg border px-4 py-3 text-sm hover:bg-muted/60 transition-colors"
-                      onClick={handleHistoryRowActivate}
-                    >
-                      <span className="font-medium">
-                        {p?.chart1Name ?? "Mapa"} × {p?.chart2Name ?? "Mapa"}
-                      </span>
-                      <span className="text-muted-foreground"> · </span>
-                      <span className="text-primary font-semibold">
-                        {row.compatibility_score}/100
-                      </span>
-                      <span className="text-muted-foreground">
-                        {" "}
-                        · {new Date(row.created_at).toLocaleDateString("pt-BR")}
-                      </span>
-                    </button>
+                    <div key={row.id} className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        data-row-id={String(row.id)}
+                        className="flex-1 text-left rounded-lg border px-4 py-3 text-sm hover:bg-muted/60 transition-colors"
+                        onClick={handleHistoryRowActivate}
+                      >
+                        <span className="font-medium">
+                          {p?.chart1Name ?? "Mapa"} × {p?.chart2Name ?? "Mapa"}
+                        </span>
+                        <span className="text-muted-foreground"> · </span>
+                        <span className="text-primary font-semibold">
+                          {row.compatibility_score}/100
+                        </span>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {new Date(row.created_at).toLocaleDateString("pt-BR")}
+                        </span>
+                      </button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                        aria-label="Remover do histórico"
+                        onClick={() => setDeleteSynastryId(String(row.id))}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   );
                 })}
                 {history.length > historyVisibleCount ? (
@@ -817,6 +851,27 @@ function CompatibilidadePage() {
           </CardContent>
         </Card>
       )}
+
+      <AlertDialog open={!!deleteSynastryId} onOpenChange={handleDeleteDialogChange}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover sinastria do histórico?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta entrada será removida permanentemente. A sinastria pode ser recalculada a
+              qualquer momento.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void confirmDeleteSynastry()}
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -56,7 +56,7 @@ export const sendTransitDigestInputSchema = z.object({
 export type SendTransitDigestInput = z.infer<typeof sendTransitDigestInputSchema>;
 
 export const cronTransitDigestSchema = z.object({
-  cronSecret: z.string().min(16),
+  cronSecret: z.string().min(32),
 });
 
 export type CronTransitDigestInput = z.infer<typeof cronTransitDigestSchema>;

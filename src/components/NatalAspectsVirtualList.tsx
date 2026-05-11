@@ -8,11 +8,11 @@ import type { PlanetKey } from "@/lib/astrology/zodiac";
 
 const ROW_ESTIMATE_PX = 76;
 
-type Props = {
+interface Props {
   aspects: Aspect[];
   planetByKey: Map<PlanetKey, PlanetPosition>;
   className?: string;
-};
+}
 
 export function NatalAspectsVirtualList({ aspects, planetByKey, className }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);

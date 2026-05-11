@@ -19,11 +19,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useChartsListQuery } from "@/hooks/use-charts-list";
 import { useAuth } from "@/hooks/use-auth";
+import { deleteChartFn, makePrimaryChartFn } from "@/lib/charts.functions";
+import { withSupabaseAuth } from "@/lib/server-fn-client";
+import { toastServerFnError } from "@/lib/toast-server-fn-error";
 
 export const Route = createFileRoute("/_authenticated/mapas/")({
   component: MapasList,
@@ -31,12 +44,15 @@ export const Route = createFileRoute("/_authenticated/mapas/")({
 
 function MapasList() {
   const qc = useQueryClient();
-  const { user } = useAuth();
+  const { session, user } = useAuth();
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: charts = [] } = useChartsListQuery();
+
+  const chartsKey = ["charts", user?.id] as const;
 
   function openRename(c: { id: string; name: string }) {
     setRenameId(c.id);
@@ -46,49 +62,48 @@ function MapasList() {
 
   async function saveRename() {
     if (!renameId || !renameValue.trim()) return;
-    const { error } = await supabase
-      .from("charts")
-      .update({ name: renameValue.trim() })
-      .eq("id", renameId);
-    if (error) toast.error(error.message);
-    else {
+    const newName = renameValue.trim();
+    // Optimistic update
+    qc.setQueryData(chartsKey, (old: typeof charts | undefined) =>
+      old?.map((c) => (c.id === renameId ? { ...c, name: newName } : c)),
+    );
+    setRenameOpen(false);
+    const { error } = await supabase.from("charts").update({ name: newName }).eq("id", renameId);
+    if (error) {
+      toast.error(error.message);
+      qc.invalidateQueries({ queryKey: chartsKey });
+    } else {
       toast.success("Nome atualizado");
-      qc.invalidateQueries({ queryKey: ["charts-list"] });
-      qc.invalidateQueries({ queryKey: ["charts"] });
-      setRenameOpen(false);
     }
   }
 
   async function makePrimaryChart(chartId: string) {
-    if (!user?.id) return;
-    const { error: e1 } = await supabase
-      .from("charts")
-      .update({ is_primary: false })
-      .eq("user_id", user.id);
-    if (e1) {
-      toast.error(e1.message);
-      return;
-    }
-    const { error: e2 } = await supabase
-      .from("charts")
-      .update({ is_primary: true })
-      .eq("id", chartId);
-    if (e2) toast.error(e2.message);
-    else {
+    // Optimistic update — toggle is_primary flags
+    qc.setQueryData(chartsKey, (old: typeof charts | undefined) =>
+      old?.map((c) => ({ ...c, is_primary: c.id === chartId })),
+    );
+    try {
+      await makePrimaryChartFn({ data: chartId, ...withSupabaseAuth(session) });
       toast.success("Mapa definido como primário");
-      qc.invalidateQueries({ queryKey: ["charts-list"] });
-      qc.invalidateQueries({ queryKey: ["charts"] });
+    } catch (err) {
+      qc.invalidateQueries({ queryKey: chartsKey });
+      await toastServerFnError(err);
     }
   }
 
-  async function deleteChart(id: string) {
-    if (!confirm("Excluir este mapa permanentemente?")) return;
-    const { error } = await supabase.from("charts").delete().eq("id", id);
-    if (error) toast.error(error.message);
-    else {
+  async function confirmDelete() {
+    if (!deleteId) return;
+    // Optimistic update — remove from list immediately
+    qc.setQueryData(chartsKey, (old: typeof charts | undefined) =>
+      old?.filter((c) => c.id !== deleteId),
+    );
+    setDeleteId(null);
+    try {
+      await deleteChartFn({ data: deleteId, ...withSupabaseAuth(session) });
       toast.success("Mapa excluído");
-      qc.invalidateQueries({ queryKey: ["charts-list"] });
-      qc.invalidateQueries({ queryKey: ["charts"] });
+    } catch (err) {
+      qc.invalidateQueries({ queryKey: chartsKey });
+      await toastServerFnError(err);
     }
   }
 
@@ -208,7 +223,7 @@ function MapasList() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive flex cursor-pointer items-center gap-2 focus:text-destructive"
-                        onClick={() => deleteChart(c.id)}
+                        onClick={() => setDeleteId(c.id)}
                       >
                         <Trash2 className="h-4 w-4" /> Excluir
                       </DropdownMenuItem>
@@ -220,6 +235,32 @@ function MapasList() {
           ))}
         </div>
       )}
+
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => {
+          if (!open) setDeleteId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir mapa permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O mapa e todas as interpretações em cache serão
+              removidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void confirmDelete()}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

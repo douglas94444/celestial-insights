@@ -204,7 +204,14 @@ export interface CalculateInput {
 export function utcBirthInstant(input: CalculateInput): Date {
   const [y, mo, d] = input.birthDate.split("-").map(Number);
   const [h, mi] = input.birthTime.split(":").map(Number);
-  return new Date(Date.UTC(y, mo - 1, d, h, mi) - input.timezoneOffset * 60_000);
+  if (!y || !mo || !d || isNaN(h) || isNaN(mi)) {
+    throw new Error(`Data/hora de nascimento inválida: "${input.birthDate}" "${input.birthTime}"`);
+  }
+  const ms = Date.UTC(y, mo - 1, d, h, mi) - input.timezoneOffset * 60_000;
+  if (isNaN(ms)) {
+    throw new Error(`Data/hora de nascimento inválida: "${input.birthDate}" "${input.birthTime}"`);
+  }
+  return new Date(ms);
 }
 
 /** Meio do Céu (MC) e Ascendente — alinhado ao sistema de casas escolhido. */

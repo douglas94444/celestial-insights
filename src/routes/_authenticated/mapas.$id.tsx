@@ -1,8 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
+import { useProfile } from "@/hooks/use-profile";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, RefreshCw, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,13 +18,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { AiCacheAgeBadge } from "@/components/AiCacheAgeBadge";
+import { AiButton } from "@/components/AiButton";
+import { AiTextCard } from "@/components/AiTextCard";
+import { RetrogradeBadge } from "@/components/RetrogradeBadge";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
 import { NatalAspectsVirtualList } from "@/components/NatalAspectsVirtualList";
 import { computeAngles, type HouseSystemId } from "@/lib/astrology/calculate";
 import { HOUSE_SYSTEM_LABELS } from "@/lib/astrology/houses";
-import type { ChartData, PlanetPosition } from "@/lib/astrology/calculate";
+import type { ChartData, PlanetPosition, HousePosition, Aspect } from "@/lib/astrology/calculate";
 import { signFromLongitude, formatDegree, PLANETS, type PlanetKey } from "@/lib/astrology/zodiac";
 import { SUN_IN_SIGN, MOON_IN_SIGN, ASC_IN_SIGN } from "@/data/interpretations";
 import {
@@ -43,21 +56,317 @@ import {
   generateNatalExecutiveSummaryFn,
   generateNatalPlanetInsightFn,
 } from "@/lib/ai-interpretation.functions";
-import { recalculateChartFn } from "@/lib/charts.functions";
+import { deleteChartFn, recalculateChartFn } from "@/lib/charts.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
 import { tryParseStoredChartGeometry } from "@/lib/schemas/chart-payload";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
-import {
-  ENGAGEMENT_ROUTES,
-  ENGAGEMENT_TOPICS,
-  insertEngagementEventDeduped,
-  recordAiEngagement,
-} from "@/lib/engagement";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, recordAiEngagement } from "@/lib/engagement";
+import { usePageEngagement } from "@/hooks/use-page-engagement";
 import type {
   AiInterpretationFnResult,
   RecalculateChartFnResult,
 } from "@/lib/types/server-fn-results";
+
+// ─── Tipos compartilhados dos tabs ───────────────────────────────────────────
+
+type ChartEssence = {
+  sun: PlanetPosition | undefined;
+  moon: PlanetPosition | undefined;
+  ascendant: number;
+  ascSign: SignName;
+  planets: PlanetPosition[];
+  houses: HousePosition[];
+  aspects: Aspect[];
+};
+
+// ─── Tab: Essência ────────────────────────────────────────────────────────────
+
+interface EssenciaTabProps {
+  chartEssence: ChartEssence;
+  chartPatterns: ReturnType<typeof deriveChartPatterns> | null;
+}
+
+const EssenciaTab = memo(function EssenciaTab({ chartEssence, chartPatterns }: EssenciaTabProps) {
+  return (
+    <div className="space-y-5">
+      {chartEssence.sun && (
+        <Card>
+          <CardContent className="p-5">
+            <h3 className="font-display text-lg font-semibold">
+              ☉ Sol em {chartEssence.sun.sign}{" "}
+              <span className="text-muted-foreground text-sm">
+                · {formatDegree(chartEssence.sun.longitude)}
+              </span>
+            </h3>
+            <p className="mt-2 text-sm text-foreground/80">
+              {SUN_IN_SIGN[chartEssence.sun.sign as SignName]}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+      {chartEssence.moon && (
+        <Card>
+          <CardContent className="p-5">
+            <h3 className="font-display text-lg font-semibold">
+              ☽ Lua em {chartEssence.moon.sign}{" "}
+              <span className="text-muted-foreground text-sm">
+                · {formatDegree(chartEssence.moon.longitude)}
+              </span>
+            </h3>
+            <p className="mt-2 text-sm text-foreground/80">
+              {MOON_IN_SIGN[chartEssence.moon.sign as SignName]}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+      <Card>
+        <CardContent className="p-5">
+          <h3 className="font-display text-lg font-semibold">
+            ↗ Ascendente em {chartEssence.ascSign}{" "}
+            <span className="text-muted-foreground text-sm">
+              · {formatDegree(chartEssence.ascendant)}
+            </span>
+          </h3>
+          <p className="mt-2 text-sm text-foreground/80">{ASC_IN_SIGN[chartEssence.ascSign]}</p>
+        </CardContent>
+      </Card>
+      {chartPatterns &&
+        (chartPatterns.grand_trines.length > 0 ||
+          chartPatterns.t_squares.length > 0 ||
+          chartPatterns.grand_crosses.length > 0 ||
+          chartPatterns.yods.length > 0) && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="p-5 space-y-4">
+              <h3 className="font-display text-lg font-semibold">Configurações especiais</h3>
+              <p className="text-xs text-muted-foreground">
+                Padrões geométricos entre planetas (orbes do cálculo natal). Leitura simbólica, não
+                determinística.
+              </p>
+              <ul className="space-y-4 text-sm">
+                {chartPatterns.grand_trines.map((g, idx) => (
+                  <li key={`gt-${idx}-${g.planets.join("-")}`}>
+                    <p className="font-medium">Grande trígono ({g.element})</p>
+                    <p className="text-muted-foreground">{planetKeysLabelPt(g.planets)}</p>
+                    <p className="mt-1 text-foreground/85">{SPECIAL_GEOMETRY_BLURBS.grand_trine}</p>
+                  </li>
+                ))}
+                {chartPatterns.t_squares.map((t, idx) => (
+                  <li key={`ts-${idx}-${t.apex}-${t.opposition.join("-")}`}>
+                    <p className="font-medium">T-quadrado</p>
+                    <p className="text-muted-foreground">
+                      Vértice {planetKeysLabelPt([t.apex])} · oposição{" "}
+                      {planetKeysLabelPt([t.opposition[0], t.opposition[1]])}
+                    </p>
+                    <p className="mt-1 text-foreground/85">{SPECIAL_GEOMETRY_BLURBS.t_square}</p>
+                  </li>
+                ))}
+                {chartPatterns.grand_crosses.map((gc, idx) => (
+                  <li key={`gc-${idx}-${gc.planets.join("-")}`}>
+                    <p className="font-medium">Grande cruz</p>
+                    <p className="text-muted-foreground">{planetKeysLabelPt(gc.planets)}</p>
+                    <p className="mt-1 text-foreground/85">{SPECIAL_GEOMETRY_BLURBS.grand_cross}</p>
+                  </li>
+                ))}
+                {chartPatterns.yods.map((y, idx) => (
+                  <li key={`yod-${idx}-${y.apex}-${y.sextile.join("-")}`}>
+                    <p className="font-medium">Yod (Dedo de Deus)</p>
+                    <p className="text-muted-foreground">
+                      Vértice {planetKeysLabelPt([y.apex])} · base em sextil{" "}
+                      {planetKeysLabelPt([y.sextile[0], y.sextile[1]])}
+                    </p>
+                    <p className="mt-1 text-foreground/85">{SPECIAL_GEOMETRY_BLURBS.yod}</p>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
+    </div>
+  );
+});
+
+// ─── Tab: Planetas ────────────────────────────────────────────────────────────
+
+interface PlanetasTabProps {
+  planetByKey: Map<PlanetKey, PlanetPosition>;
+  aiPlanetTexts: Record<string, string | undefined>;
+  aiPlanetCachedAt: Record<string, string | undefined>;
+  aiPlanetLoading: string | null;
+  onAiPlanet: (key: PlanetKey) => void;
+}
+
+const PlanetasTab = memo(function PlanetasTab({
+  planetByKey,
+  aiPlanetTexts,
+  aiPlanetCachedAt,
+  aiPlanetLoading,
+  onAiPlanet,
+}: PlanetasTabProps) {
+  return (
+    <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+      {PLANETS.map((meta) => {
+        const p = planetByKey.get(meta.key);
+        if (!p) return null;
+        return (
+          <Card key={p.key}>
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <h3 className="font-display text-base font-semibold">
+                  <span className="mr-1.5">{p.symbol}</span>
+                  {p.name} em {p.sign}{" "}
+                  <span className="text-muted-foreground text-sm font-normal inline-flex flex-wrap items-center gap-1">
+                    · {formatDegree(p.longitude)} · Casa {p.house}
+                    {p.retrograde ? <RetrogradeBadge /> : null}
+                  </span>
+                </h3>
+                <AiButton
+                  isPending={aiPlanetLoading === p.key}
+                  onClick={() => onAiPlanet(p.key)}
+                  label="Aprofundar com IA"
+                  size="sm"
+                  className="shrink-0 text-xs h-8"
+                />
+              </div>
+              <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
+                {planetInSignInterpretation(p.key, p.sign as SignName)}
+              </p>
+              {aiPlanetTexts[p.key] ? (
+                <AiTextCard
+                  text={aiPlanetTexts[p.key]!}
+                  cachedAt={aiPlanetCachedAt[p.key]}
+                  className="mt-3 rounded-md border border-primary/15 bg-primary/5 p-3 text-sm"
+                />
+              ) : null}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+});
+
+// ─── Tab: Casas ───────────────────────────────────────────────────────────────
+
+interface CasasTabProps {
+  houses: HousePosition[];
+  planetsByHouse: Map<number, PlanetPosition[]>;
+  storedHouseSystem: HouseSystemId;
+}
+
+const CasasTab = memo(function CasasTab({
+  houses,
+  planetsByHouse,
+  storedHouseSystem,
+}: CasasTabProps) {
+  return (
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+      <p className="text-sm text-muted-foreground">
+        Sistema usado neste mapa: <strong>{HOUSE_SYSTEM_LABELS[storedHouseSystem]}</strong>. Altere
+        o padrão em{" "}
+        <Link to="/configuracoes" className="text-primary underline underline-offset-2">
+          Configurações
+        </Link>{" "}
+        e use &quot;Recalcular mapa&quot; para aplicar outro sistema sem criar um mapa novo.
+      </p>
+      {houses.map((house) => {
+        const inHouse = planetsByHouse.get(house.number) ?? [];
+        return (
+          <Card key={house.number}>
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3 className="font-display text-base font-semibold">
+                    Casa {house.number}{" "}
+                    <span className="text-muted-foreground font-normal text-sm">
+                      · cúspide em {house.sign} ({formatDegree(house.cusp)})
+                    </span>
+                  </h3>
+                  <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
+                    {HOUSE_MEANINGS[house.number]}
+                  </p>
+                </div>
+              </div>
+              {inHouse.length > 0 ? (
+                <ul className="mt-3 space-y-2 border-t border-border/60 pt-3">
+                  {inHouse.map((p) => (
+                    <li key={p.key} className="text-sm">
+                      <span className="font-medium">
+                        {p.symbol} {p.name}
+                      </span>{" "}
+                      em {p.sign} ({formatDegree(p.longitude)}){" "}
+                      {p.retrograde ? <RetrogradeBadge inline /> : null} —{" "}
+                      <span className="text-muted-foreground">
+                        {planetInHouseInterpretation(p.key, house.number) ||
+                          `${p.name} em ${p.sign} colore esta área com sua energia arquetípica.`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-3 text-sm text-muted-foreground italic">
+                  Nenhum planeta listado neste segmento (útil para áreas mais livres de ênfase
+                  planetária direta).
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+});
+
+// ─── Tab: Aspectos ────────────────────────────────────────────────────────────
+
+interface AspectosTabProps {
+  filteredAspects: Aspect[];
+  totalAspects: number;
+  aspectFilter: "todos" | "harmonicos" | "desafiadores";
+  setAspectFilter: (v: "todos" | "harmonicos" | "desafiadores") => void;
+  planetByKey: Map<PlanetKey, PlanetPosition>;
+}
+
+const AspectosTab = memo(function AspectosTab({
+  filteredAspects,
+  totalAspects,
+  aspectFilter,
+  setAspectFilter,
+  planetByKey,
+}: AspectosTabProps) {
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm text-muted-foreground">Filtrar:</span>
+        <Select
+          value={aspectFilter}
+          onValueChange={(v) => setAspectFilter(v as "todos" | "harmonicos" | "desafiadores")}
+        >
+          <SelectTrigger className="w-[200px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os aspectos</SelectItem>
+            <SelectItem value="harmonicos">Harmônicos (trígono, sextil)</SelectItem>
+            <SelectItem value="desafiadores">Desafiadores (quadratura, oposição)</SelectItem>
+          </SelectContent>
+        </Select>
+        <Badge variant="secondary" className="font-normal">
+          {filteredAspects.length} de {totalAspects}
+        </Badge>
+      </div>
+      {filteredAspects.length === 0 ? (
+        <div className="rounded-lg border border-border/80 p-4 text-sm text-muted-foreground">
+          Nenhum aspecto neste filtro (ou lista vazia).
+        </div>
+      ) : (
+        <NatalAspectsVirtualList aspects={filteredAspects} planetByKey={planetByKey} />
+      )}
+    </div>
+  );
+});
+
+// ─── Rota ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/_authenticated/mapas/$id")({
   component: ChartView,
@@ -68,29 +377,16 @@ function ChartView() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session, user } = useAuth();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  useEffect(() => {
-    if (!user?.id) return;
-    insertEngagementEventDeduped(supabase, user.id, {
-      route_key: ENGAGEMENT_ROUTES.mapas_detail,
-      topic_key: ENGAGEMENT_TOPICS.chart_detail_open,
-      meta: { chart_id: id },
-    });
-  }, [user?.id, id]);
+  usePageEngagement(
+    ENGAGEMENT_ROUTES.mapas_detail,
+    ENGAGEMENT_TOPICS.chart_detail_open,
+    { meta: { chart_id: id } },
+    [id],
+  );
 
-  const { data: profile } = useQuery({
-    queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("house_system, subscription_tier")
-        .eq("id", user!.id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: profile } = useProfile();
 
   const [aspectFilter, setAspectFilter] = useState<"todos" | "harmonicos" | "desafiadores">(
     "todos",
@@ -109,7 +405,11 @@ function ChartView() {
     setAiPlanetCachedAt({});
   }, [id]);
 
-  const { data: chart, isLoading } = useQuery({
+  const {
+    data: chart,
+    isLoading,
+    isError: chartLoadError,
+  } = useQuery({
     queryKey: ["chart", id],
     queryFn: async () => {
       const { data, error } = await supabase.from("charts").select("*").eq("id", id).single();
@@ -214,14 +514,15 @@ function ChartView() {
   }, [parsedChart, angles.ascendant]);
 
   const handleDelete = useCallback(async () => {
-    if (!confirm("Excluir este mapa?")) return;
-    const { error } = await supabase.from("charts").delete().eq("id", id);
-    if (error) toast.error(error.message);
-    else {
+    if (!session) return;
+    try {
+      await deleteChartFn({ data: id, ...withSupabaseAuth(session) });
       toast.success("Mapa excluído");
       navigate({ to: "/dashboard" });
+    } catch (e) {
+      await toastServerFnError(e);
     }
-  }, [id, navigate]);
+  }, [id, session, navigate]);
 
   const aiExecutiveMutation = useMutation<AiInterpretationFnResult, Error, void>({
     mutationFn: async () => {
@@ -272,6 +573,12 @@ function ChartView() {
     onError: (e) => void toastServerFnError(e),
   });
 
+  const handleAiPlanet = useCallback(
+    (key: PlanetKey) => aiPlanetMutation.mutate(key),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [aiPlanetMutation.mutate],
+  );
+
   const recalcMutation = useMutation<RecalculateChartFnResult, Error, void>({
     mutationFn: async () => {
       if (!session) throw new Error("Sessão necessária.");
@@ -301,6 +608,19 @@ function ChartView() {
             <Skeleton className="h-40 w-full rounded-xl" />
           </div>
         </div>
+      </div>
+    );
+  }
+  if (chartLoadError) {
+    return (
+      <div className="container mx-auto max-w-5xl space-y-3 p-6">
+        <p className="text-destructive text-sm">Não foi possível carregar o mapa.</p>
+        <Button
+          variant="outline"
+          onClick={() => void queryClient.invalidateQueries({ queryKey: ["chart", id] })}
+        >
+          Tentar novamente
+        </Button>
       </div>
     );
   }
@@ -346,11 +666,35 @@ function ChartView() {
               Recalcular mapa
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handleDelete}>
+          <Button variant="outline" size="sm" onClick={() => setDeleteDialogOpen(true)}>
             <Trash2 className="mr-1 h-4 w-4" /> Excluir
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <TriangleAlert className="h-5 w-5 text-destructive" />
+              Excluir mapa permanentemente?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O mapa, as interpretações em cache e todos os dados
+              associados serão removidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void handleDelete()}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {needsRecalc && (
         <div className="text-sm text-muted-foreground mb-4 space-y-2">
@@ -402,24 +746,18 @@ function ChartView() {
                   </span>
                 ) : null}
               </p>
-              <Button
-                size="sm"
-                variant="secondary"
-                disabled={aiExecutiveMutation.isPending}
+              <AiButton
+                isPending={aiExecutiveMutation.isPending}
                 onClick={() => aiExecutiveMutation.mutate()}
-              >
-                {aiExecutiveMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
-                )}
-                Gerar resumo executivo
-              </Button>
+                label="Gerar resumo executivo"
+                variant="secondary"
+              />
               {aiExecutiveText ? (
-                <article className="space-y-2 rounded-lg border bg-card p-4 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                  <AiCacheAgeBadge cachedAt={aiExecutiveCachedAt} />
-                  {aiExecutiveText}
-                </article>
+                <AiTextCard
+                  text={aiExecutiveText}
+                  cachedAt={aiExecutiveCachedAt}
+                  className="rounded-lg border bg-card p-4 text-sm"
+                />
               ) : null}
             </CollapsibleContent>
           </CardContent>
@@ -446,264 +784,36 @@ function ChartView() {
               <TabsTrigger value="aspectos">Aspectos</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="essencia" className="space-y-5 mt-4">
-              {chartEssence?.sun && (
-                <Card>
-                  <CardContent className="p-5">
-                    <h3 className="font-display text-lg font-semibold">
-                      ☉ Sol em {chartEssence.sun.sign}{" "}
-                      <span className="text-muted-foreground text-sm">
-                        · {formatDegree(chartEssence.sun.longitude)}
-                      </span>
-                    </h3>
-                    <p className="mt-2 text-sm text-foreground/80">
-                      {SUN_IN_SIGN[chartEssence.sun.sign as SignName]}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-              {chartEssence?.moon && (
-                <Card>
-                  <CardContent className="p-5">
-                    <h3 className="font-display text-lg font-semibold">
-                      ☽ Lua em {chartEssence.moon.sign}{" "}
-                      <span className="text-muted-foreground text-sm">
-                        · {formatDegree(chartEssence.moon.longitude)}
-                      </span>
-                    </h3>
-                    <p className="mt-2 text-sm text-foreground/80">
-                      {MOON_IN_SIGN[chartEssence.moon.sign as SignName]}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-              <Card>
-                <CardContent className="p-5">
-                  <h3 className="font-display text-lg font-semibold">
-                    ↗ Ascendente em {chartEssence!.ascSign}{" "}
-                    <span className="text-muted-foreground text-sm">
-                      · {formatDegree(chartEssence!.ascendant)}
-                    </span>
-                  </h3>
-                  <p className="mt-2 text-sm text-foreground/80">
-                    {ASC_IN_SIGN[chartEssence!.ascSign]}
-                  </p>
-                </CardContent>
-              </Card>
-
-              {chartPatterns &&
-                (chartPatterns.grand_trines.length > 0 ||
-                  chartPatterns.t_squares.length > 0 ||
-                  chartPatterns.grand_crosses.length > 0 ||
-                  chartPatterns.yods.length > 0) && (
-                  <Card className="border-primary/20 bg-primary/5">
-                    <CardContent className="p-5 space-y-4">
-                      <h3 className="font-display text-lg font-semibold">
-                        Configurações especiais
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        Padrões geométricos entre planetas (orbes do cálculo natal). Leitura
-                        simbólica, não determinística.
-                      </p>
-                      <ul className="space-y-4 text-sm">
-                        {chartPatterns.grand_trines.map((g, idx) => (
-                          <li key={`gt-${idx}-${g.planets.join("-")}`}>
-                            <p className="font-medium">Grande trígono ({g.element})</p>
-                            <p className="text-muted-foreground">{planetKeysLabelPt(g.planets)}</p>
-                            <p className="mt-1 text-foreground/85">
-                              {SPECIAL_GEOMETRY_BLURBS.grand_trine}
-                            </p>
-                          </li>
-                        ))}
-                        {chartPatterns.t_squares.map((t, idx) => (
-                          <li key={`ts-${idx}-${t.apex}-${t.opposition.join("-")}`}>
-                            <p className="font-medium">T-quadrado</p>
-                            <p className="text-muted-foreground">
-                              Vértice {planetKeysLabelPt([t.apex])} · oposição{" "}
-                              {planetKeysLabelPt([t.opposition[0], t.opposition[1]])}
-                            </p>
-                            <p className="mt-1 text-foreground/85">
-                              {SPECIAL_GEOMETRY_BLURBS.t_square}
-                            </p>
-                          </li>
-                        ))}
-                        {chartPatterns.grand_crosses.map((gc, idx) => (
-                          <li key={`gc-${idx}-${gc.planets.join("-")}`}>
-                            <p className="font-medium">Grande cruz</p>
-                            <p className="text-muted-foreground">{planetKeysLabelPt(gc.planets)}</p>
-                            <p className="mt-1 text-foreground/85">
-                              {SPECIAL_GEOMETRY_BLURBS.grand_cross}
-                            </p>
-                          </li>
-                        ))}
-                        {chartPatterns.yods.map((y, idx) => (
-                          <li key={`yod-${idx}-${y.apex}-${y.sextile.join("-")}`}>
-                            <p className="font-medium">Yod (Dedo de Deus)</p>
-                            <p className="text-muted-foreground">
-                              Vértice {planetKeysLabelPt([y.apex])} · base em sextil{" "}
-                              {planetKeysLabelPt([y.sextile[0], y.sextile[1]])}
-                            </p>
-                            <p className="mt-1 text-foreground/85">{SPECIAL_GEOMETRY_BLURBS.yod}</p>
-                          </li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                )}
+            <TabsContent value="essencia" className="mt-4">
+              <EssenciaTab chartEssence={chartEssence!} chartPatterns={chartPatterns} />
             </TabsContent>
 
-            <TabsContent
-              value="planetas"
-              className="mt-4 space-y-3 max-h-[70vh] overflow-y-auto pr-1"
-            >
-              {PLANETS.map((meta) => {
-                const p = planetByKey.get(meta.key);
-                if (!p) return null;
-                return (
-                  <Card key={p.key}>
-                    <CardContent className="p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <h3 className="font-display text-base font-semibold">
-                          <span className="mr-1.5">{p.symbol}</span>
-                          {p.name} em {p.sign}{" "}
-                          <span className="text-muted-foreground text-sm font-normal inline-flex flex-wrap items-center gap-1">
-                            · {formatDegree(p.longitude)} · Casa {p.house}
-                            {p.retrograde ? (
-                              <Badge
-                                variant="outline"
-                                className="text-amber-600 border-amber-400 text-[10px] px-1 py-0 font-normal"
-                              >
-                                ℞
-                              </Badge>
-                            ) : null}
-                          </span>
-                        </h3>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="shrink-0 text-xs h-8"
-                          disabled={aiPlanetLoading === p.key}
-                          onClick={() => aiPlanetMutation.mutate(p.key)}
-                        >
-                          {aiPlanetLoading === p.key ? (
-                            <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                          ) : (
-                            <Sparkles className="mr-1 h-3 w-3" />
-                          )}
-                          Aprofundar com IA
-                        </Button>
-                      </div>
-                      <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
-                        {planetInSignInterpretation(p.key, p.sign as SignName)}
-                      </p>
-                      {aiPlanetTexts[p.key] ? (
-                        <article className="mt-3 space-y-2 rounded-md border border-primary/15 bg-primary/5 p-3 text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                          <AiCacheAgeBadge cachedAt={aiPlanetCachedAt[p.key]} />
-                          {aiPlanetTexts[p.key]}
-                        </article>
-                      ) : null}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <TabsContent value="planetas" className="mt-4">
+              <PlanetasTab
+                planetByKey={planetByKey}
+                aiPlanetTexts={aiPlanetTexts}
+                aiPlanetCachedAt={aiPlanetCachedAt}
+                aiPlanetLoading={aiPlanetLoading}
+                onAiPlanet={handleAiPlanet}
+              />
             </TabsContent>
 
-            <TabsContent value="casas" className="mt-4 space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-              <p className="text-sm text-muted-foreground">
-                Sistema usado neste mapa: <strong>{HOUSE_SYSTEM_LABELS[storedHouseSystem]}</strong>.
-                Altere o padrão em{" "}
-                <Link to="/configuracoes" className="text-primary underline underline-offset-2">
-                  Configurações
-                </Link>{" "}
-                e use &quot;Recalcular mapa&quot; para aplicar outro sistema sem criar um mapa novo.
-              </p>
-              {chartEssence!.houses.map((house) => {
-                const inHouse = planetsByHouse.get(house.number) ?? [];
-                return (
-                  <Card key={house.number}>
-                    <CardContent className="p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <h3 className="font-display text-base font-semibold">
-                            Casa {house.number}{" "}
-                            <span className="text-muted-foreground font-normal text-sm">
-                              · cúspide em {house.sign} ({formatDegree(house.cusp)})
-                            </span>
-                          </h3>
-                          <p className="mt-2 text-sm text-foreground/85 leading-relaxed">
-                            {HOUSE_MEANINGS[house.number]}
-                          </p>
-                        </div>
-                      </div>
-                      {inHouse.length > 0 ? (
-                        <ul className="mt-3 space-y-2 border-t border-border/60 pt-3">
-                          {inHouse.map((p) => (
-                            <li key={p.key} className="text-sm">
-                              <span className="font-medium">
-                                {p.symbol} {p.name}
-                              </span>{" "}
-                              em {p.sign} ({formatDegree(p.longitude)}){" "}
-                              {p.retrograde ? (
-                                <Badge
-                                  variant="outline"
-                                  className="align-middle text-amber-600 border-amber-400 text-[10px] px-1 py-0 font-normal"
-                                >
-                                  ℞
-                                </Badge>
-                              ) : null}{" "}
-                              —{" "}
-                              <span className="text-muted-foreground">
-                                {planetInHouseInterpretation(p.key, house.number) ||
-                                  `${p.name} em ${p.sign} colore esta área com sua energia arquetípica.`}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="mt-3 text-sm text-muted-foreground italic">
-                          Nenhum planeta listado neste segmento (útil para áreas mais livres de
-                          ênfase planetária direta).
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <TabsContent value="casas" className="mt-4">
+              <CasasTab
+                houses={chartEssence!.houses}
+                planetsByHouse={planetsByHouse}
+                storedHouseSystem={storedHouseSystem}
+              />
             </TabsContent>
 
-            <TabsContent value="aspectos" className="mt-4 space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="text-sm text-muted-foreground">Filtrar:</span>
-                <Select
-                  value={aspectFilter}
-                  onValueChange={(v) =>
-                    setAspectFilter(v as "todos" | "harmonicos" | "desafiadores")
-                  }
-                >
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os aspectos</SelectItem>
-                    <SelectItem value="harmonicos">Harmônicos (trígono, sextil)</SelectItem>
-                    <SelectItem value="desafiadores">
-                      Desafiadores (quadratura, oposição)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <Badge variant="secondary" className="font-normal">
-                  {filteredAspects.length} de {chartEssence!.aspects.length}
-                </Badge>
-              </div>
-
-              {filteredAspects.length === 0 ? (
-                <div className="rounded-lg border border-border/80 p-4 text-sm text-muted-foreground">
-                  Nenhum aspecto neste filtro (ou lista vazia).
-                </div>
-              ) : (
-                <NatalAspectsVirtualList aspects={filteredAspects} planetByKey={planetByKey} />
-              )}
+            <TabsContent value="aspectos" className="mt-4">
+              <AspectosTab
+                filteredAspects={filteredAspects}
+                totalAspects={chartEssence!.aspects.length}
+                aspectFilter={aspectFilter}
+                setAspectFilter={setAspectFilter}
+                planetByKey={planetByKey}
+              />
             </TabsContent>
           </Tabs>
         </div>

@@ -32,9 +32,16 @@ interface Props {
   overlayChart: ChartData;
   synastryAspects: SynastryCrossAspect[];
   size?: number;
+  ariaLabel?: string;
 }
 
-function SynastryBiWheelComponent({ baseChart, overlayChart, synastryAspects, size = 520 }: Props) {
+function SynastryBiWheelComponent({
+  baseChart,
+  overlayChart,
+  synastryAspects,
+  size = 520,
+  ariaLabel = "Biwheel de sinastria — dois mapas sobrepostos com aspectos cruzados",
+}: Props) {
   const cx = size / 2;
   const cy = size / 2;
   const rOuter = size / 2 - 4;
@@ -72,6 +79,8 @@ function SynastryBiWheelComponent({ baseChart, overlayChart, synastryAspects, si
       initial={{ opacity: 0, scale: 0.94 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.55, ease: "easeOut" }}
+      role="img"
+      aria-label={ariaLabel}
       viewBox={`0 0 ${size} ${size}`}
       className="w-full h-auto max-w-[560px]"
     >

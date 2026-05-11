@@ -67,11 +67,16 @@ describe("synastryNarrativeInputSchema", () => {
 });
 
 describe("cronTransitDigestSchema", () => {
-  it("exige secret com comprimento mínimo", () => {
+  it("exige secret com comprimento mínimo de 32 caracteres", () => {
     expect(cronTransitDigestSchema.safeParse({ cronSecret: "short" }).success).toBe(false);
     expect(cronTransitDigestSchema.safeParse({ cronSecret: "at-least-16-chars!" }).success).toBe(
-      true,
+      false,
     );
+    expect(
+      cronTransitDigestSchema.safeParse({
+        cronSecret: "this-secret-is-exactly-32-chars!",
+      }).success,
+    ).toBe(true);
   });
 });
 

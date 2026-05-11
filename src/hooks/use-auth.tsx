@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -24,27 +24,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
     // Then read existing session
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: s } }) => {
+        setSession(s);
+        setLoading(false);
+      })
+      .catch(() => {
+        // Network failure reading session — treat as logged-out
+        setLoading(false);
+      });
     return () => subscription.unsubscribe();
   }, []);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user: session?.user ?? null,
-        session,
-        loading,
-        signOut: async () => {
-          await supabase.auth.signOut();
-        },
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user: session?.user ?? null,
+      session,
+      loading,
+      signOut: async () => {
+        await supabase.auth.signOut();
+      },
+    }),
+    [session, loading],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

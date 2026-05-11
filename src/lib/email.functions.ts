@@ -5,7 +5,7 @@ import { ASPECT_LABELS } from "@/data/chart-detail-interpretations";
 import type { HouseSystemId } from "@/lib/astrology/calculate";
 import type { TransitDayPayload } from "@/lib/astrology/transits";
 import { analyzeTransitDay, formatTransitDayTitle } from "@/lib/astrology/transits";
-import { PLANETS, type SignName } from "@/lib/astrology/zodiac";
+import { getPlanetName, type SignName } from "@/lib/astrology/zodiac";
 import { chartRowToChartData } from "@/lib/chart-from-row";
 import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
 import { assertCronCallerIpAllowed } from "@/lib/cron-caller-guard";
@@ -41,15 +41,11 @@ export function saoPauloDigestContext(d = new Date()): {
   return { dateStr, hour: Number.isNaN(hour) ? 12 : hour, weekday: idx === -1 ? 0 : idx };
 }
 
-function planetPt(k: string) {
-  return PLANETS.find((p) => p.key === k)?.name ?? k;
-}
-
 export function buildTransitDigestHtml(chartName: string, day: TransitDayPayload): string {
   const title = formatTransitDayTitle(day.date);
   const aspectLines = day.aspects.slice(0, 12).map((a) => {
-    const p1 = escapeHtml(planetPt(a.planet1));
-    const p2 = escapeHtml(planetPt(a.planet2));
+    const p1 = escapeHtml(getPlanetName(a.planet1));
+    const p2 = escapeHtml(getPlanetName(a.planet2));
     const aspectLabel = escapeHtml(ASPECT_LABELS[a.type] ?? String(a.type));
     const orb = escapeHtml(String(a.orb));
     return `<li>${p1} (trânsito) ${aspectLabel} ${p2} natal — orbe ${orb}°</li>`;
@@ -194,6 +190,23 @@ export const sendTransitDigestEmailFn = createServerFn({ method: "POST" })
       const houseSystem = (chart.house_system as HouseSystemId | undefined) ?? "placidus";
       const day = analyzeTransitDay(dateStr, cd.planets, cd.houses, cd.ascendant, houseSystem);
 
+      // Rate limit: 1 manual digest per chart per date (prevents accidental spam)
+      const since24h = new Date(Date.now() - 86_400_000).toISOString();
+      const { count: recentCount } = await supabase
+        .from("user_engagement_events")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .eq("topic_key", "transit_digest_sent")
+        .eq("route_key", data.chartId)
+        .gte("created_at", since24h);
+      if ((recentCount ?? 0) > 0) {
+        throw jsonError(
+          429,
+          "ALREADY_SENT",
+          "Digest para este mapa já foi enviado hoje. Tente novamente amanhã.",
+        );
+      }
+
       const html = buildTransitDigestHtml(chart.name, day);
 
       await sendViaResend({
@@ -202,6 +215,14 @@ export const sendTransitDigestEmailFn = createServerFn({ method: "POST" })
         to: authUser.user.email,
         subject: `Trânsitos ${day.date} — ${chart.name}`,
         html,
+      });
+
+      // Record the send so the rate limit check above works
+      void supabase.from("user_engagement_events").insert({
+        user_id: userId,
+        route_key: data.chartId,
+        topic_key: "transit_digest_sent",
+        meta: { date: day.date } as unknown as import("@/integrations/supabase/types").Json,
       });
 
       return { ok: true as const, to: authUser.user.email, date: day.date };
@@ -299,7 +320,8 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
           });
           sent++;
         } catch (e) {
-          console.error("[transit-digest-cron]", row.id, e);
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error("[transit-digest-cron] email failed", row.id, msg.slice(0, 200));
           skipped++;
         }
       }
@@ -400,7 +422,8 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
           });
           momentSent++;
         } catch (e) {
-          console.error("[moment-daily-email-cron]", row.id, e);
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error("[moment-daily-email-cron] email failed", row.id, msg.slice(0, 200));
           momentSkipped++;
         }
       }

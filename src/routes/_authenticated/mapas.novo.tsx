@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { BirthChartForm } from "@/components/BirthChartForm";
 import { UpgradeMapModal } from "@/components/UpgradeMapModal";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useProfile } from "@/hooks/use-profile";
+import { useChartsListQuery } from "@/hooks/use-charts-list";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/mapas/novo")({
@@ -12,33 +12,12 @@ export const Route = createFileRoute("/_authenticated/mapas/novo")({
 });
 
 function NovoMapa() {
-  const { user, session } = useAuth();
+  const { session } = useAuth();
   const navigate = useNavigate();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
 
-  const { data: profile } = useQuery({
-    queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("subscription_tier")
-        .eq("id", user!.id)
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
-
-  const { data: charts = [] } = useQuery({
-    queryKey: ["charts", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("charts").select("id").eq("user_id", user!.id);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user,
-  });
+  const { data: profile } = useProfile();
+  const { data: charts = [] } = useChartsListQuery();
 
   const freeBlocked = profile?.subscription_tier === "FREE" && charts.length >= 1;
 

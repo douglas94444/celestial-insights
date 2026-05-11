@@ -97,7 +97,7 @@ function PremiumPlansPage() {
               Ativar assinatura (em breve)
             </Button>
             <p className="text-center text-xs text-muted-foreground">
-              Quando o Stripe estiver ligado, o botão substitui este estado desativado.
+              Quando o Mercado Pago estiver ligado, o botão substitui este estado desativado.
             </p>
           </CardContent>
         </Card>

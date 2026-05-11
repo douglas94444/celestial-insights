@@ -4,7 +4,7 @@ import type { HouseSystemId } from "@/lib/astrology/calculate";
 import { calculateChart } from "@/lib/astrology/calculate";
 import { birthChartInputSchema } from "@/lib/schemas/birth-chart";
 import { chartGeometryToSupabaseJson } from "@/lib/schemas/chart-payload";
-import { recalculateChartInputSchema } from "@/lib/schemas/server-fns";
+import { chartIdSchema, recalculateChartInputSchema } from "@/lib/schemas/server-fns";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
 import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
@@ -158,5 +158,55 @@ export const recalculateChartFn = createServerFn({ method: "POST" })
       if (updateErr) throw jsonError(500, "UPDATE", updateErr.message);
 
       return { chart: updated, computed };
+    }),
+  );
+
+/** Define um mapa como primário, desmarcando os demais do mesmo utilizador. Operação atômica. */
+export const makePrimaryChartFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    const parsed = chartIdSchema.safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
+    return parsed.data;
+  })
+  .handler(
+    timedServerFn("makePrimaryChartFn", async ({ data: chartId, context }) => {
+      const { supabase, userId } = context;
+
+      const { error: e1 } = await supabase
+        .from("charts")
+        .update({ is_primary: false })
+        .eq("user_id", userId);
+      if (e1) throw jsonError(500, "UNSET_PRIMARY", e1.message);
+
+      const { error: e2 } = await supabase
+        .from("charts")
+        .update({ is_primary: true })
+        .eq("id", chartId)
+        .eq("user_id", userId);
+      if (e2) throw jsonError(500, "SET_PRIMARY", e2.message);
+
+      return { ok: true };
+    }),
+  );
+
+/** Exclui um mapa (apenas o dono). */
+export const deleteChartFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => {
+    const parsed = chartIdSchema.safeParse(input);
+    if (!parsed.success) throwValidationResponse(parsed.error);
+    return parsed.data;
+  })
+  .handler(
+    timedServerFn("deleteChartFn", async ({ data: chartId, context }) => {
+      const { supabase, userId } = context;
+      const { error } = await supabase
+        .from("charts")
+        .delete()
+        .eq("id", chartId)
+        .eq("user_id", userId);
+      if (error) throw jsonError(500, "DELETE", error.message);
+      return { ok: true };
     }),
   );

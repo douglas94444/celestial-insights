@@ -1,19 +1,21 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Stars, Sparkles, CalendarRange } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { fetchChartsList } from "@/hooks/use-charts-list";
+import { fetchProfile } from "@/hooks/use-profile";
+import { Plus, Stars, Sparkles, CalendarRange } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AiButton } from "@/components/AiButton";
+import { AiTextCard } from "@/components/AiTextCard";
+import { TransitScoreBadges } from "@/components/TransitScoreBadges";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
 import { UpgradeMapModal } from "@/components/UpgradeMapModal";
 import { useDailyMoment } from "@/hooks/use-daily-moment";
 import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  ENGAGEMENT_ROUTES,
-  ENGAGEMENT_TOPICS,
-  insertEngagementEventDeduped,
-} from "@/lib/engagement";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS } from "@/lib/engagement";
+import { usePageEngagement } from "@/hooks/use-page-engagement";
 import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -22,16 +24,28 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 
 function Dashboard() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const { user } = useAuth();
+  const prefetchedRef = useRef(false);
 
+  usePageEngagement(ENGAGEMENT_ROUTES.dashboard, ENGAGEMENT_TOPICS.dashboard_open);
+
+  // Prefetch dados usados pelas rotas seguintes mais prováveis
   useEffect(() => {
-    if (!user?.id) return;
-    insertEngagementEventDeduped(supabase, user.id, {
-      route_key: ENGAGEMENT_ROUTES.dashboard,
-      topic_key: ENGAGEMENT_TOPICS.dashboard_open,
+    if (!user?.id || prefetchedRef.current) return;
+    prefetchedRef.current = true;
+    void qc.prefetchQuery({
+      queryKey: ["charts", user.id],
+      queryFn: fetchChartsList,
+      staleTime: 60_000,
     });
-  }, [user?.id]);
+    void qc.prefetchQuery({
+      queryKey: ["profile", user.id],
+      queryFn: () => fetchProfile(user.id),
+      staleTime: 10 * 60_000,
+    });
+  }, [user?.id, qc]);
 
   const {
     profile,
@@ -220,22 +234,22 @@ function Dashboard() {
                 {moonSkyLine ? (
                   <p className="mb-2 text-xs leading-snug text-muted-foreground">{moonSkyLine}</p>
                 ) : null}
-                <div className="mb-2 flex flex-wrap gap-2">
-                  <Badge variant="outline" className="text-[10px]">
-                    Humor {transitToday.scores.humor}/100
-                  </Badge>
-                  <Badge variant="outline" className="text-[10px]">
-                    Relações {transitToday.scores.amor}/100
-                  </Badge>
-                  <Badge variant="outline" className="text-[10px]">
-                    Trabalho {transitToday.scores.trabalho}/100
-                  </Badge>
+                <div className="mb-2">
+                  <TransitScoreBadges scores={transitToday.scores} />
                 </div>
                 <ul className="list-disc space-y-1 pl-4 text-sm leading-snug">
                   {transitToday.narrative.slice(0, 4).map((line, i) => (
                     <li key={i}>{line}</li>
                   ))}
                 </ul>
+                {transitToday.narrative.length > 4 && (
+                  <Link
+                    to="/transitos"
+                    className="mt-1 inline-block text-xs font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    Ver trânsitos completos →
+                  </Link>
+                )}
                 {transitToday.interpretiveHints.length > 0 ? (
                   <div className="mt-3 border-t border-primary/10 pt-3">
                     <p className="mb-1 text-[10px] font-medium uppercase text-muted-foreground">
@@ -250,26 +264,18 @@ function Dashboard() {
                 ) : null}
 
                 <div className="mt-3 space-y-2 border-t border-primary/10 pt-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="w-full border-primary/25 text-xs"
-                    disabled={dashTransitAiMutation.isPending}
-                    aria-label="Gerar explicação do trânsito de hoje com inteligência artificial"
+                  <AiButton
+                    isPending={dashTransitAiMutation.isPending}
                     onClick={() => dashTransitAiMutation.mutate()}
-                  >
-                    {dashTransitAiMutation.isPending ? (
-                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                    ) : (
-                      <Sparkles className="mr-2 h-3 w-3" />
-                    )}
-                    Explicar hoje com IA
-                  </Button>
+                    label="Explicar hoje com IA"
+                    aria-label="Gerar explicação do trânsito de hoje com inteligência artificial"
+                    className="w-full border-primary/25 text-xs"
+                  />
                   {dashTransitAi ? (
-                    <article className="rounded-md border border-primary/10 bg-background/40 p-2 text-xs leading-relaxed whitespace-pre-wrap text-foreground/90">
-                      {dashTransitAi}
-                    </article>
+                    <AiTextCard
+                      text={dashTransitAi}
+                      className="rounded-md border border-primary/10 bg-background/40 p-2 text-xs"
+                    />
                   ) : null}
                 </div>
               </div>

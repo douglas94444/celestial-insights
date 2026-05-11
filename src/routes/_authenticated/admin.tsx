@@ -9,7 +9,8 @@ import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { useAuth } from "@/hooks/use-auth";
 import { useUserIsAdmin } from "@/hooks/use-user-is-admin";
 
-const SUPABASE_PROJECT_REF = "fxcoxnqqjgvqfukasfjb";
+const SUPABASE_PROJECT_REF =
+  import.meta.env.VITE_SUPABASE_URL?.replace(/^https?:\/\//, "").split(".")[0] ?? "";
 const SUPABASE_DASHBOARD_URL = `https://supabase.com/dashboard/project/${SUPABASE_PROJECT_REF}`;
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -118,18 +119,32 @@ function AdminPage() {
           </div>
         ) : metrics ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <MetricCard title="Perfis" value={metrics.profiles_count} />
-            <MetricCard title="Mapas" value={metrics.charts_count} />
-            <MetricCard title="Sinastrias" value={metrics.synastries_count} />
-            <MetricCard title="Registos de humor" value={metrics.mood_logs_count} />
-            <MetricCard title="Entradas cache IA" value={metrics.ai_cache_count} />
+            <MetricCard title="Perfis" value={metrics.profiles_count} subtitle="total acumulado" />
+            <MetricCard title="Mapas" value={metrics.charts_count} subtitle="total acumulado" />
             <MetricCard
-              title="Eventos de produto (total)"
-              value={metrics.engagement_events_total}
+              title="Sinastrias"
+              value={metrics.synastries_count}
+              subtitle="total acumulado"
             />
             <MetricCard
-              title="Eventos de produto (7 dias)"
+              title="Registos de humor"
+              value={metrics.mood_logs_count}
+              subtitle="total acumulado"
+            />
+            <MetricCard
+              title="Entradas cache IA"
+              value={metrics.ai_cache_count}
+              subtitle="total acumulado"
+            />
+            <MetricCard
+              title="Eventos de produto"
+              value={metrics.engagement_events_total}
+              subtitle="total acumulado"
+            />
+            <MetricCard
+              title="Eventos de produto"
               value={metrics.engagement_events_last_7d}
+              subtitle="últimos 7 dias"
             />
           </div>
         ) : (
@@ -140,7 +155,15 @@ function AdminPage() {
   );
 }
 
-function MetricCard({ title, value }: { title: string; value: number }) {
+function MetricCard({
+  title,
+  value,
+  subtitle,
+}: {
+  title: string;
+  value: number;
+  subtitle?: string;
+}) {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -150,6 +173,11 @@ function MetricCard({ title, value }: { title: string; value: number }) {
         <p className="font-display text-3xl font-bold tabular-nums">
           {value.toLocaleString("pt-BR")}
         </p>
+        {subtitle && (
+          <p className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground/70">
+            {subtitle}
+          </p>
+        )}
       </CardContent>
     </Card>
   );

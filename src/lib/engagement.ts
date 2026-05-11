@@ -29,7 +29,7 @@ export const ENGAGEMENT_TOPICS = {
 } as const;
 
 /** Registo fire-and-forget de utilização (RLS: apenas o próprio utilizador). */
-export function insertEngagementEvent(
+function insertEngagementEvent(
   client: SupabaseClient<Database>,
   userId: string,
   row: { route_key: string; topic_key?: string | null; meta?: Json },

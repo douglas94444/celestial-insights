@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Loader2, Sparkles, Share2, Download, Copy } from "lucide-react";
@@ -12,8 +12,11 @@ import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AiCacheAgeBadge, AiCacheAgeBadgeFromResult } from "@/components/AiCacheAgeBadge";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ShareableMomentCard } from "@/components/ShareableMomentCard";
-import { MoodWidget } from "@/components/MoodWidget";
+const MoodWidget = lazy(() =>
+  import("@/components/MoodWidget").then((m) => ({ default: m.MoodWidget })),
+);
 import { useDailyMoment } from "@/hooks/use-daily-moment";
 import {
   touchMomentStreak,
@@ -38,17 +41,10 @@ import {
 import { primarySunMoonAsc } from "@/lib/personalized-moment";
 import { pickMomentFallbackQuote, signLabelPt } from "@/data/daily-moment-fallback";
 import { buildMomentQuoteLines } from "@/lib/moment-quote";
-import {
-  ENGAGEMENT_ROUTES,
-  ENGAGEMENT_TOPICS,
-  insertEngagementEventDeduped,
-} from "@/lib/engagement";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  captureMomentShareCardPng,
-  downloadBlob,
-  sharePngIfPossible,
-} from "@/lib/share-card-export";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS } from "@/lib/engagement";
+import { usePageEngagement } from "@/hooks/use-page-engagement";
+import { AiButton } from "@/components/AiButton";
+import { AiTextCard } from "@/components/AiTextCard";
 import { buildShareCardDailyExtras, buildTransitLuckFingerprint } from "@/data/share-card-daily";
 
 export const Route = createFileRoute("/_authenticated/momento")({
@@ -92,13 +88,14 @@ function MomentoPage() {
     user,
   } = useDailyMoment();
 
-  useEffect(() => {
-    if (!primary?.id || !user?.id) return;
-    insertEngagementEventDeduped(supabase, user.id, {
-      route_key: ENGAGEMENT_ROUTES.momento,
-      topic_key: ENGAGEMENT_TOPICS.moment_open,
-    });
-  }, [primary?.id, user?.id]);
+  usePageEngagement(
+    ENGAGEMENT_ROUTES.momento,
+    ENGAGEMENT_TOPICS.moment_open,
+    {
+      enabled: !!primary?.id,
+    },
+    [primary?.id],
+  );
 
   const viewYmd = pickedYmd ?? todayStr;
   const isTodayView = viewYmd === todayStr;
@@ -328,6 +325,8 @@ function MomentoPage() {
     if (!cardRef.current) return;
     setExporting(true);
     try {
+      const { captureMomentShareCardPng, sharePngIfPossible, downloadBlob } =
+        await import("@/lib/share-card-export");
       const blob = await captureMomentShareCardPng(cardRef.current);
       const filename = `astro-moment-${viewYmd}.png`;
       const shared = await sharePngIfPossible(blob, filename, "Meu momento com o céu — AstroMap");
@@ -344,6 +343,7 @@ function MomentoPage() {
     if (!cardRef.current) return;
     setExporting(true);
     try {
+      const { captureMomentShareCardPng, downloadBlob } = await import("@/lib/share-card-export");
       const blob = await captureMomentShareCardPng(cardRef.current);
       await downloadBlob(blob, `astro-moment-${viewYmd}.png`);
       toast.success("Imagem guardada");
@@ -421,7 +421,17 @@ function MomentoPage() {
 
       {primary?.id ? (
         <div className="mb-8">
-          <MoodWidget chartId={primary.id} todayStr={todayStr} viewYmd={viewYmd} />
+          <ErrorBoundary
+            fallback={
+              <p className="text-center text-xs text-muted-foreground py-4">
+                Widget de humor indisponível.
+              </p>
+            }
+          >
+            <Suspense fallback={null}>
+              <MoodWidget chartId={primary.id} todayStr={todayStr} viewYmd={viewYmd} />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       ) : null}
 
@@ -522,45 +532,33 @@ function MomentoPage() {
 
           {isTodayView ? (
             <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-primary/25"
-                disabled={dashTransitAiMutation.isPending}
-                aria-label="Gerar texto do dia com inteligência artificial"
+              <AiButton
+                isPending={dashTransitAiMutation.isPending}
                 onClick={() => dashTransitAiMutation.mutate()}
-              >
-                {dashTransitAiMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
-                )}
-                Iluminar com IA
-              </Button>
-              <Button
-                type="button"
+                label="Iluminar com IA"
+                aria-label="Gerar texto do dia com inteligência artificial"
+                className="w-full border-primary/25"
+              />
+              <AiButton
+                isPending={morningDeepMutation.isPending}
+                onClick={() => morningDeepMutation.mutate()}
+                label="Carta do dia (profunda)"
+                aria-label="Gerar carta do dia profunda com estrutura JSON"
                 variant="secondary"
                 className="w-full border border-primary/10"
-                disabled={morningDeepMutation.isPending}
-                aria-label="Gerar carta do dia profunda com estrutura JSON"
-                onClick={() => morningDeepMutation.mutate()}
-              >
-                {morningDeepMutation.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-4 w-4" />
-                )}
-                Carta do dia (profunda)
-              </Button>
+              />
             </div>
           ) : null}
           {dashAiShown ? (
-            <article className="space-y-2 whitespace-pre-wrap rounded-md border border-primary/10 bg-background/40 p-3 text-xs leading-relaxed text-foreground/90">
-              {isTodayView && dashTransitAiCachedAt ? (
-                <AiCacheAgeBadge cachedAt={dashTransitAiCachedAt} />
-              ) : null}
-              {dashAiShown}
-            </article>
+            <AiTextCard
+              text={dashAiShown}
+              badge={
+                isTodayView && dashTransitAiCachedAt ? (
+                  <AiCacheAgeBadge cachedAt={dashTransitAiCachedAt} />
+                ) : null
+              }
+              className="rounded-md border border-primary/10 bg-background/40 p-3 text-xs"
+            />
           ) : null}
           {isTodayView && morningDeep ? (
             <article className="space-y-3 rounded-md border border-accent/20 bg-muted/25 p-3 text-xs leading-relaxed text-foreground/90">
@@ -579,6 +577,10 @@ function MomentoPage() {
                 <p className="text-[11px] text-muted-foreground">{morningDeep.closing_note}</p>
               ) : null}
             </article>
+          ) : isTodayView && morningDeepMutation.isError ? (
+            <p className="text-center text-xs text-muted-foreground">
+              Não foi possível carregar a carta profunda do dia. Tente novamente.
+            </p>
           ) : null}
         </CardContent>
       </Card>
@@ -589,6 +591,17 @@ function MomentoPage() {
           <div className="flex justify-center">
             <AiCacheAgeBadgeFromResult result={natalEssenceQuery.data} />
           </div>
+        ) : null}
+        {natalEssenceQuery.isError && isTodayView ? (
+          <p className="text-center text-xs text-muted-foreground">
+            Essência natal indisponível no momento.{" "}
+            <button
+              className="underline underline-offset-2"
+              onClick={() => void natalEssenceQuery.refetch()}
+            >
+              Tentar novamente
+            </button>
+          </p>
         ) : null}
         <p className="text-center text-xs text-muted-foreground/90">
           Pré-visualização do dia selecionado — exportação em alta resolução (1080×1350). Legenda e

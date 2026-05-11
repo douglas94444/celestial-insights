@@ -18,7 +18,12 @@ function Onboarding() {
   const navigate = useNavigate();
   const { user, session } = useAuth();
 
-  const { data: charts = [], isFetched } = useQuery({
+  const {
+    data: charts = [],
+    isFetched,
+    isError: chartsError,
+    refetch: refetchCharts,
+  } = useQuery({
     queryKey: ["charts", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -30,6 +35,19 @@ function Onboarding() {
     },
     enabled: !!user,
   });
+
+  if (chartsError) {
+    return (
+      <div className="container mx-auto max-w-xl px-4 py-24 text-center">
+        <p className="text-muted-foreground">
+          Não foi possível carregar seus dados. Verifique sua conexão e tente novamente.
+        </p>
+        <Button variant="outline" className="mt-6" onClick={() => void refetchCharts()}>
+          Tentar novamente
+        </Button>
+      </div>
+    );
+  }
 
   if (user && isFetched && charts.length > 0) {
     return <Navigate to="/dashboard" replace />;

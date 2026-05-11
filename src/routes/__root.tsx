@@ -1,3 +1,4 @@
+import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -9,6 +10,7 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/hooks/use-auth";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
@@ -24,11 +26,31 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:title", content: "AstroMap — Seu Mapa Astral Completo" },
       { name: "twitter:title", content: "AstroMap — Seu Mapa Astral Completo" },
-      { name: "description", content: "A modern astrology platform for detailed birth charts, compatibility analysis, and planetary transit tracking." },
-      { property: "og:description", content: "A modern astrology platform for detailed birth charts, compatibility analysis, and planetary transit tracking." },
-      { name: "twitter:description", content: "A modern astrology platform for detailed birth charts, compatibility analysis, and planetary transit tracking." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ce4c0761-7274-484b-9faf-89110fb77a8e/id-preview-6a518360--d4e8693b-554a-4129-b5e5-8110d5012555.lovable.app-1778457821294.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ce4c0761-7274-484b-9faf-89110fb77a8e/id-preview-6a518360--d4e8693b-554a-4129-b5e5-8110d5012555.lovable.app-1778457821294.png" },
+      {
+        name: "description",
+        content:
+          "A modern astrology platform for detailed birth charts, compatibility analysis, and planetary transit tracking.",
+      },
+      {
+        property: "og:description",
+        content:
+          "A modern astrology platform for detailed birth charts, compatibility analysis, and planetary transit tracking.",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "A modern astrology platform for detailed birth charts, compatibility analysis, and planetary transit tracking.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ce4c0761-7274-484b-9faf-89110fb77a8e/id-preview-6a518360--d4e8693b-554a-4129-b5e5-8110d5012555.lovable.app-1778457821294.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/ce4c0761-7274-484b-9faf-89110fb77a8e/id-preview-6a518360--d4e8693b-554a-4129-b5e5-8110d5012555.lovable.app-1778457821294.png",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -80,7 +102,9 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <Outlet />
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
           <Toaster />
         </AuthProvider>
       </ThemeProvider>

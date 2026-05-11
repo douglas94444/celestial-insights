@@ -143,10 +143,28 @@ export function useDailyMoment() {
   const moonSign = planets.find((p) => p.key === "moon")?.sign as SignName | undefined;
   const ascSign = houses[0]?.sign as SignName | undefined;
 
-  const todayStr = useMemo(
-    () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }),
-    [],
+  const [todayStr, setTodayStr] = useState(() =>
+    new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }),
   );
+
+  useEffect(() => {
+    function refreshTodaySp() {
+      const next = new Date().toLocaleDateString("en-CA", {
+        timeZone: "America/Sao_Paulo",
+      });
+      setTodayStr((prev) => (prev !== next ? next : prev));
+    }
+    refreshTodaySp();
+    const intervalId = setInterval(refreshTodaySp, 60_000);
+    function onVisibility() {
+      if (document.visibilityState === "visible") refreshTodaySp();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
 
   const weekEndStr = useMemo(() => {
     const [y, m, d] = todayStr.split("-").map(Number);

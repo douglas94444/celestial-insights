@@ -7,10 +7,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CompositeChartWheel } from "@/components/CompositeChartWheel";
+import { SynastryAspectsVirtualList } from "@/components/SynastryAspectsVirtualList";
 import {
   Select,
   SelectContent,
@@ -22,7 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AiCacheAgeBadgeFromResult } from "@/components/AiCacheAgeBadge";
 import { SynastryBiWheel } from "@/components/SynastryBiWheel";
 import { supabase } from "@/integrations/supabase/client";
-import type { AspectType, ChartData } from "@/lib/astrology/calculate";
+import type { ChartData } from "@/lib/astrology/calculate";
 import type {
   SynastryAnalysis,
   SynastryAreaScores,
@@ -53,9 +53,6 @@ import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
 import { useChartsListQuery } from "@/hooks/use-charts-list";
-import { PLANETS } from "@/lib/astrology/zodiac";
-import type { PlanetKey } from "@/lib/astrology/zodiac";
-import { ASPECT_LABELS, aspectMood } from "@/data/chart-detail-interpretations";
 
 export const Route = createFileRoute("/_authenticated/compatibilidade")({
   component: CompatibilidadePage,
@@ -103,10 +100,6 @@ function synastryScorePresentation(score: number) {
       value: v,
     };
   return { label: "Alta" as const, labelClass: "text-green-600 dark:text-green-400", value: v };
-}
-
-function planetDisplayName(key: PlanetKey) {
-  return PLANETS.find((p) => p.key === key)?.name ?? key;
 }
 
 const AREA_META: { key: keyof SynastryAreaScores; title: string; hint: string }[] = [
@@ -691,59 +684,14 @@ function CompatibilidadePage() {
                       Todos os aspectos cruzados
                       <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                     </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="border-t divide-y divide-border max-h-[min(60vh,480px)] overflow-y-auto px-0 pb-3">
-                        {activeView.analysis.aspects.length === 0 ? (
-                          <p className="p-4 text-sm text-muted-foreground">
-                            Nenhum aspecto na lista.
-                          </p>
-                        ) : (
-                          [...activeView.analysis.aspects]
-                            .sort((a, b) => a.orb - b.orb)
-                            .map((a, idx) => {
-                              const mood = aspectMood(a.type);
-                              const label =
-                                ASPECT_LABELS[a.type as AspectType] ??
-                                String(a.type).replace(/_/g, " ");
-                              return (
-                                <div
-                                  key={`${a.planet1}-${a.planet2}-${a.type}-${idx}`}
-                                  className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"
-                                >
-                                  <span>
-                                    <span className="font-medium">
-                                      {planetDisplayName(a.planet1)}
-                                    </span>
-                                    {" — "}
-                                    <span className="font-medium">
-                                      {planetDisplayName(a.planet2)}
-                                    </span>
-                                    {" · "}
-                                    <span className="text-muted-foreground">{label}</span>
-                                    {" · órbe "}
-                                    <span className="tabular-nums">{a.orb}°</span>
-                                  </span>
-                                  <Badge
-                                    variant="secondary"
-                                    className={
-                                      mood === "harmonic"
-                                        ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200"
-                                        : mood === "desafiador"
-                                          ? "bg-amber-500/15 text-amber-900 dark:text-amber-100"
-                                          : ""
-                                    }
-                                  >
-                                    {mood === "harmonic"
-                                      ? "harmônico"
-                                      : mood === "desafiador"
-                                        ? "desafiador"
-                                        : "neutro"}
-                                  </Badge>
-                                </div>
-                              );
-                            })
-                        )}
-                      </div>
+                    <CollapsibleContent className="border-t">
+                      {activeView.analysis.aspects.length === 0 ? (
+                        <p className="p-4 text-sm text-muted-foreground">
+                          Nenhum aspecto na lista.
+                        </p>
+                      ) : (
+                        <SynastryAspectsVirtualList aspects={activeView.analysis.aspects} />
+                      )}
                     </CollapsibleContent>
                   </Collapsible>
                 </div>

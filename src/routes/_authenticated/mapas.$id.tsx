@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, Loader2, RefreshCw, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,13 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { AiCacheAgeBadge } from "@/components/AiCacheAgeBadge";
 import { NatalChartWheel } from "@/components/NatalChartWheel";
+import { NatalAspectsVirtualList } from "@/components/NatalAspectsVirtualList";
 import { computeAngles, type HouseSystemId } from "@/lib/astrology/calculate";
 import { HOUSE_SYSTEM_LABELS } from "@/lib/astrology/houses";
 import type { ChartData, PlanetPosition } from "@/lib/astrology/calculate";
 import { signFromLongitude, formatDegree, PLANETS, type PlanetKey } from "@/lib/astrology/zodiac";
 import { SUN_IN_SIGN, MOON_IN_SIGN, ASC_IN_SIGN } from "@/data/interpretations";
 import {
-  ASPECT_LABELS,
   aspectMood,
   HOUSE_MEANINGS,
   planetInSignInterpretation,
@@ -38,7 +38,6 @@ import {
   SPECIAL_GEOMETRY_BLURBS,
 } from "@/lib/chart-patterns";
 import type { SignName } from "@/lib/astrology/zodiac";
-import type { AspectType } from "@/lib/astrology/calculate";
 import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
 import {
   generateNatalExecutiveSummaryFn,
@@ -172,6 +171,58 @@ function ChartView() {
     return deriveChartPatterns(cd);
   }, [parsedChart, angles.ascendant, angles.midheaven]);
 
+  const chartWheelData = useMemo((): ChartData | null => {
+    if (!parsedChart) return null;
+    const asc = parsedChart.houses[0]?.cusp ?? angles.ascendant;
+    return {
+      ascendant: asc,
+      midheaven: angles.midheaven,
+      planets: parsedChart.planets,
+      houses: parsedChart.houses,
+      aspects: parsedChart.aspects,
+    };
+  }, [parsedChart, angles.ascendant, angles.midheaven]);
+
+  const planetByKey = useMemo(() => {
+    if (!parsedChart) return new Map<PlanetKey, PlanetPosition>();
+    return new Map(parsedChart.planets.map((p) => [p.key, p]));
+  }, [parsedChart]);
+
+  const filteredAspects = useMemo(() => {
+    if (!parsedChart) return [];
+    return parsedChart.aspects.filter((a) => {
+      if (aspectFilter === "todos") return true;
+      const m = aspectMood(a.type);
+      if (aspectFilter === "harmonicos") return m === "harmonic";
+      return m === "desafiador";
+    });
+  }, [parsedChart, aspectFilter]);
+
+  const chartEssence = useMemo(() => {
+    if (!parsedChart) return null;
+    const ascendant = parsedChart.houses[0]?.cusp ?? angles.ascendant;
+    const planets = parsedChart.planets;
+    return {
+      sun: planets.find((p) => p.key === "sun"),
+      moon: planets.find((p) => p.key === "moon"),
+      ascendant,
+      ascSign: signFromLongitude(ascendant) as SignName,
+      planets,
+      houses: parsedChart.houses,
+      aspects: parsedChart.aspects,
+    };
+  }, [parsedChart, angles.ascendant]);
+
+  const handleDelete = useCallback(async () => {
+    if (!confirm("Excluir este mapa?")) return;
+    const { error } = await supabase.from("charts").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Mapa excluído");
+      navigate({ to: "/dashboard" });
+    }
+  }, [id, navigate]);
+
   const aiExecutiveMutation = useMutation<AiInterpretationFnResult, Error, void>({
     mutationFn: async () => {
       if (!session) throw new Error("Sessão necessária.");
@@ -267,37 +318,6 @@ function ChartView() {
         </Button>
       </div>
     );
-  }
-
-  const { planets, houses, aspects } = parsedChart;
-  const ascendant = houses[0]?.cusp ?? angles.ascendant;
-  const data: ChartData = {
-    ascendant,
-    midheaven: angles.midheaven,
-    planets,
-    houses,
-    aspects,
-  };
-
-  const sun = planets.find((p) => p.key === "sun");
-  const moon = planets.find((p) => p.key === "moon");
-  const ascSign = signFromLongitude(ascendant) as SignName;
-
-  const filteredAspects = aspects.filter((a) => {
-    if (aspectFilter === "todos") return true;
-    const m = aspectMood(a.type);
-    if (aspectFilter === "harmonicos") return m === "harmonic";
-    return m === "desafiador";
-  });
-
-  async function handleDelete() {
-    if (!confirm("Excluir este mapa?")) return;
-    const { error } = await supabase.from("charts").delete().eq("id", id);
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Mapa excluído");
-      navigate({ to: "/dashboard" });
-    }
   }
 
   return (
@@ -409,7 +429,7 @@ function ChartView() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardContent className="p-4">
-            <NatalChartWheel data={data} />
+            <NatalChartWheel data={chartWheelData!} />
             <p className="text-center text-xs text-muted-foreground mt-2">
               {HOUSE_SYSTEM_LABELS[storedHouseSystem]} · Meio do Céu (MC){" "}
               {formatDegree(angles.midheaven)} — {signFromLongitude(angles.midheaven)}
@@ -427,32 +447,32 @@ function ChartView() {
             </TabsList>
 
             <TabsContent value="essencia" className="space-y-5 mt-4">
-              {sun && (
+              {chartEssence!.sun && (
                 <Card>
                   <CardContent className="p-5">
                     <h3 className="font-display text-lg font-semibold">
-                      ☉ Sol em {sun.sign}{" "}
+                      ☉ Sol em {chartEssence.sun.sign}{" "}
                       <span className="text-muted-foreground text-sm">
-                        · {formatDegree(sun.longitude)}
+                        · {formatDegree(chartEssence.sun.longitude)}
                       </span>
                     </h3>
                     <p className="mt-2 text-sm text-foreground/80">
-                      {SUN_IN_SIGN[sun.sign as SignName]}
+                      {SUN_IN_SIGN[chartEssence.sun.sign as SignName]}
                     </p>
                   </CardContent>
                 </Card>
               )}
-              {moon && (
+              {chartEssence!.moon && (
                 <Card>
                   <CardContent className="p-5">
                     <h3 className="font-display text-lg font-semibold">
-                      ☽ Lua em {moon.sign}{" "}
+                      ☽ Lua em {chartEssence.moon.sign}{" "}
                       <span className="text-muted-foreground text-sm">
-                        · {formatDegree(moon.longitude)}
+                        · {formatDegree(chartEssence.moon.longitude)}
                       </span>
                     </h3>
                     <p className="mt-2 text-sm text-foreground/80">
-                      {MOON_IN_SIGN[moon.sign as SignName]}
+                      {MOON_IN_SIGN[chartEssence.moon.sign as SignName]}
                     </p>
                   </CardContent>
                 </Card>
@@ -460,12 +480,14 @@ function ChartView() {
               <Card>
                 <CardContent className="p-5">
                   <h3 className="font-display text-lg font-semibold">
-                    ↗ Ascendente em {ascSign}{" "}
+                    ↗ Ascendente em {chartEssence!.ascSign}{" "}
                     <span className="text-muted-foreground text-sm">
-                      · {formatDegree(ascendant)}
+                      · {formatDegree(chartEssence!.ascendant)}
                     </span>
                   </h3>
-                  <p className="mt-2 text-sm text-foreground/80">{ASC_IN_SIGN[ascSign]}</p>
+                  <p className="mt-2 text-sm text-foreground/80">
+                    {ASC_IN_SIGN[chartEssence!.ascSign]}
+                  </p>
                 </CardContent>
               </Card>
 
@@ -535,7 +557,7 @@ function ChartView() {
               className="mt-4 space-y-3 max-h-[70vh] overflow-y-auto pr-1"
             >
               {PLANETS.map((meta) => {
-                const p = planets.find((x) => x.key === meta.key);
+                const p = planetByKey.get(meta.key);
                 if (!p) return null;
                 return (
                   <Card key={p.key}>
@@ -596,7 +618,7 @@ function ChartView() {
                 </Link>{" "}
                 e use &quot;Recalcular mapa&quot; para aplicar outro sistema sem criar um mapa novo.
               </p>
-              {houses.map((house) => {
+              {chartEssence!.houses.map((house) => {
                 const inHouse = planetsByHouse.get(house.number) ?? [];
                 return (
                   <Card key={house.number}>
@@ -671,62 +693,17 @@ function ChartView() {
                   </SelectContent>
                 </Select>
                 <Badge variant="secondary" className="font-normal">
-                  {filteredAspects.length} de {aspects.length}
+                  {filteredAspects.length} de {chartEssence!.aspects.length}
                 </Badge>
               </div>
 
-              <div className="rounded-lg border border-border/80 divide-y divide-border/60 max-h-[60vh] overflow-y-auto">
-                {filteredAspects.length === 0 ? (
-                  <p className="p-4 text-sm text-muted-foreground">
-                    Nenhum aspecto neste filtro (ou lista vazia).
-                  </p>
-                ) : (
-                  filteredAspects.map((a, idx) => {
-                    const p1 = planets.find((p) => p.key === a.planet1);
-                    const p2 = planets.find((p) => p.key === a.planet2);
-                    if (!p1 || !p2) return null;
-                    const mood = aspectMood(a.type);
-                    return (
-                      <div
-                        key={`${a.planet1}-${a.planet2}-${a.type}-${idx}`}
-                        className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm"
-                      >
-                        <span>
-                          <span className="font-medium">
-                            {p1.symbol} {p1.name}
-                          </span>{" "}
-                          —{" "}
-                          <span className="font-medium">
-                            {p2.symbol} {p2.name}
-                          </span>
-                        </span>
-                        <span className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline">{ASPECT_LABELS[a.type as AspectType]}</Badge>
-                          <span className="text-muted-foreground">
-                            órbe {a.orb}° · ângulo {a.exactAngle}°
-                          </span>
-                          <Badge
-                            variant="secondary"
-                            className={
-                              mood === "harmonic"
-                                ? "bg-emerald-500/15 text-emerald-800 dark:text-emerald-200"
-                                : mood === "desafiador"
-                                  ? "bg-amber-500/15 text-amber-900 dark:text-amber-100"
-                                  : ""
-                            }
-                          >
-                            {mood === "harmonic"
-                              ? "harmônico"
-                              : mood === "desafiador"
-                                ? "desafiador"
-                                : "neutro"}
-                          </Badge>
-                        </span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+              {filteredAspects.length === 0 ? (
+                <div className="rounded-lg border border-border/80 p-4 text-sm text-muted-foreground">
+                  Nenhum aspecto neste filtro (ou lista vazia).
+                </div>
+              ) : (
+                <NatalAspectsVirtualList aspects={filteredAspects} planetByKey={planetByKey} />
+              )}
             </TabsContent>
           </Tabs>
         </div>

@@ -39,7 +39,31 @@ TanStack Router with file-based routes. **`src/routeTree.gen.ts` is auto-generat
 
 - `__root.tsx` — providers: `QueryClientProvider`, `ThemeProvider`, `AuthProvider`, `Toaster`
 - `_authenticated.tsx` — layout guard: checks Supabase session via cookie (SSR) or `getSession()` (client), redirects to `/auth` if missing. Renders `AppSidebar` + `AppAuthenticatedHeader`.
-- `_authenticated/*.tsx` — protected pages (dashboard, mapas, transitos, compatibilidade, momento, configuracoes, premium, onboarding)
+- `_authenticated/*.tsx` — rotas protegidas (ver tabela abaixo).
+
+### Páginas e funcionalidades (mapa do produto)
+
+Rotas em `src/routes/`. Textos de UI em **PT-BR**. Nome comercial na app: **AstroMap**.
+
+| Rota | Ficheiro | O que faz |
+|------|----------|-----------|
+| `/` | `index.tsx` | Landing: marketing, CTAs para registo, lista de funcionalidades. |
+| `/auth` | `auth.tsx` | Separadores Entrar / Criar conta (email+senha), OAuth Google; redirect após sessão (`emailRedirectTo` pode incluir `/onboarding`). |
+| `/reset-password` | `reset-password.tsx` | Fluxo de recuperação de palavra-passe (Supabase). |
+| `/dashboard` | `_authenticated/dashboard.tsx` | Resumo: mapa principal (`NatalChartWheel`), horóscopo do dia, trânsitos vs natal, link para Momento / mapa. Limite FREE para número de mapas + modal upgrade. |
+| `/onboarding` | `_authenticated/onboarding.tsx` | Primeiro mapa via `BirthChartForm`; redirect para detalhe do mapa ou dashboard se já existir mapa. |
+| `/mapas` | `_authenticated/mapas.tsx` | Lista de mapas do utilizador; badge «Primário»; menu tornar primário (update em cascata); links para novo mapa e detalhe. |
+| `/mapas/novo` | `_authenticated/mapas.novo.tsx` | Criar mapa adicional (mesmo fluxo de formulário + upgrade FREE). |
+| `/mapas/$id` | `_authenticated/mapas.$id.tsx` | Detalhe do mapa: roda natal, separadores Essência (Sol/Lua/Asc + **Configurações especiais**: Grand Trine, T-Square, Grand Cross, Yod), Planetas (interpretações + IA por planeta), Casas (planeta-em-casa), Aspectos (filtro + lista virtualizada). Ações: recalcular geometria, excluir mapa; IA resumo executivo. |
+| `/transitos` | `_authenticated/transitos.tsx` | Separadores **Período** (janela ±30/60/90 dias, calendário, lista do dia, filtros de aspectos, IA do dia, PDF, email digest) e **Ano** (previsão anual: `generateAnnualForecastFn`). |
+| `/compatibilidade` | `_authenticated/compatibilidade.tsx` | Dois mapas: sinastria (`calculateAndSaveSynastryFn`), biwheel, scores por área, destaques, lista «Todos os aspectos cruzados» (virtualizada), IA sinastria / sinastria profunda; separador **Mapa composto** (`calculateCompositeFn`, roda composta, IA `composite`). Histórico paginado de sinastrias guardadas. |
+| `/momento` | `_authenticated/momento.tsx` | Dia civil (SP): cartão partilhável, streak, histórico local, IA «Momento», export PNG do cartão, **MoodWidget** (humor + gráfico vs intensidade). |
+| `/configuracoes` | `_authenticated/configuracoes.tsx` | Perfil (nome, género, avatar), sistema de casas, preferências; gestão de conta / eliminar conta (server fn). |
+| `/premium` | `_authenticated/premium.tsx` | Planos / upgrade PREMIUM. |
+
+**Server functions** (`src/lib/*.functions.ts`): `astrology.functions.ts` — `calculateChartFn` (pré-visualização de mapa, rate limit `chart_preview_calc_events`); `charts.functions.ts` — CRUD mapas, recalcular geometria; `transits.functions.ts` — trânsitos por intervalo; `annual-forecast.functions.ts`; `synastry.functions.ts`; `composite.functions.ts`; `ai-interpretation.functions.ts` (IAs em cache); `mood.functions.ts`; `email.functions.ts` (digest trânsitos); `profile.functions.ts`. Cliente: `withSupabaseAuth(session)`. Erros: `server-fn-http.ts`; quotas IA: `assertAiGenerationAllowed`.
+
+**Componentes notáveis**: `NatalChartWheel`, `SynastryBiWheel`, `CompositeChartWheel`, `ShareableMomentCard`, `BirthChartForm`, `MoodWidget`, listas virtualizadas (`NatalAspectsVirtualList`, `SynastryAspectsVirtualList`), PDF `TransitReportPdf`.
 
 ### Authentication
 
@@ -75,8 +99,11 @@ Pure-TS calculation in `src/lib/astrology/`. Core files:
 - `calculate.ts` — `calculateChart(input)` → `ChartData`; `computePlanetPositionsUtc(date)` for transits without houses; `utcBirthInstant(input)` converts local birth time + timezone offset to UTC
 - `zodiac.ts` — `PLANETS` array (13 bodies incl. Chiron, North/South Node), `signFromLongitude`, `formatDegree`
 - `houses.ts` — Placidus, Equal, and Whole Sign house systems
-- `transits.ts` — `analyzeTransitDay(date, natalPlanets, natalHouses, ascendant, houseSystem)`
-- `synastry.ts` — cross-aspect analysis and area scores
+- `transits.ts` — `analyzeTransitDay`, `analyzeTransitRange`; filtros auxiliares para UI de trânsitos
+- `synastry.ts` — aspectos cruzados e scores por área
+- `annual-forecast.ts` — `buildAnnualForecast(year, …)`: intensidade mensal, ingressos planetas lentos, retrógrados Mercúrio/Vênus/Marte
+- `composite.ts` — mapa composto por midpoint de longitudes + casas derivadas → `ChartData`
+- `chart-patterns.ts` — `deriveChartPatterns`: Stellium, Grand Trine, T-Square, Grand Cross, Yod (quincúncio por longitude local)
 
 `astronomy-engine` provides geocentric ephemeris. Chiron and lunar nodes are computed with manual formulas in `extra-bodies.ts`.
 
@@ -94,7 +121,7 @@ All AI server functions (`src/lib/ai-interpretation.functions.ts`) follow the sa
 4. Check quota via `assertAiGenerationAllowed` (24h rolling + monthly for FREE tier)
 5. Call LLM, insert into cache (handle `23505` duplicate race)
 
-Supported kinds: `natal_summary`, `natal_planet`, `synastry`, `synastry_deep`, `transit_day`, `morning_deep`, `natal_essence`.
+Supported kinds (`interpretation_ai_kind`): `natal_summary`, `natal_planet`, `synastry`, `synastry_deep`, `transit_day`, `morning_deep`, `natal_essence`, `composite`.
 
 ### Database (Supabase)
 
@@ -102,8 +129,9 @@ Migrations in `supabase/migrations/`. Key tables:
 
 - `profiles` — extends `auth.users`; holds `subscription_tier` (FREE/PREMIUM), `house_system`, personalization prefs, streak data
 - `charts` — natal chart rows; `chart_geometry` JSON column stores `ChartData`; `house_system`, `timezone_offset_minutes`
-- `synastries` — synastry pairs; `compatibility_data` JSON
-- `interpretation_ai_cache` — cached AI outputs keyed by `(user_id, kind, fingerprint)`
+- `synastries` — sinastrias guardadas; `compatibility_data` JSON
+- `mood_logs` — diário de humor (`user_id`, `ymd`, `mood_score`, `emotions`, `note`; índice único por utilizador+dia)
+- `interpretation_ai_cache` — cache de IAs por `(user_id, kind, fingerprint)`
 - `chart_preview_calc_events` — rate-limiting table for `calculateChartFn`
 - `user_engagement_events` — analytics; fire-and-forget via `insertEngagementEventDeduped`
 
@@ -114,6 +142,8 @@ Types auto-generated at `src/integrations/supabase/types.ts` — run `npm run su
 shadcn/ui components in `src/components/ui/` (Radix UI primitives). TailwindCSS v4. Fonts: Cormorant Garamond (`font-display` class) + Inter (body).
 
 Toast notifications via `sonner`. All user-facing strings are in Portuguese (PT-BR).
+
+**Hooks úteis**: `use-auth.tsx`, `use-charts-list.ts` (lista de mapas React Query), `use-daily-moment.ts` (Momento + Dashboard: trânsitos do dia/semana, geometria do mapa primário, `todayStr` America/Sao_Paulo com atualização ao longo do dia).
 
 ### Environment Variables
 

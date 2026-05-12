@@ -412,7 +412,7 @@ function PremiumPlansPage() {
     if (checkoutReady) parts.push("Pix (SyncPay)");
     if (mpTransparent) parts.push("Cartão (MP — nesta página)");
     if (mpCheckoutPro) parts.push("Checkout MP (redirecionar)");
-    if (parts.length === 0) return "Pagamento em preparação";
+    if (parts.length === 0) return "Pagamento indisponível neste ambiente";
     return parts.join(" · ");
   })();
 
@@ -806,12 +806,13 @@ function PremiumPlansPage() {
           <div className="mx-auto max-w-2xl space-y-3">
             <Alert className="border-muted bg-muted/30">
               <Info className="h-4 w-4 text-muted-foreground" />
-              <AlertTitle>Pagamentos em configuração</AlertTitle>
+              <AlertTitle>Meios de pagamento indisponíveis</AlertTitle>
               <AlertDescription className="space-y-3">
                 <p>
-                  O checkout nesta página ainda não está ativo: os botões ficam desativados até o
-                  servidor (Cloudflare Worker ou ambiente local) ter Pix via SyncPay e/ou Mercado
-                  Pago corretamente configurados. Pode continuar a usar o app com o plano atual.
+                  Não foi possível ativar Pix ou Mercado Pago nesta sessão: os botões de pagamento
+                  ficam desativados até o servidor (Cloudflare Worker ou ambiente local) ter SyncPay
+                  e/ou Mercado Pago corretamente configurados. Pode continuar a usar o app com o
+                  plano atual.
                 </p>
                 <ul className="list-inside list-disc space-y-1 text-sm">
                   <li>

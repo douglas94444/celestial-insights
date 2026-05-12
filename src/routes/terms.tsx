@@ -68,12 +68,11 @@ function TermsPage() {
           <section>
             <h2 className="font-display text-xl font-semibold">5. Planos e pagamentos</h2>
             <p className="mt-2 text-muted-foreground leading-relaxed">
-              O AstroMap prevê assinatura nos planos Mensal e Anual, com o mesmo conjunto de
+              O AstroMap oferece assinatura nos planos Mensal e Anual, com o mesmo conjunto de
               recursos; os valores vigentes estão na página pública de planos e na área autenticada.
-              O checkout de pagamentos está em preparação — nenhuma cobrança será realizada sem
-              confirmação explícita e ativação dos meios de pagamento. Enquanto o checkout não
-              estiver ativo, a conta pode dispor de acesso completo às funcionalidades, conforme
-              comunicado na interface.
+              O checkout de pagamentos está ativo: as cobranças ocorrem apenas após confirmação
+              explícita no fluxo de pagamento (Pix e/ou cartão via provedores indicados na
+              interface), nos termos exibidos no momento da compra.
             </p>
             <p className="mt-2 text-muted-foreground leading-relaxed">
               As assinaturas pagas poderão ser canceladas conforme as regras exibidas no checkout.

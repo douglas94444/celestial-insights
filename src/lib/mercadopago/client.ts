@@ -68,6 +68,8 @@ function mercadoPagoPublicKeyForTransparent(): string {
   const viteKey = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY as string | undefined;
   const a = typeof viteKey === "string" ? viteKey.trim() : "";
   if (a) return a;
+  const runtimeViteKey = process.env.VITE_MERCADOPAGO_PUBLIC_KEY?.trim();
+  if (runtimeViteKey) return runtimeViteKey;
   return process.env.MERCADOPAGO_PUBLIC_KEY?.trim() ?? "";
 }
 

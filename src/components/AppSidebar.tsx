@@ -32,6 +32,7 @@ import { useProfile } from "@/hooks/use-profile";
 import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
 import type { RolloutGates } from "@/lib/subscription-rollout";
 import { rolloutLockedMessage } from "@/lib/subscription-rollout";
+import { Lock } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -69,6 +70,8 @@ export function AppSidebar() {
     return [...items.slice(0, 5), ...(showAdmin ? [adminEntry] : []), ...items.slice(5)];
   }, [showAdmin]);
 
+  const isFreeRestricted = rollout?.freeRestricted ?? false;
+
   return (
     <TooltipProvider delayDuration={300}>
       <Sidebar collapsible="icon">
@@ -97,9 +100,13 @@ export function AppSidebar() {
                   const isMomento = item.url === "/momento";
                   const gate = item.rolloutGate;
                   const rolloutBlocked = !!rollout?.active && !!gate && !rollout.gates[gate];
-                  const rolloutTooltip = rolloutBlocked
-                    ? rolloutLockedMessage(gate, rollout.dayIndex)
-                    : null;
+                  const freeBlocked = isFreeRestricted && !!gate;
+                  const isBlocked = rolloutBlocked || freeBlocked;
+                  const rolloutTooltip = freeBlocked
+                    ? "Adquira o Mapa Natal (R$ 37) para desbloquear esta área."
+                    : rolloutBlocked
+                      ? rolloutLockedMessage(gate, rollout.dayIndex)
+                      : null;
                   const expandedLink = (
                     <Link to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4 shrink-0" />
@@ -118,6 +125,18 @@ export function AppSidebar() {
                         </Badge>
                       ) : null}
                     </Link>
+                  );
+                  const expandedDisabledFree = (
+                    <span className="flex w-full cursor-not-allowed items-center gap-2 opacity-50">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                      <span className="flex-1 truncate">{item.title}</span>
+                      <Lock className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    </span>
+                  );
+                  const collapsedDisabledFree = (
+                    <span className="flex items-center gap-2 opacity-50">
+                      <item.icon className="h-4 w-4 shrink-0" />
+                    </span>
                   );
                   const collapsedLink = (
                     <Link to={item.url} className="flex items-center gap-2">
@@ -142,12 +161,12 @@ export function AppSidebar() {
                   );
                   return (
                     <SidebarMenuItem key={item.url}>
-                      {rolloutBlocked ? (
+                      {isBlocked ? (
                         collapsed ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <SidebarMenuButton isActive={false} className="pointer-events-none">
-                                {collapsedDisabled}
+                                {freeBlocked ? collapsedDisabledFree : collapsedDisabled}
                               </SidebarMenuButton>
                             </TooltipTrigger>
                             <TooltipContent side="right" className="max-w-xs">
@@ -158,7 +177,7 @@ export function AppSidebar() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <SidebarMenuButton isActive={false} className="pointer-events-none">
-                                {expandedDisabled}
+                                {freeBlocked ? expandedDisabledFree : expandedDisabled}
                               </SidebarMenuButton>
                             </TooltipTrigger>
                             <TooltipContent side="right" className="max-w-xs">
@@ -201,13 +220,26 @@ export function AppSidebar() {
                   size="icon"
                   className="w-full bg-mystical text-white hover:opacity-90"
                 >
-                  <Link to="/planos" aria-label="Planos">
+                  <Link
+                    to={isFreeRestricted ? "/assinatura" : "/planos"}
+                    search={isFreeRestricted ? { produto: "mapa" } : undefined}
+                    aria-label={isFreeRestricted ? "Comprar Mapa" : "Planos"}
+                  >
                     <Crown className="h-4 w-4" />
                   </Link>
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Planos</TooltipContent>
+              <TooltipContent side="right">
+                {isFreeRestricted ? "Comprar Mapa — R$ 37" : "Planos"}
+              </TooltipContent>
             </Tooltip>
+          ) : isFreeRestricted ? (
+            <Button asChild variant="default" className="bg-mystical text-white hover:opacity-90">
+              <Link to="/assinatura" search={{ produto: "mapa" }}>
+                <Crown className="mr-1 h-4 w-4" />
+                Comprar Mapa — R$ 37
+              </Link>
+            </Button>
           ) : (
             <Button asChild variant="default" className="bg-mystical text-white hover:opacity-90">
               <Link to="/planos">

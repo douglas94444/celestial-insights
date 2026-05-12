@@ -95,21 +95,52 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: orders, error: findErr } = await admin
+  // Procurar primeiro em syncpay_orders; se não encontrar, tentar mapa_orders
+  let orderId: string | null = null;
+  let orderUserId: string | null = null;
+  let orderPlan: string | null = null;
+  let isMapa = false;
+
+  const { data: spOrders, error: findErr } = await admin
     .from("syncpay_orders")
     .select("id, user_id, plan, status")
     .in("syncpay_identifier", parsed.candidateIds)
     .limit(1);
 
   if (findErr) {
-    console.error("[syncpay-webhook] select order", findErr.message);
+    console.error("[syncpay-webhook] select syncpay_order", findErr.message);
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   }
-  const order = orders?.[0];
-  if (!order) {
+
+  if (spOrders && spOrders.length > 0) {
+    orderId = spOrders[0].id;
+    orderUserId = spOrders[0].user_id;
+    orderPlan = spOrders[0].plan;
+    isMapa = false;
+  } else {
+    // Tentar mapa_orders (external_ref é o syncpay_identifier)
+    const { data: mapaOrders, error: mapaErr } = await admin
+      .from("mapa_orders")
+      .select("id, user_id, status")
+      .in("external_ref", parsed.candidateIds)
+      .limit(1);
+
+    if (mapaErr) {
+      console.error("[syncpay-webhook] select mapa_order", mapaErr.message);
+    }
+
+    if (mapaOrders && mapaOrders.length > 0) {
+      orderId = mapaOrders[0].id;
+      orderUserId = mapaOrders[0].user_id;
+      orderPlan = "mapa";
+      isMapa = true;
+    }
+  }
+
+  if (!orderId || !orderUserId) {
     console.warn("[syncpay-webhook] Pedido desconhecido:", parsed.candidateIds.join(", "));
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
@@ -125,32 +156,52 @@ Deno.serve(async (req) => {
     payloadJson = { _note: "unserializable_body" };
   }
 
-  const { error: upOrderErr } = await admin
-    .from("syncpay_orders")
-    .update({
-      status: newStatus,
-      raw_last_payload: payloadJson,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", order.id);
+  if (isMapa) {
+    const { error: upOrderErr } = await admin
+      .from("mapa_orders")
+      .update({
+        status:
+          newStatus === "completed" ? "completed" : newStatus === "failed" ? "failed" : "pending",
+        raw_last_payload: payloadJson,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
 
-  if (upOrderErr) {
-    console.error("[syncpay-webhook] update order", upOrderErr.message);
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    if (upOrderErr) {
+      console.error("[syncpay-webhook] update mapa_order", upOrderErr.message);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  } else {
+    const { error: upOrderErr } = await admin
+      .from("syncpay_orders")
+      .update({
+        status: newStatus,
+        raw_last_payload: payloadJson,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (upOrderErr) {
+      console.error("[syncpay-webhook] update syncpay_order", upOrderErr.message);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
   }
 
   if (newStatus === "completed") {
-    const tier = order.plan === "anual" ? "ANUAL" : "MENSAL";
+    const tier = isMapa ? "MAPA" : orderPlan === "anual" ? "ANUAL" : "MENSAL";
     const { error: profErr } = await admin
       .from("profiles")
       .update({
         subscription_tier: tier,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", order.user_id);
+      .eq("id", orderUserId);
 
     if (profErr) {
       console.error("[syncpay-webhook] update profile", profErr.message);

@@ -182,6 +182,17 @@ export function isSyncPayServerConfigured(): boolean {
   return Boolean(base && id && secret && hook && supabaseUrl);
 }
 
+/** Nomes de variáveis em falta para o Pix SyncPay (diagnóstico; usar só em dev / admin). */
+export function syncPayConfigurationGaps(): string[] {
+  const missing: string[] = [];
+  if (!process.env.SYNCPAY_API_BASE_URL?.trim()) missing.push("SYNCPAY_API_BASE_URL");
+  if (!process.env.SYNCPAY_CLIENT_ID?.trim()) missing.push("SYNCPAY_CLIENT_ID");
+  if (!process.env.SYNCPAY_CLIENT_SECRET?.trim()) missing.push("SYNCPAY_CLIENT_SECRET");
+  if (!process.env.SYNCPAY_WEBHOOK_TOKEN?.trim()) missing.push("SYNCPAY_WEBHOOK_TOKEN");
+  if (!getSupabaseUrl().trim()) missing.push("SUPABASE_URL");
+  return missing;
+}
+
 export function buildSyncPayWebhookUrl(): string {
   const supabaseUrl = normalizeBaseUrl(getSupabaseUrl().trim());
   const hookToken = process.env.SYNCPAY_WEBHOOK_TOKEN?.trim();

@@ -5,25 +5,28 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import type { Json } from "@/integrations/supabase/types";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
+import { shouldExposePaymentConfigurationGaps } from "@/lib/payment-configuration-diagnostics";
 import {
   buildMercadoPagoWebhookUrl,
   getMercadoPagoPublicKey,
   isMercadoPagoServerConfigured,
   isMercadoPagoTransparentConfigured,
+  mercadoPagoCheckoutProGaps,
   mercadoPagoCheckoutRedirectUrl,
   mercadoPagoCreatePreference,
   mercadoPagoGetPayment,
   mercadoPagoPostCardPayment,
+  mercadoPagoTransparentGaps,
   MercadoPagoApiError,
   MercadoPagoConfigError,
 } from "@/lib/mercadopago/client";
 import {
   amountForSubscriptionPlan,
   subscriptionPlanTitle,
-  type SubscriptionPlanId,
+  type SubscriptionProductId,
 } from "@/lib/subscription-pricing";
 
-const planSchema = z.enum(["mensal", "anual"]);
+const planSchema = z.enum(["mensal", "anual", "mapa"]);
 
 const createPreferenceSchema = z.object({
   plan: planSchema,
@@ -64,13 +67,28 @@ function userMessageFromMercadoPago(err: unknown): string {
 export const getMercadoPagoAvailabilityFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(
-    timedServerFn("getMercadoPagoAvailabilityFn", async () => {
+    timedServerFn("getMercadoPagoAvailabilityFn", async ({ context }) => {
       const publicKey = getMercadoPagoPublicKey();
-      return {
-        checkoutPro: isMercadoPagoServerConfigured(),
-        transparent: isMercadoPagoTransparentConfigured(),
+      const checkoutPro = isMercadoPagoServerConfigured();
+      const transparent = isMercadoPagoTransparentConfigured();
+      const base = {
+        checkoutPro,
+        transparent,
         publicKey: publicKey || undefined,
       } as const;
+      const diagnostics = await shouldExposePaymentConfigurationGaps(
+        context.supabase,
+        context.userId,
+      );
+      return diagnostics
+        ? ({
+            ...base,
+            configurationGaps: {
+              checkoutPro: mercadoPagoCheckoutProGaps(),
+              transparent: mercadoPagoTransparentGaps(),
+            },
+          } as const)
+        : base;
     }),
   );
 
@@ -135,7 +153,7 @@ export const createMercadoPagoPreferenceFn = createServerFn({ method: "POST" })
         );
       }
 
-      const plan = data.plan as SubscriptionPlanId;
+      const plan = data.plan as SubscriptionProductId;
       const amount = amountForSubscriptionPlan(plan);
       const title = subscriptionPlanTitle(plan);
       const orderId = crypto.randomUUID();
@@ -156,16 +174,31 @@ export const createMercadoPagoPreferenceFn = createServerFn({ method: "POST" })
           throw jsonError(502, "MERCADOPAGO_RESPONSE", "Resposta sem id da preferência.");
         }
 
-        const { error: insertErr } = await supabase.from("mercadopago_orders").insert({
-          id: orderId,
-          user_id: userId,
-          plan,
-          amount,
-          currency: "BRL",
-          external_reference: externalReference,
-          preference_id: preferenceId,
-          status: "pending",
-        });
+        let insertErr: { message: string } | null = null;
+        if (plan === "mapa") {
+          const { error } = await supabase.from("mapa_orders").insert({
+            id: orderId,
+            user_id: userId,
+            amount,
+            currency: "BRL",
+            payment_method: "mercadopago",
+            external_ref: externalReference,
+            status: "pending",
+          });
+          insertErr = error ?? null;
+        } else {
+          const { error } = await supabase.from("mercadopago_orders").insert({
+            id: orderId,
+            user_id: userId,
+            plan,
+            amount,
+            currency: "BRL",
+            external_reference: externalReference,
+            preference_id: preferenceId,
+            status: "pending",
+          });
+          insertErr = error ?? null;
+        }
 
         if (insertErr) {
           throw jsonError(500, "ORDER_INSERT", insertErr.message);
@@ -322,7 +355,7 @@ export const createMercadoPagoTransparentPaymentFn = createServerFn({ method: "P
         );
       }
 
-      const plan = data.plan as SubscriptionPlanId;
+      const plan = data.plan as SubscriptionProductId;
       const expectedAmount = amountForSubscriptionPlan(plan);
       if (Math.abs(data.transaction_amount - expectedAmount) > 0.02) {
         throw jsonError(400, "AMOUNT_MISMATCH", "Valor do pagamento não corresponde ao plano.");
@@ -337,16 +370,31 @@ export const createMercadoPagoTransparentPaymentFn = createServerFn({ method: "P
         throw jsonError(503, "WEBHOOK_URL", e instanceof Error ? e.message : "Webhook inválido.");
       }
 
-      const { error: insertErr } = await admin.from("mercadopago_orders").insert({
-        id: orderId,
-        user_id: userId,
-        plan,
-        amount: expectedAmount,
-        currency: "BRL",
-        external_reference: externalReference,
-        preference_id: null,
-        status: "pending",
-      });
+      let insertErr: { message: string } | null = null;
+      if (plan === "mapa") {
+        const { error } = await admin.from("mapa_orders").insert({
+          id: orderId,
+          user_id: userId,
+          amount: expectedAmount,
+          currency: "BRL",
+          payment_method: "mercadopago",
+          external_ref: externalReference,
+          status: "pending",
+        });
+        insertErr = error ?? null;
+      } else {
+        const { error } = await admin.from("mercadopago_orders").insert({
+          id: orderId,
+          user_id: userId,
+          plan,
+          amount: expectedAmount,
+          currency: "BRL",
+          external_reference: externalReference,
+          preference_id: null,
+          status: "pending",
+        });
+        insertErr = error ?? null;
+      }
 
       if (insertErr) {
         throw jsonError(500, "ORDER_INSERT", insertErr.message);
@@ -393,7 +441,7 @@ export const createMercadoPagoTransparentPaymentFn = createServerFn({ method: "P
         }
 
         if (mpStatus === "approved") {
-          const tier = plan === "anual" ? "ANUAL" : "MENSAL";
+          const tier = plan === "anual" ? "ANUAL" : plan === "mapa" ? "MAPA" : "MENSAL";
           const { error: profErr } = await admin
             .from("profiles")
             .update({
@@ -404,6 +452,14 @@ export const createMercadoPagoTransparentPaymentFn = createServerFn({ method: "P
 
           if (profErr) {
             throw jsonError(500, "PROFILE_UPDATE", profErr.message);
+          }
+
+          if (plan === "mapa") {
+            await admin
+              .from("mapa_orders")
+              .update({ status: "completed", updated_at: new Date().toISOString() })
+              .eq("id", orderId)
+              .eq("user_id", userId);
           }
         }
 
@@ -416,17 +472,30 @@ export const createMercadoPagoTransparentPaymentFn = createServerFn({ method: "P
       } catch (err) {
         if (err instanceof Response) throw err;
         const msg = userMessageFromMercadoPago(err);
-        await admin
-          .from("mercadopago_orders")
-          .update({
-            status: "rejected",
-            raw_last_payload: {
-              error: err instanceof MercadoPagoApiError ? err.body : String(err),
-            } as unknown as Json,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", orderId)
-          .eq("user_id", userId);
+        const errPayload = {
+          error: err instanceof MercadoPagoApiError ? err.body : String(err),
+        } as unknown as Json;
+        if (plan === "mapa") {
+          await admin
+            .from("mapa_orders")
+            .update({
+              status: "failed",
+              raw_last_payload: errPayload,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", orderId)
+            .eq("user_id", userId);
+        } else {
+          await admin
+            .from("mercadopago_orders")
+            .update({
+              status: "rejected",
+              raw_last_payload: errPayload,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", orderId)
+            .eq("user_id", userId);
+        }
         throw jsonError(502, "MERCADOPAGO", msg);
       }
     }),

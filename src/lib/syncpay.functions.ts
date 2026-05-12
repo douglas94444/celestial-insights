@@ -3,9 +3,11 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
+import { shouldExposePaymentConfigurationGaps } from "@/lib/payment-configuration-diagnostics";
 import {
   buildSyncPayWebhookUrl,
   isSyncPayServerConfigured,
+  syncPayConfigurationGaps,
   syncPayCreateCashIn,
   syncPayGetTransaction,
   SyncPayApiError,
@@ -14,10 +16,10 @@ import {
 import {
   amountForSubscriptionPlan,
   subscriptionPlanTitle,
-  type SubscriptionPlanId,
+  type SubscriptionProductId,
 } from "@/lib/subscription-pricing";
 
-const planSchema = z.enum(["mensal", "anual"]);
+const planSchema = z.enum(["mensal", "anual", "mapa"]);
 
 const createPixOrderSchema = z.object({
   plan: planSchema,
@@ -49,8 +51,15 @@ function userMessageFromSyncPay(err: unknown): string {
 export const getSyncPayAvailabilityFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(
-    timedServerFn("getSyncPayAvailabilityFn", async () => {
-      return { available: isSyncPayServerConfigured() } as const;
+    timedServerFn("getSyncPayAvailabilityFn", async ({ context }) => {
+      const available = isSyncPayServerConfigured();
+      const diagnostics = await shouldExposePaymentConfigurationGaps(
+        context.supabase,
+        context.userId,
+      );
+      return diagnostics
+        ? ({ available, configurationGaps: syncPayConfigurationGaps() } as const)
+        : ({ available } as const);
     }),
   );
 
@@ -130,7 +139,7 @@ export const createSyncPayPixOrderFn = createServerFn({ method: "POST" })
       }
 
       const name = (profileAfter?.name ?? "").trim() || "Cliente";
-      const plan = data.plan as SubscriptionPlanId;
+      const plan = data.plan as SubscriptionProductId;
       const amount = amountForSubscriptionPlan(plan);
       const description = subscriptionPlanTitle(plan);
 
@@ -159,14 +168,28 @@ export const createSyncPayPixOrderFn = createServerFn({ method: "POST" })
           throw jsonError(502, "SYNCPAY_RESPONSE", "Resposta SyncPay sem identificador.");
         }
 
-        const { error: insertErr } = await supabase.from("syncpay_orders").insert({
-          user_id: userId,
-          plan: data.plan,
-          amount,
-          currency: "BRL",
-          syncpay_identifier: identifier,
-          status: "pending",
-        });
+        let insertErr: { message: string } | null = null;
+        if (data.plan === "mapa") {
+          const { error } = await supabase.from("mapa_orders").insert({
+            user_id: userId,
+            amount,
+            currency: "BRL",
+            payment_method: "syncpay",
+            external_ref: identifier,
+            status: "pending",
+          });
+          insertErr = error ?? null;
+        } else {
+          const { error } = await supabase.from("syncpay_orders").insert({
+            user_id: userId,
+            plan: data.plan,
+            amount,
+            currency: "BRL",
+            syncpay_identifier: identifier,
+            status: "pending",
+          });
+          insertErr = error ?? null;
+        }
 
         if (insertErr) {
           throw jsonError(500, "ORDER_INSERT", insertErr.message);

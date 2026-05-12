@@ -2,16 +2,21 @@
 
 export type SubscriptionPlanId = "mensal" | "anual";
 
-export const SUBSCRIPTION_PLAN_AMOUNTS: Record<SubscriptionPlanId, number> = {
+/** Identificador de qualquer produto vendável (planos recorrentes + mapa avulso). */
+export type SubscriptionProductId = SubscriptionPlanId | "mapa";
+
+export const SUBSCRIPTION_PLAN_AMOUNTS: Record<SubscriptionProductId, number> = {
+  mapa: 37,
   mensal: 24.9,
   anual: 147,
 };
 
-export function amountForSubscriptionPlan(plan: SubscriptionPlanId): number {
+export function amountForSubscriptionPlan(plan: SubscriptionProductId): number {
   return SUBSCRIPTION_PLAN_AMOUNTS[plan];
 }
 
-export function subscriptionPlanTitle(plan: SubscriptionPlanId): string {
+export function subscriptionPlanTitle(plan: SubscriptionProductId): string {
+  if (plan === "mapa") return "AstroMap — mapa natal";
   return plan === "mensal" ? "AstroMap — plano mensal" : "AstroMap — plano anual";
 }
 

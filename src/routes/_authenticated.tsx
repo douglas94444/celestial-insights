@@ -56,10 +56,10 @@ function AuthenticatedLayout() {
 
   useEffect(() => {
     if (!loading && !user) {
-      const redirect = sanitizePostAuthRedirectPath(location.pathname);
+      const red = sanitizePostAuthRedirectPath(location.pathname);
       void navigate({
         to: "/auth",
-        search: redirect ? { redirect } : {},
+        search: red ? { redirect: red } : {},
         replace: true,
       });
     }

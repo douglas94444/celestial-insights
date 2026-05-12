@@ -152,6 +152,45 @@ export type Database = {
           },
         ];
       };
+      mapa_orders: {
+        Row: {
+          amount: number;
+          created_at: string;
+          currency: string;
+          external_ref: string;
+          id: string;
+          payment_method: string;
+          raw_last_payload: Json | null;
+          status: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          currency?: string;
+          external_ref: string;
+          id?: string;
+          payment_method: string;
+          raw_last_payload?: Json | null;
+          status?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          currency?: string;
+          external_ref?: string;
+          id?: string;
+          payment_method?: string;
+          raw_last_payload?: Json | null;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       mercadopago_orders: {
         Row: {
           amount: number;
@@ -476,7 +515,7 @@ export type Database = {
         | "natal_essence"
         | "synastry_deep"
         | "composite";
-      subscription_tier: "FREE" | "PREMIUM" | "MENSAL" | "ANUAL";
+      subscription_tier: "FREE" | "PREMIUM" | "MENSAL" | "ANUAL" | "MAPA";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -613,7 +652,7 @@ export const Constants = {
         "synastry_deep",
         "composite",
       ],
-      subscription_tier: ["FREE", "PREMIUM", "MENSAL", "ANUAL"],
+      subscription_tier: ["FREE", "PREMIUM", "MENSAL", "ANUAL", "MAPA"],
     },
   },
 } as const;

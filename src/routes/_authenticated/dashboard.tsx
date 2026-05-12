@@ -151,7 +151,11 @@ function Dashboard() {
               </p>
             </div>
           </div>
-          <Button asChild variant="outline" className="shrink-0 border-primary/30 hover:bg-primary/5">
+          <Button
+            asChild
+            variant="outline"
+            className="shrink-0 border-primary/30 hover:bg-primary/5"
+          >
             <Link to="/planos">Abrir página de planos</Link>
           </Button>
         </CardContent>

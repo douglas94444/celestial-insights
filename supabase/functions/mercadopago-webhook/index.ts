@@ -153,20 +153,57 @@ Deno.serve(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: order, error: findErr } = await admin
+  // Procurar em mercadopago_orders; se não encontrar, tentar mapa_orders
+  let orderId: string | null = null;
+  let orderUserId: string | null = null;
+  let orderPlan: string | null = null;
+  let orderStatus: string | null = null;
+  let orderAmount: number | null = null;
+  let isMapa = false;
+
+  const { data: mpOrder, error: findErr } = await admin
     .from("mercadopago_orders")
     .select("id, user_id, plan, status, amount")
     .eq("external_reference", extRef)
     .maybeSingle();
 
   if (findErr) {
-    console.error("[mercadopago-webhook] select order", findErr.message);
+    console.error("[mercadopago-webhook] select mp_order", findErr.message);
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
   }
-  if (!order) {
+
+  if (mpOrder) {
+    orderId = mpOrder.id;
+    orderUserId = mpOrder.user_id;
+    orderPlan = mpOrder.plan;
+    orderStatus = mpOrder.status;
+    orderAmount = Number(mpOrder.amount);
+    isMapa = false;
+  } else {
+    const { data: mapaOrder, error: mapaErr } = await admin
+      .from("mapa_orders")
+      .select("id, user_id, status, amount")
+      .eq("external_ref", extRef)
+      .maybeSingle();
+
+    if (mapaErr) {
+      console.error("[mercadopago-webhook] select mapa_order", mapaErr.message);
+    }
+
+    if (mapaOrder) {
+      orderId = mapaOrder.id;
+      orderUserId = mapaOrder.user_id;
+      orderPlan = "mapa";
+      orderStatus = mapaOrder.status;
+      orderAmount = Number(mapaOrder.amount);
+      isMapa = true;
+    }
+  }
+
+  if (!orderId || !orderUserId) {
     console.warn("[mercadopago-webhook] Pedido desconhecido:", extRef);
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
@@ -174,7 +211,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  if (order.status === "approved") {
+  if (orderStatus === "approved" || orderStatus === "completed") {
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
@@ -196,7 +233,7 @@ Deno.serve(async (req) => {
   }
 
   const txAmt = Number(payment.transaction_amount);
-  const orderAmt = Number(order.amount);
+  const orderAmt = orderAmount ?? 0;
   const amountOk =
     Number.isFinite(txAmt) && Number.isFinite(orderAmt) && Math.abs(txAmt - orderAmt) <= 0.02;
   const currencyOk = !currency || currency === "BRL";
@@ -219,33 +256,58 @@ Deno.serve(async (req) => {
     payloadJson = { _note: "payload_error" };
   }
 
-  const { error: upOrderErr } = await admin
-    .from("mercadopago_orders")
-    .update({
-      status: newOrderStatus,
-      payment_id: paymentIdStr,
-      raw_last_payload: payloadJson,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", order.id);
+  if (isMapa) {
+    const mapaStatus =
+      newOrderStatus === "approved"
+        ? "completed"
+        : newOrderStatus === "rejected"
+          ? "failed"
+          : "pending";
+    const { error: upOrderErr } = await admin
+      .from("mapa_orders")
+      .update({
+        status: mapaStatus,
+        raw_last_payload: payloadJson,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
 
-  if (upOrderErr) {
-    console.error("[mercadopago-webhook] update order", upOrderErr.message);
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    if (upOrderErr) {
+      console.error("[mercadopago-webhook] update mapa_order", upOrderErr.message);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  } else {
+    const { error: upOrderErr } = await admin
+      .from("mercadopago_orders")
+      .update({
+        status: newOrderStatus,
+        payment_id: paymentIdStr,
+        raw_last_payload: payloadJson,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", orderId);
+
+    if (upOrderErr) {
+      console.error("[mercadopago-webhook] update mp_order", upOrderErr.message);
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
   }
 
-  if (newOrderStatus === "approved" && order.status !== "approved" && amountOk && currencyOk) {
-    const tier = order.plan === "anual" ? "ANUAL" : "MENSAL";
+  if (newOrderStatus === "approved" && orderStatus !== "approved" && amountOk && currencyOk) {
+    const tier = isMapa ? "MAPA" : orderPlan === "anual" ? "ANUAL" : "MENSAL";
     const { error: profErr } = await admin
       .from("profiles")
       .update({
         subscription_tier: tier,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", order.user_id);
+      .eq("id", orderUserId);
 
     if (profErr) {
       console.error("[mercadopago-webhook] update profile", profErr.message);

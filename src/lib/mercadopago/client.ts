@@ -4,7 +4,7 @@
  * @see https://www.mercadopago.com.br/developers/pt/reference/payments/_payments/post
  */
 
-import type { SubscriptionPlanId } from "@/lib/subscription-pricing";
+import type { SubscriptionProductId } from "@/lib/subscription-pricing";
 import { getSupabaseUrl } from "@/integrations/supabase/public-config";
 
 const MP_API = "https://api.mercadopago.com";
@@ -14,7 +14,7 @@ export type MercadoPagoCreatePreferenceInput = {
   payerEmail: string;
   title: string;
   unitPrice: number;
-  plan: SubscriptionPlanId;
+  plan: SubscriptionProductId;
   userId: string;
 };
 
@@ -88,6 +88,27 @@ export function isMercadoPagoTransparentConfigured(): boolean {
   const hook = process.env.MERCADOPAGO_WEBHOOK_TOKEN?.trim();
   const supabaseUrl = getSupabaseUrl().trim();
   return Boolean(token && hook && supabaseUrl && mercadoPagoPublicKeyForTransparent());
+}
+
+/** Variáveis em falta para o Checkout Pro (inclui APP_PUBLIC_URL para back_urls). */
+export function mercadoPagoCheckoutProGaps(): string[] {
+  const missing: string[] = [];
+  if (!process.env.MERCADOPAGO_ACCESS_TOKEN?.trim()) missing.push("MERCADOPAGO_ACCESS_TOKEN");
+  if (!process.env.MERCADOPAGO_WEBHOOK_TOKEN?.trim()) missing.push("MERCADOPAGO_WEBHOOK_TOKEN");
+  if (!getSupabaseUrl().trim()) missing.push("SUPABASE_URL");
+  if (!process.env.APP_PUBLIC_URL?.trim()) missing.push("APP_PUBLIC_URL");
+  return missing;
+}
+
+/** Variáveis em falta para cartão nesta página (sem exigir APP_PUBLIC_URL). */
+export function mercadoPagoTransparentGaps(): string[] {
+  const missing: string[] = [];
+  if (!process.env.MERCADOPAGO_ACCESS_TOKEN?.trim()) missing.push("MERCADOPAGO_ACCESS_TOKEN");
+  if (!process.env.MERCADOPAGO_WEBHOOK_TOKEN?.trim()) missing.push("MERCADOPAGO_WEBHOOK_TOKEN");
+  if (!getSupabaseUrl().trim()) missing.push("SUPABASE_URL");
+  if (!mercadoPagoPublicKeyForTransparent())
+    missing.push("VITE_MERCADOPAGO_PUBLIC_KEY ou MERCADOPAGO_PUBLIC_KEY");
+  return missing;
 }
 
 /** Chave pública para o SDK no browser (segura de expor). */

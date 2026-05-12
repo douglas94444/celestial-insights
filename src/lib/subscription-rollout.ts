@@ -41,6 +41,21 @@ export function isPaidRolloutTier(tier: string): tier is PaidRolloutTier {
   return tier === "MENSAL" || tier === "ANUAL" || tier === "PREMIUM";
 }
 
+/** Tier de compra avulsa do mapa natal (permanente, R$37). */
+export function isMapaTier(tier: string): boolean {
+  return tier === "MAPA";
+}
+
+/** Tier gratuito (sem compra): acesso ao mapa natal mas features avançadas bloqueadas. */
+export function isFreeTier(tier: string): boolean {
+  return tier === "FREE";
+}
+
+/** Tiers com acesso completo (sinastria, trânsitos, PDF, etc.). */
+export function isFullPremiumTier(tier: string): boolean {
+  return isPaidRolloutTier(tier);
+}
+
 /** Dias 0–6: desbloqueio progressivo; a partir do dia 7 (índice ≥7) tudo liberado para pagos. */
 export const ROLLOUT_WINDOW_DAYS = 7;
 
@@ -54,6 +69,32 @@ export type RolloutGates = {
   moodAdvanced: boolean;
   digestEmail: boolean;
   aiFullKinds: boolean;
+};
+
+/** Gates do tier FREE: o mapa natal é acessível (criação + visualização), o resto bloqueado. */
+export const FREE_TIER_GATES: RolloutGates = {
+  transits: false,
+  extraCharts: false,
+  synastry: false,
+  composite: false,
+  annualForecast: false,
+  pdfExport: false,
+  moodAdvanced: false,
+  digestEmail: false,
+  aiFullKinds: false,
+};
+
+/** Gates do tier MAPA: só mapa natal + IA natal; sem trânsitos, sinastria, mapas extra, etc. */
+export const MAPA_TIER_GATES: RolloutGates = {
+  transits: false,
+  extraCharts: false,
+  synastry: false,
+  composite: false,
+  annualForecast: false,
+  pdfExport: false,
+  moodAdvanced: false,
+  digestEmail: false,
+  aiFullKinds: false,
 };
 
 export const FULL_ROLLOUT_GATES: RolloutGates = {

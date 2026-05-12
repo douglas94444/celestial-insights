@@ -30,10 +30,15 @@ import { formatSubscriptionPriceBrl, SUBSCRIPTION_PLAN_AMOUNTS } from "@/lib/sub
 const SESSION_MP_ORDER_REF = "astromap_mp_order_ref";
 
 export const Route = createFileRoute("/_authenticated/assinatura")({
-  validateSearch: (search: Record<string, unknown>): { mp?: "success" | "failure" | "pending" } => {
-    const v = search.mp;
-    if (v === "success" || v === "failure" || v === "pending") return { mp: v };
-    return {};
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { mp?: "success" | "failure" | "pending"; produto?: "mapa" } => {
+    const mp = search.mp;
+    const produto = search.produto;
+    return {
+      ...(mp === "success" || mp === "failure" || mp === "pending" ? { mp } : {}),
+      ...(produto === "mapa" ? { produto: "mapa" as const } : {}),
+    };
   },
   component: PremiumPlansPage,
 });
@@ -51,10 +56,46 @@ function onlyDigits(s: string): string {
   return s.replace(/\D/g, "");
 }
 
+function PaymentEnvGapBlock({ label, gaps }: { label: string; gaps: string[] | null }) {
+  if (gaps === null) {
+    return (
+      <div className="rounded-md border border-dashed border-muted-foreground/30 bg-muted/15 px-3 py-2">
+        <p className="text-xs font-medium text-foreground">{label}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Lista não disponível nesta resposta (atualize o deploy se esperava diagnóstico).
+        </p>
+      </div>
+    );
+  }
+  if (gaps.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-muted-foreground/25 bg-muted/20 px-3 py-2">
+        <p className="text-xs font-medium text-foreground">{label}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Nenhuma das variáveis verificadas aparece em falta neste processo.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-md border border-amber-500/35 bg-amber-500/[0.06] px-3 py-2">
+      <p className="text-xs font-medium text-foreground">{label}</p>
+      <ul className="mt-1 list-inside list-disc space-y-0.5 text-xs text-muted-foreground">
+        {gaps.map((g) => (
+          <li key={`${label}-${g}`}>
+            <code className="rounded bg-muted px-1 text-foreground">{g}</code>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function PremiumPlansPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const { mp } = useSearch({ from: "/_authenticated/assinatura" });
+  const { mp, produto } = useSearch({ from: "/_authenticated/assinatura" });
+  const isMapa = produto === "mapa";
   const { session, user } = useAuth();
   const { data: profile } = useProfile();
   const { data: isAdmin } = useUserIsAdmin();
@@ -203,7 +244,7 @@ function PremiumPlansPage() {
   }, [pollQuery.data?.remoteStatus, qc, user?.id]);
 
   const createOrder = useMutation({
-    mutationFn: async (plan: "mensal" | "anual") => {
+    mutationFn: async (plan: "mensal" | "anual" | "mapa") => {
       if (!session) throw new Error("Sessão necessária.");
       const cpf = onlyDigits(billingCpf);
       const phone = onlyDigits(billingPhone);
@@ -231,7 +272,7 @@ function PremiumPlansPage() {
   });
 
   const createMpPreference = useMutation({
-    mutationFn: async (plan: "mensal" | "anual") => {
+    mutationFn: async (plan: "mensal" | "anual" | "mapa") => {
       if (!session) throw new Error("Sessão necessária.");
       return createMercadoPagoPreferenceFn({
         data: { plan },
@@ -267,6 +308,7 @@ function PremiumPlansPage() {
     }
   }
 
+  const mapaPrice = formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mapa);
   const mensalPrice = formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mensal);
   const anualPrice = formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual);
   const anualSavings = formatSubscriptionPriceBrl(
@@ -292,27 +334,37 @@ function PremiumPlansPage() {
       <div className="container relative z-[1] mx-auto max-w-4xl space-y-8 p-4 pb-12 sm:p-6 texture-grain">
         <div className="text-center sm:text-left">
           <Badge variant="outline" className="mb-3 border-primary/40 bg-primary/5">
-            {paymentBadgeLabel}
+            {isMapa ? "Mapa Natal" : paymentBadgeLabel}
           </Badge>
           <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-            Planos AstroMap
+            {isMapa ? `Mapa Natal Completo — ${mapaPrice}` : "Planos AstroMap"}
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
-            Mensal e anual incluem os mesmos recursos quando a rampa de 7 dias termina (desbloqueio
-            gradual por dia civil, fuso São Paulo). Pode pagar com Pix (SyncPay) ou com cartão via
-            Mercado Pago (nesta página ou no site do MP, conforme as opções ativas).
+            {isMapa
+              ? "Pagamento único e permanente. Roda natal interactiva, planetas, aspectos e interpretações com IA. Sem mensalidade."
+              : "Mensal e anual incluem os mesmos recursos quando a rampa de 7 dias termina (desbloqueio gradual por dia civil, fuso São Paulo). Pode pagar com Pix (SyncPay) ou com cartão via Mercado Pago (nesta página ou no site do MP, conforme as opções ativas)."}
           </p>
+          {isMapa && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Quer também sinastria, trânsitos e PDF?{" "}
+              <Link to="/assinatura" className="text-primary underline underline-offset-2">
+                Ver planos Premium
+              </Link>
+            </p>
+          )}
         </div>
 
-        <Alert className="border-primary/25 bg-primary/5">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <AlertTitle>Transparência</AlertTitle>
-          <AlertDescription>
-            Pode usar a conta desde o primeiro dia; na primeira semana algumas áreas abrem dia a dia
-            (trânsitos, sinastria, mapa composto, etc.). O CPF e o telefone são usados para cumprir
-            requisitos das operadoras de pagamento (Pix e Mercado Pago).
-          </AlertDescription>
-        </Alert>
+        {!isMapa && (
+          <Alert className="border-primary/25 bg-primary/5">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <AlertTitle>Transparência</AlertTitle>
+            <AlertDescription>
+              Pode usar a conta desde o primeiro dia; na primeira semana algumas áreas abrem dia a
+              dia (trânsitos, sinastria, mapa composto, etc.). O CPF e o telefone são usados para
+              cumprir requisitos das operadoras de pagamento (Pix e Mercado Pago).
+            </AlertDescription>
+          </Alert>
+        )}
 
         {showBillingForm ? (
           <Card className="border bg-card shadow-soft">
@@ -357,14 +409,14 @@ function PremiumPlansPage() {
               <Info className="h-4 w-4 text-muted-foreground" />
               <AlertTitle>Pagamentos em configuração</AlertTitle>
               <AlertDescription>
-                O checkout nesta página ainda não está activo neste ambiente: os botões de pagamento
-                ficam desactivados até o servidor ter pelo menos um meio configurado (Pix via
-                SyncPay e/ou Mercado Pago). Pode continuar a usar a app com o plano actual.
+                O checkout nesta página ainda não está ativo neste ambiente: os botões de pagamento
+                ficam desativados até o servidor ter pelo menos um meio configurado (Pix via SyncPay
+                e/ou Mercado Pago). Você pode continuar usando o app com o plano atual.
               </AlertDescription>
             </Alert>
             {showPaymentsOperatorHint ? (
               <p className="text-center text-xs text-muted-foreground">
-                Para activar: no Worker (ou `.env` local), configure conforme{" "}
+                Para ativar: no Worker (ou `.env` local), configure conforme{" "}
                 <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code> — SyncPay
                 (`SYNCPAY_*`, <code className="rounded bg-muted px-1">SUPABASE_URL</code>) e/ou
                 Mercado Pago (
@@ -375,6 +427,64 @@ function PremiumPlansPage() {
                 <code className="rounded bg-muted px-1">MERCADOPAGO_PUBLIC_KEY</code> para cartão
                 nesta página). Depois de alterar secrets, faça novamente o deploy do Worker.
               </p>
+            ) : null}
+            {showPaymentsOperatorHint ? (
+              <Card className="border-amber-500/25 bg-amber-500/[0.04] shadow-none">
+                <CardHeader className="space-y-1 pb-2">
+                  <CardTitle className="font-display text-base">
+                    Diagnóstico (dev ou administrador)
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Variáveis em falta no processo que executa as server functions (por exemplo{" "}
+                    <code className="rounded bg-muted px-0.5">vite</code> local ou o Worker). A
+                    ausência de <code className="rounded bg-muted px-0.5">APP_PUBLIC_URL</code>{" "}
+                    impede o Checkout Pro; a chave pública é necessária à parte para cartão nesta
+                    página.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {availabilityQuery.isLoading || mpAvailabilityQuery.isLoading ? (
+                    <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> A carregar diagnóstico…
+                    </p>
+                  ) : (
+                    <>
+                      <PaymentEnvGapBlock
+                        label="SyncPay (Pix)"
+                        gaps={
+                          availabilityQuery.data &&
+                          "configurationGaps" in availabilityQuery.data &&
+                          Array.isArray(availabilityQuery.data.configurationGaps)
+                            ? availabilityQuery.data.configurationGaps
+                            : null
+                        }
+                      />
+                      <div className="space-y-2">
+                        <PaymentEnvGapBlock
+                          label="Mercado Pago — Checkout Pro"
+                          gaps={
+                            mpAvailabilityQuery.data &&
+                            "configurationGaps" in mpAvailabilityQuery.data &&
+                            Array.isArray(mpAvailabilityQuery.data.configurationGaps.checkoutPro)
+                              ? mpAvailabilityQuery.data.configurationGaps.checkoutPro
+                              : null
+                          }
+                        />
+                        <PaymentEnvGapBlock
+                          label="Mercado Pago — cartão nesta página"
+                          gaps={
+                            mpAvailabilityQuery.data &&
+                            "configurationGaps" in mpAvailabilityQuery.data &&
+                            Array.isArray(mpAvailabilityQuery.data.configurationGaps.transparent)
+                              ? mpAvailabilityQuery.data.configurationGaps.transparent
+                              : null
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
             ) : null}
           </div>
         )}
@@ -555,105 +665,180 @@ function PremiumPlansPage() {
           </Card>
         ) : null}
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card className="border bg-card shadow-soft">
+        {isMapa ? (
+          <Card className="mx-auto max-w-md border-2 border-primary shadow-mystical">
             <CardHeader>
-              <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
-                Mensal
-                {highlightMensal ? (
-                  <Badge className="bg-mystical text-white hover:bg-mystical/90">Plano atual</Badge>
-                ) : null}
-              </CardTitle>
-              <CardDescription>Cobrança mês a mês</CardDescription>
+              <CardTitle className="font-display text-2xl">Mapa Natal Completo</CardTitle>
+              <CardDescription>Pagamento único — sem mensalidade</CardDescription>
             </CardHeader>
-            <CardContent className="flex h-full flex-col space-y-2 sm:space-y-3">
-              <p className="font-display text-2xl sm:text-3xl font-bold">
-                {mensalPrice}
-                <span className="text-base font-normal text-muted-foreground">/mês</span>
-              </p>
-              <ul className="flex-1 space-y-2 text-sm text-muted-foreground">
-                {PLAN_FEATURES.map((t) => (
+            <CardContent className="space-y-4">
+              <p className="font-display text-3xl font-bold">{mapaPrice}</p>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                {[
+                  "Roda natal interactiva",
+                  "Planetas, casas e aspectos completos",
+                  "IA: Sol, Lua, Ascendente, planetas e essência natal",
+                  "Configurações especiais (Grand Trine, T-Square, Yod…)",
+                  "Acesso permanente",
+                ].map((t) => (
                   <li key={t} className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <span>{t}</span>
                   </li>
                 ))}
               </ul>
-              <Button
-                className="mt-auto w-full bg-mystical text-white hover:opacity-90"
-                disabled={
-                  !checkoutReady ||
-                  createOrder.isPending ||
-                  createMpPreference.isPending ||
-                  !hasBillingForPayment
-                }
-                onClick={() => createOrder.mutate("mensal")}
-              >
-                {createOrder.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
-                  </>
-                ) : (
-                  "Pagar mensal com Pix"
-                )}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="relative border-2 border-primary shadow-mystical">
-            <CardHeader>
-              <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
-                Anual
-                <Badge
-                  variant="secondary"
-                  className="bg-primary/10 text-primary hover:bg-primary/15"
+              {showBillingForm && (
+                <Button
+                  className="w-full bg-mystical text-white hover:opacity-90"
+                  disabled={
+                    !checkoutReady ||
+                    createOrder.isPending ||
+                    createMpPreference.isPending ||
+                    !hasBillingForPayment
+                  }
+                  onClick={() => createOrder.mutate("mapa")}
                 >
-                  Melhor custo no ano
-                </Badge>
-                {highlightAnual ? (
-                  <Badge className="bg-mystical text-white hover:bg-mystical/90">Plano atual</Badge>
-                ) : null}
-              </CardTitle>
-              <CardDescription>Melhor custo por mês</CardDescription>
-            </CardHeader>
-            <CardContent className="flex h-full flex-col space-y-2 sm:space-y-3">
-              <p className="font-display text-2xl sm:text-3xl font-bold">
-                {anualPrice}
-                <span className="text-base font-normal text-muted-foreground">/ano</span>
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual / 12)}/mês · economia de{" "}
-                {anualSavings} vs mensal
-              </p>
-              <ul className="flex-1 space-y-2 text-sm text-muted-foreground">
-                {PLAN_FEATURES.map((t) => (
-                  <li key={`a-${t}`} className="flex gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-              <Button
-                className="mt-auto w-full bg-mystical text-white hover:opacity-90"
-                disabled={
-                  !checkoutReady ||
-                  createOrder.isPending ||
-                  createMpPreference.isPending ||
-                  !hasBillingForPayment
-                }
-                onClick={() => createOrder.mutate("anual")}
-              >
-                {createOrder.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
-                  </>
-                ) : (
-                  "Pagar anual com Pix"
-                )}
-              </Button>
+                  {createOrder.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
+                    </>
+                  ) : (
+                    `Pagar ${mapaPrice} com Pix`
+                  )}
+                </Button>
+              )}
+              {mpCheckoutPro && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  disabled={
+                    !mpCheckoutPro ||
+                    !hasBillingForPayment ||
+                    createMpPreference.isPending ||
+                    createOrder.isPending
+                  }
+                  onClick={() => createMpPreference.mutate("mapa")}
+                >
+                  {createMpPreference.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A abrir checkout…
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Pagar com Mercado Pago
+                    </>
+                  )}
+                </Button>
+              )}
             </CardContent>
           </Card>
-        </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card className="border bg-card shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
+                  Mensal
+                  {highlightMensal ? (
+                    <Badge className="bg-mystical text-white hover:bg-mystical/90">
+                      Plano atual
+                    </Badge>
+                  ) : null}
+                </CardTitle>
+                <CardDescription>Cobrança mês a mês</CardDescription>
+              </CardHeader>
+              <CardContent className="flex h-full flex-col space-y-2 sm:space-y-3">
+                <p className="font-display text-2xl sm:text-3xl font-bold">
+                  {mensalPrice}
+                  <span className="text-base font-normal text-muted-foreground">/mês</span>
+                </p>
+                <ul className="flex-1 space-y-2 text-sm text-muted-foreground">
+                  {PLAN_FEATURES.map((t) => (
+                    <li key={t} className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  className="mt-auto w-full bg-mystical text-white hover:opacity-90"
+                  disabled={
+                    !checkoutReady ||
+                    createOrder.isPending ||
+                    createMpPreference.isPending ||
+                    !hasBillingForPayment
+                  }
+                  onClick={() => createOrder.mutate("mensal")}
+                >
+                  {createOrder.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
+                    </>
+                  ) : (
+                    "Pagar mensal com Pix"
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="relative border-2 border-primary shadow-mystical">
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
+                  Anual
+                  <Badge
+                    variant="secondary"
+                    className="bg-primary/10 text-primary hover:bg-primary/15"
+                  >
+                    Melhor custo no ano
+                  </Badge>
+                  {highlightAnual ? (
+                    <Badge className="bg-mystical text-white hover:bg-mystical/90">
+                      Plano atual
+                    </Badge>
+                  ) : null}
+                </CardTitle>
+                <CardDescription>Melhor custo por mês</CardDescription>
+              </CardHeader>
+              <CardContent className="flex h-full flex-col space-y-2 sm:space-y-3">
+                <p className="font-display text-2xl sm:text-3xl font-bold">
+                  {anualPrice}
+                  <span className="text-base font-normal text-muted-foreground">/ano</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual / 12)}/mês · economia
+                  de {anualSavings} vs mensal
+                </p>
+                <ul className="flex-1 space-y-2 text-sm text-muted-foreground">
+                  {PLAN_FEATURES.map((t) => (
+                    <li key={`a-${t}`} className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  className="mt-auto w-full bg-mystical text-white hover:opacity-90"
+                  disabled={
+                    !checkoutReady ||
+                    createOrder.isPending ||
+                    createMpPreference.isPending ||
+                    !hasBillingForPayment
+                  }
+                  onClick={() => createOrder.mutate("anual")}
+                >
+                  {createOrder.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
+                    </>
+                  ) : (
+                    "Pagar anual com Pix"
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
           <Button asChild variant="outline">

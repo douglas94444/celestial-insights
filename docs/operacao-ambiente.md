@@ -2,14 +2,27 @@
 
 Checklist para colocar o AstroMap funcional fora da máquina local.
 
+## Primeiro deploy Cloudflare (conta própria)
+
+Fluxo para produção **na tua conta Cloudflare** (TanStack Start + Worker). O deploy **não** envia o `.env` nem cria secrets automaticamente: o código e os assets saem do `npm run build`; as secrets definem-se no painel do Worker ou com `npx wrangler secret put <NOME>`.
+
+1. **Autenticação Wrangler** — Na raiz do repo: `npx wrangler login` (browser) **ou** `CLOUDFLARE_API_TOKEN` no ambiente (token com permissão de editar Workers; ver [`.env.example`](../.env.example)).
+2. **Variáveis no momento do build** — Antes de `npm run deploy:worker`, definir no terminal (ou no CI) pelo menos `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` e, se usar cartão na página, `VITE_MERCADOPAGO_PUBLIC_KEY`. O JavaScript do cliente é gerado aqui; secrets coladas **só** no Worker depois do deploy **não** alteram o bundle antigo.
+3. **Deploy** — `npm run deploy:worker` (equivale a `npm run build` + `wrangler deploy --config dist/server/wrangler.json`). No dashboard **Workers & Pages** deve aparecer o Worker (nome predefinido no repo: `tanstack-start-app`). URL inicial típico: `*.workers.dev` até haver domínio custom.
+4. **Secrets no Worker** — **Settings → Variables and Secrets** do Worker (tipo **Secret** para tokens). Mínimo comum: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SYNCPAY_API_BASE_URL`, `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET`, **`SYNCPAY_WEBHOOK_TOKEN`** (igual à Edge Function `syncpay-webhook` no Supabase), `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN` (igual à Edge Function `mercadopago-webhook`), `APP_PUBLIC_URL`, `SUPABASE_SERVICE_ROLE_KEY` (ex. Checkout transparente). Lista completa: [`.env.example`](../.env.example) e secções abaixo.
+5. **Domínio e Supabase Auth** — **Custom Domains** no Worker (ou rotas + DNS na zona Cloudflare). `APP_PUBLIC_URL` deve coincidir com o URL público final (ex. `https://teu-dominio.com`). No Supabase: **Authentication → URL configuration** com redirects para esse origin. Se o domínio antes apontava para outro host (ex. Lovable), ajustar ou remover registos `A`/`CNAME` antigos para evitar dois sites no mesmo hostname.
+6. **Verificação** — Abrir `/assinatura`: com pelo menos um meio completo no Worker, aparece **«Dados de cobrança»**. Em desenvolvimento ou como administrador, a página pode mostrar diagnóstico de variáveis em falta. Após mudar secrets, voltar a correr `npm run deploy:worker` se o hosting não aplicar alterações automaticamente.
+
+Referência técnica: [`wrangler.jsonc`](../wrangler.jsonc), script `deploy:worker` em [`package.json`](../package.json).
+
 ## Variáveis de ambiente
 
 Ver [`.env.example`](../.env.example). No cliente só podem existir segredos **anon** com prefixo `VITE_`. Chaves `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_*`, `TRANSIT_DIGEST_CRON_SECRET`, **`SYNCPAY_*`** (só servidor) e **`MERCADOPAGO_ACCESS_TOKEN` / `MERCADOPAGO_WEBHOOK_TOKEN`** (só servidor) e **todas as variáveis `AI_*` / chaves de LLM** ficam **só no servidor**. A **`VITE_MERCADOPAGO_PUBLIC_KEY`** é pública e entra no **build** do frontend (Vite); opcionalmente **`MERCADOPAGO_PUBLIC_KEY`** no Worker se o runtime não expuser `VITE_*`.
 
 ### Pagamentos SyncPay (Pix cash-in)
 
-1. Definir no **Worker / Lovable** (server functions): `SYNCPAY_API_BASE_URL` (URL absoluto só até ao host, **sem** sufixo `/api/partner/v1` e sem `/` final), `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET`.
-2. Gerar um segredo longo e aleatório para `SYNCPAY_WEBHOOK_TOKEN`; o mesmo valor deve estar na secret **`SYNCPAY_WEBHOOK_TOKEN`** da Edge Function `syncpay-webhook` (Supabase Dashboard → Edge Functions → Secrets).
+1. Definir no **Worker / Lovable** (server functions), p.ex. **Cloudflare → Workers → Settings → Variables and Secrets** (tipo **Secret** para credenciais): `SYNCPAY_API_BASE_URL` (URL absoluto só até ao host, **sem** sufixo `/api/partner/v1` e sem `/` final), `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET` e **`SYNCPAY_WEBHOOK_TOKEN`**. O `wrangler deploy` **não** envia estas variáveis: criar no painel ou `npx wrangler secret put SYNCPAY_WEBHOOK_TOKEN`.
+2. O **`SYNCPAY_WEBHOOK_TOKEN`** é um segredo **teu** (string longa aleatória): o **mesmo** valor no Worker e na secret **`SYNCPAY_WEBHOOK_TOKEN`** da Edge Function `syncpay-webhook` (Supabase Dashboard → Edge Functions → Secrets). Sem o token no Worker, o cash-in não monta `.../syncpay-webhook?token=...` e o Pix fica desligado em `/assinatura`.
 3. Deploy da função: `npx supabase functions deploy syncpay-webhook --no-verify-jwt` (ou script npm equivalente). O URL do webhook passado ao cash-in é `{SUPABASE_URL}/functions/v1/syncpay-webhook?token={SYNCPAY_WEBHOOK_TOKEN}` (o servidor monta-o automaticamente quando `SUPABASE_URL` e `SYNCPAY_WEBHOOK_TOKEN` existem). Use **esta** função (`syncpay-webhook`), não outro nome de endpoint; no painel SyncPay, evento de cash-in / recebimento conforme a doc do parceiro.
 4. No painel SyncPay, **autorizar IP** de egress (Worker e/ou Supabase Edge, conforme o que chama a API) e configurar webhooks conforme a documentação do parceiro.
 5. Utilizadores precisam de **nome**, **e-mail** (Auth), **CPF e telefone** em `profiles` (`billing_cpf`, `billing_phone`) — preenchidos em Configurações ou no fluxo Premium. O webhook de cash-in (incl. padrão OLD da doc SyncPay) pode trazer `data.id` e `data.idtransaction`; a função `syncpay-webhook` reconcilia o pedido se qualquer um coincidir com o `identifier` guardado em `syncpay_orders`.

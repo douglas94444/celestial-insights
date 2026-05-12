@@ -366,6 +366,136 @@ function PremiumPlansPage() {
           </Alert>
         )}
 
+        {isMapa ? (
+          <Card className="mx-auto max-w-md border-2 border-primary shadow-mystical">
+            <CardHeader>
+              <CardTitle className="font-display text-2xl">Mapa Natal Completo</CardTitle>
+              <CardDescription>Pagamento único — sem mensalidade</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="font-display text-3xl font-bold">{mapaPrice}</p>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                {[
+                  "Roda natal interactiva",
+                  "Planetas, casas e aspectos completos",
+                  "IA: Sol, Lua, Ascendente, planetas e essência natal",
+                  "Configurações especiais (Grand Trine, T-Square, Yod…)",
+                  "Acesso permanente",
+                ].map((t) => (
+                  <li key={t} className="flex gap-2">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                    <span>{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card className="border bg-card shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
+                  Mensal
+                  {highlightMensal ? (
+                    <Badge className="bg-mystical text-white hover:bg-mystical/90">
+                      Plano atual
+                    </Badge>
+                  ) : null}
+                </CardTitle>
+                <CardDescription>Cobrança mês a mês</CardDescription>
+              </CardHeader>
+              <CardContent className="flex h-full flex-col space-y-2 sm:space-y-3">
+                <p className="font-display text-2xl sm:text-3xl font-bold">
+                  {mensalPrice}
+                  <span className="text-base font-normal text-muted-foreground">/mês</span>
+                </p>
+                <ul className="flex-1 space-y-2 text-sm text-muted-foreground">
+                  {PLAN_FEATURES.map((t) => (
+                    <li key={t} className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  className="mt-auto w-full bg-mystical text-white hover:opacity-90"
+                  disabled={
+                    !checkoutReady ||
+                    createOrder.isPending ||
+                    createMpPreference.isPending ||
+                    !hasBillingForPayment
+                  }
+                  onClick={() => createOrder.mutate("mensal")}
+                >
+                  {createOrder.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
+                    </>
+                  ) : (
+                    "Pagar mensal com Pix"
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="relative border-2 border-primary shadow-mystical">
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
+                  Anual
+                  <Badge
+                    variant="secondary"
+                    className="bg-primary/10 text-primary hover:bg-primary/15"
+                  >
+                    Melhor custo no ano
+                  </Badge>
+                  {highlightAnual ? (
+                    <Badge className="bg-mystical text-white hover:bg-mystical/90">
+                      Plano atual
+                    </Badge>
+                  ) : null}
+                </CardTitle>
+                <CardDescription>Melhor custo por mês</CardDescription>
+              </CardHeader>
+              <CardContent className="flex h-full flex-col space-y-2 sm:space-y-3">
+                <p className="font-display text-2xl sm:text-3xl font-bold">
+                  {anualPrice}
+                  <span className="text-base font-normal text-muted-foreground">/ano</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual / 12)}/mês · economia
+                  de {anualSavings} vs mensal
+                </p>
+                <ul className="flex-1 space-y-2 text-sm text-muted-foreground">
+                  {PLAN_FEATURES.map((t) => (
+                    <li key={`a-${t}`} className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  className="mt-auto w-full bg-mystical text-white hover:opacity-90"
+                  disabled={
+                    !checkoutReady ||
+                    createOrder.isPending ||
+                    createMpPreference.isPending ||
+                    !hasBillingForPayment
+                  }
+                  onClick={() => createOrder.mutate("anual")}
+                >
+                  {createOrder.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
+                    </>
+                  ) : (
+                    "Pagar anual com Pix"
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {showBillingForm ? (
           <Card className="border bg-card shadow-soft">
             <CardHeader>
@@ -489,7 +619,63 @@ function PremiumPlansPage() {
           </div>
         )}
 
-        {mpTransparent ? (
+        {isMapa && showBillingForm ? (
+          <Card className="mx-auto max-w-md border bg-card shadow-soft">
+            <CardHeader>
+              <CardTitle className="font-display text-lg">Pagamento</CardTitle>
+              <CardDescription>
+                Gere o Pix ou pague com Mercado Pago após preencher o CPF e o telefone em cima.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button
+                className="w-full bg-mystical text-white hover:opacity-90"
+                disabled={
+                  !checkoutReady ||
+                  createOrder.isPending ||
+                  createMpPreference.isPending ||
+                  !hasBillingForPayment
+                }
+                onClick={() => createOrder.mutate("mapa")}
+              >
+                {createOrder.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
+                  </>
+                ) : (
+                  `Pagar ${mapaPrice} com Pix`
+                )}
+              </Button>
+              {mpCheckoutPro ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="w-full"
+                  disabled={
+                    !mpCheckoutPro ||
+                    !hasBillingForPayment ||
+                    createMpPreference.isPending ||
+                    createOrder.isPending
+                  }
+                  onClick={() => createMpPreference.mutate("mapa")}
+                >
+                  {createMpPreference.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A abrir checkout…
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Pagar com Mercado Pago
+                    </>
+                  )}
+                </Button>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {!isMapa && mpTransparent ? (
           <Card className="border bg-card shadow-soft">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 font-display text-lg">
@@ -549,7 +735,7 @@ function PremiumPlansPage() {
           </Card>
         ) : null}
 
-        {mpCheckoutPro ? (
+        {!isMapa && mpCheckoutPro ? (
           <Card className="border bg-card shadow-soft">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 font-display text-lg">
@@ -664,181 +850,6 @@ function PremiumPlansPage() {
             </CardContent>
           </Card>
         ) : null}
-
-        {isMapa ? (
-          <Card className="mx-auto max-w-md border-2 border-primary shadow-mystical">
-            <CardHeader>
-              <CardTitle className="font-display text-2xl">Mapa Natal Completo</CardTitle>
-              <CardDescription>Pagamento único — sem mensalidade</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="font-display text-3xl font-bold">{mapaPrice}</p>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                {[
-                  "Roda natal interactiva",
-                  "Planetas, casas e aspectos completos",
-                  "IA: Sol, Lua, Ascendente, planetas e essência natal",
-                  "Configurações especiais (Grand Trine, T-Square, Yod…)",
-                  "Acesso permanente",
-                ].map((t) => (
-                  <li key={t} className="flex gap-2">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span>{t}</span>
-                  </li>
-                ))}
-              </ul>
-              {showBillingForm && (
-                <Button
-                  className="w-full bg-mystical text-white hover:opacity-90"
-                  disabled={
-                    !checkoutReady ||
-                    createOrder.isPending ||
-                    createMpPreference.isPending ||
-                    !hasBillingForPayment
-                  }
-                  onClick={() => createOrder.mutate("mapa")}
-                >
-                  {createOrder.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
-                    </>
-                  ) : (
-                    `Pagar ${mapaPrice} com Pix`
-                  )}
-                </Button>
-              )}
-              {mpCheckoutPro && (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full"
-                  disabled={
-                    !mpCheckoutPro ||
-                    !hasBillingForPayment ||
-                    createMpPreference.isPending ||
-                    createOrder.isPending
-                  }
-                  onClick={() => createMpPreference.mutate("mapa")}
-                >
-                  {createMpPreference.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A abrir checkout…
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Pagar com Mercado Pago
-                    </>
-                  )}
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card className="border bg-card shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
-                  Mensal
-                  {highlightMensal ? (
-                    <Badge className="bg-mystical text-white hover:bg-mystical/90">
-                      Plano atual
-                    </Badge>
-                  ) : null}
-                </CardTitle>
-                <CardDescription>Cobrança mês a mês</CardDescription>
-              </CardHeader>
-              <CardContent className="flex h-full flex-col space-y-2 sm:space-y-3">
-                <p className="font-display text-2xl sm:text-3xl font-bold">
-                  {mensalPrice}
-                  <span className="text-base font-normal text-muted-foreground">/mês</span>
-                </p>
-                <ul className="flex-1 space-y-2 text-sm text-muted-foreground">
-                  {PLAN_FEATURES.map((t) => (
-                    <li key={t} className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span>{t}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  className="mt-auto w-full bg-mystical text-white hover:opacity-90"
-                  disabled={
-                    !checkoutReady ||
-                    createOrder.isPending ||
-                    createMpPreference.isPending ||
-                    !hasBillingForPayment
-                  }
-                  onClick={() => createOrder.mutate("mensal")}
-                >
-                  {createOrder.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
-                    </>
-                  ) : (
-                    "Pagar mensal com Pix"
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="relative border-2 border-primary shadow-mystical">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
-                  Anual
-                  <Badge
-                    variant="secondary"
-                    className="bg-primary/10 text-primary hover:bg-primary/15"
-                  >
-                    Melhor custo no ano
-                  </Badge>
-                  {highlightAnual ? (
-                    <Badge className="bg-mystical text-white hover:bg-mystical/90">
-                      Plano atual
-                    </Badge>
-                  ) : null}
-                </CardTitle>
-                <CardDescription>Melhor custo por mês</CardDescription>
-              </CardHeader>
-              <CardContent className="flex h-full flex-col space-y-2 sm:space-y-3">
-                <p className="font-display text-2xl sm:text-3xl font-bold">
-                  {anualPrice}
-                  <span className="text-base font-normal text-muted-foreground">/ano</span>
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual / 12)}/mês · economia
-                  de {anualSavings} vs mensal
-                </p>
-                <ul className="flex-1 space-y-2 text-sm text-muted-foreground">
-                  {PLAN_FEATURES.map((t) => (
-                    <li key={`a-${t}`} className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span>{t}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  className="mt-auto w-full bg-mystical text-white hover:opacity-90"
-                  disabled={
-                    !checkoutReady ||
-                    createOrder.isPending ||
-                    createMpPreference.isPending ||
-                    !hasBillingForPayment
-                  }
-                  onClick={() => createOrder.mutate("anual")}
-                >
-                  {createOrder.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
-                    </>
-                  ) : (
-                    "Pagar anual com Pix"
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        )}
 
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
           <Button asChild variant="outline">

@@ -370,8 +370,8 @@ function PremiumPlansPage() {
                 Mercado Pago (
                 <code className="rounded bg-muted px-1">MERCADOPAGO_ACCESS_TOKEN</code>,{" "}
                 <code className="rounded bg-muted px-1">MERCADOPAGO_WEBHOOK_TOKEN</code>,{" "}
-                <code className="rounded bg-muted px-1">APP_PUBLIC_URL</code> para Checkout Pro; mais{" "}
-                <code className="rounded bg-muted px-1">VITE_MERCADOPAGO_PUBLIC_KEY</code> ou{" "}
+                <code className="rounded bg-muted px-1">APP_PUBLIC_URL</code> para Checkout Pro;
+                mais <code className="rounded bg-muted px-1">VITE_MERCADOPAGO_PUBLIC_KEY</code> ou{" "}
                 <code className="rounded bg-muted px-1">MERCADOPAGO_PUBLIC_KEY</code> para cartão
                 nesta página). Depois de alterar secrets, faça novamente o deploy do Worker.
               </p>

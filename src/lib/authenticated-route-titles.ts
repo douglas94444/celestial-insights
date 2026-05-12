@@ -2,7 +2,9 @@
 export function titleForAuthenticatedPath(pathname: string): string {
   if (pathname === "/dashboard") return "Início";
   if (pathname.startsWith("/onboarding")) return "Boas-vindas";
-  if (pathname === "/premium") return "Planos Premium";
+  if (pathname === "/planos") return "Planos";
+  if (pathname === "/assinatura") return "Assinatura";
+  if (pathname === "/premium") return "Redirecionamento";
   if (pathname.startsWith("/mapas/novo")) return "Novo mapa";
   if (/^\/mapas\/[^/]+$/.test(pathname)) return "Mapa natal";
   if (pathname.startsWith("/mapas")) return "Meus mapas";

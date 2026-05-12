@@ -141,9 +141,9 @@ export async function mercadoPagoCreatePreference(
     external_reference: input.externalReference,
     metadata: { user_id: input.userId, plan: input.plan },
     back_urls: {
-      success: `${base}/premium?mp=success`,
-      failure: `${base}/premium?mp=failure`,
-      pending: `${base}/premium?mp=pending`,
+      success: `${base}/assinatura?mp=success`,
+      failure: `${base}/assinatura?mp=failure`,
+      pending: `${base}/assinatura?mp=pending`,
     },
     auto_return: "approved",
     notification_url: notificationUrl,

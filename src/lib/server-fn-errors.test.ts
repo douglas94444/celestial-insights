@@ -10,7 +10,7 @@ describe("getServerFnErrorMessage", () => {
       }),
     );
     expect(msg).toContain("Muito pedidos.");
-    expect(msg).toContain("/premium");
+    expect(msg).toContain("/assinatura");
   });
 
   it("não altera mensagens sem código de quota IA", async () => {

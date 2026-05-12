@@ -3,7 +3,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchChartsList } from "@/hooks/use-charts-list";
 import { fetchProfile } from "@/hooks/use-profile";
-import { Plus, Stars, Sparkles, CalendarRange, Heart, BarChart2 } from "lucide-react";
+import { Plus, Stars, Sparkles, CalendarRange, Heart, BarChart2, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -135,6 +135,27 @@ function Dashboard() {
           <Plus className="mr-1 h-4 w-4" /> Novo mapa
         </Button>
       </div>
+
+      <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-violet-500/5 shadow-sm ring-1 ring-primary/10">
+        <CardContent className="flex flex-col gap-4 py-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-mystical/10 text-mystical">
+              <Crown className="h-5 w-5" aria-hidden />
+            </div>
+            <div>
+              <p className="font-display text-lg font-semibold text-foreground">
+                Conheça os planos AstroMap
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Compare Grátis e Premium e veja preços antes de ir para o pagamento.
+              </p>
+            </div>
+          </div>
+          <Button asChild variant="outline" className="shrink-0 border-primary/30 hover:bg-primary/5">
+            <Link to="/planos">Abrir página de planos</Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       {!primary && (
         <Card className="border-dashed">

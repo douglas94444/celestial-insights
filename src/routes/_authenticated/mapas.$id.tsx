@@ -791,7 +791,7 @@ function ChartView() {
                     <>
                       {" "}
                       ·{" "}
-                      <Link to="/premium" className="text-primary underline underline-offset-2">
+                      <Link to="/assinatura" className="text-primary underline underline-offset-2">
                         Upgrade para ilimitado
                       </Link>
                     </>

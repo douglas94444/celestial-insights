@@ -5,7 +5,7 @@ const ROLLOUT_CODES = new Set(["ROLLOUT_LOCKED", "ROLLOUT_AI_MONTHLY"]);
 
 function appendIaQuotaPremiumHint(message: string, code?: string): string {
   if (!code || !IA_QUOTA_CODES.has(code)) return message;
-  return `${message} Para planos Premium ou mais uso, vá a /premium.`;
+  return `${message} Para planos Premium ou mais uso, vá a /assinatura.`;
 }
 
 function appendRolloutHint(message: string, code?: string): string {

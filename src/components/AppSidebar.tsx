@@ -49,7 +49,7 @@ const items: NavItem[] = [
   { title: "Meus Mapas", url: "/mapas", icon: Stars },
   { title: "Compatibilidade", url: "/compatibilidade", icon: Heart, rolloutGate: "synastry" },
   { title: "Trânsitos", url: "/transitos", icon: CalendarRange, rolloutGate: "transits" },
-  { title: "Planos", url: "/premium", icon: Crown },
+  { title: "Planos", url: "/planos", icon: Crown },
   { title: "Configurações", url: "/configuracoes", icon: Settings },
 ];
 
@@ -89,8 +89,8 @@ export function AppSidebar() {
               <SidebarMenu>
                 {navItems.map((item) => {
                   const active =
-                    item.url === "/premium"
-                      ? path === "/premium"
+                    item.url === "/planos"
+                      ? path === "/planos"
                       : item.url === "/admin"
                         ? path === "/admin" || path.startsWith("/admin/")
                         : path.startsWith(item.url);
@@ -201,7 +201,7 @@ export function AppSidebar() {
                   size="icon"
                   className="w-full bg-mystical text-white hover:opacity-90"
                 >
-                  <Link to="/premium" aria-label="Planos">
+                  <Link to="/planos" aria-label="Planos">
                     <Crown className="h-4 w-4" />
                   </Link>
                 </Button>
@@ -210,7 +210,7 @@ export function AppSidebar() {
             </Tooltip>
           ) : (
             <Button asChild variant="default" className="bg-mystical text-white hover:opacity-90">
-              <Link to="/premium">
+              <Link to="/planos">
                 <Crown className="mr-1 h-4 w-4" />
                 Planos
               </Link>

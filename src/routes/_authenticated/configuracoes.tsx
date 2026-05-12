@@ -353,7 +353,7 @@ function Settings() {
                 agilizar o checkout.
               </p>
               <Button asChild variant="outline" className="w-full sm:w-auto">
-                <Link to="/premium">Ver planos e pagar com Pix</Link>
+                <Link to="/assinatura">Ver planos e pagar com Pix</Link>
               </Button>
             </CardContent>
           </Card>

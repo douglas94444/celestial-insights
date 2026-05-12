@@ -9,7 +9,7 @@ export function sanitizePostAuthRedirectPath(raw: unknown): string | undefined {
   if (pathOnly.includes("..") || pathOnly.includes("\\")) return undefined;
   if (pathOnly === "/auth" || pathOnly === "/") return undefined;
   if (
-    /^\/(premium|dashboard|onboarding|configuracoes|transitos|momento|compatibilidade|admin)(\/|$)/.test(
+    /^\/(assinatura|premium|planos|dashboard|onboarding|configuracoes|transitos|momento|compatibilidade|admin)(\/|$)/.test(
       pathOnly,
     )
   ) {

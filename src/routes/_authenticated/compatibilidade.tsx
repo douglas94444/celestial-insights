@@ -500,7 +500,7 @@ function CompatibilidadePage() {
 
             <div className="flex flex-wrap gap-2 pt-1">
               <Button asChild size="sm" className="bg-mystical text-white hover:opacity-90">
-                <Link to="/premium">Ver planos</Link>
+                <Link to="/assinatura">Ver planos</Link>
               </Button>
               <Button asChild size="sm" variant="outline">
                 <Link to="/mapas/novo">Criar segundo mapa</Link>

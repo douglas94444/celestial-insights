@@ -87,7 +87,7 @@ function Landing() {
               <Link to="/auth">Entrar</Link>
             </Button>
             <Button asChild size="sm" className="bg-mystical text-white hover:opacity-90">
-              <Link to="/premium">Começar</Link>
+              <Link to="/assinatura">Começar</Link>
             </Button>
           </div>
         </div>
@@ -113,7 +113,7 @@ function Landing() {
               size="lg"
               className="bg-mystical text-white shadow-mystical hover:opacity-90"
             >
-              <Link to="/premium">
+              <Link to="/assinatura">
                 Começar
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -209,7 +209,7 @@ function Landing() {
             size="lg"
             className="mt-6 bg-mystical text-white shadow-mystical hover:opacity-90"
           >
-            <Link to="/premium">
+            <Link to="/assinatura">
               Começar
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -624,7 +624,7 @@ function Landing() {
             size="lg"
             className="mt-10 bg-mystical text-white shadow-mystical hover:opacity-90"
           >
-            <Link to="/premium">
+            <Link to="/assinatura">
               Começar
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -656,7 +656,7 @@ function Landing() {
             Planos Mensal ou Anual · checkout em preparação
           </p>
           <Button asChild size="sm" className="shrink-0 bg-mystical text-white hover:opacity-90">
-            <Link to="/premium">Começar</Link>
+            <Link to="/assinatura">Começar</Link>
           </Button>
         </div>
       )}

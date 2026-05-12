@@ -21,7 +21,7 @@ Ver [`.env.example`](../.env.example). No cliente só podem existir segredos **a
 3. `SUPABASE_URL` no Worker permite montar `notification_url` apontando para `{SUPABASE_URL}/functions/v1/mercadopago-webhook?token=...`.
 4. Deploy: `npm run supabase:functions:deploy:mercadopago-webhook` (ou `npx supabase functions deploy mercadopago-webhook --no-verify-jwt`).
 5. No painel MP (Webhooks / notificações URL), configurar a mesma URL pública da Edge Function (produção). Consulte a documentação oficial sobre formato **GET** (IPN) e **POST** (webhooks) e allowlist de IPs se aplicável.
-6. `APP_PUBLIC_URL` deve ser a URL pública do site para `back_urls` do checkout (`/premium?mp=success|failure|pending`). Em local, use um túnel (ngrok, etc.) se precisar de voltar do checkout de teste.
+6. `APP_PUBLIC_URL` deve ser a URL pública do site para `back_urls` do checkout (`/assinatura?mp=success|failure|pending`). URLs antigas com `/premium?mp=…` redirecionam para `/assinatura`. Em local, use um túnel (ngrok, etc.) se precisar de voltar do checkout de teste.
 7. O checkout no domínio do Mercado Pago pode mostrar **Pix, cartão e outros** meios conforme a conta e a preferência; não é garantido «só cartão».
 
 ### Checkout Transparente (cartão nesta página — Card Payment Brick)
@@ -31,7 +31,7 @@ Ver [`.env.example`](../.env.example). No cliente só podem existir segredos **a
 3. **`SUPABASE_SERVICE_ROLE_KEY`** no Worker: a server function `createMercadoPagoTransparentPaymentFn` grava `mercadopago_orders` e actualiza `subscription_tier` com o cliente admin (o utilizador não tem permissão de `UPDATE` em `subscription_tier`).
 4. O formulário de cartão é renderizado pelo SDK do Mercado Pago; o token segue para `POST /v1/payments` no servidor.
 
-### Página `/premium` sem pagamentos (botões Pix desactivados)
+### Página `/assinatura` sem pagamentos (botões Pix desactivados)
 
 Isto é **esperado** quando, no **mesmo runtime das server functions** (Worker / ambiente de deploy), **nenhum** meio está completo:
 

@@ -8,13 +8,13 @@ A página `/premium` mostra o aviso quando **ambos** os gates falham no servidor
 
 Comparando com os secrets já configurados no projeto:
 
-| Secret | Estado |
-|---|---|
-| `SYNCPAY_API_BASE_URL`, `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET` | ✅ presentes |
-| `SYNCPAY_WEBHOOK_TOKEN` | ❌ **em falta** |
-| `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN`, `VITE_MERCADOPAGO_PUBLIC_KEY` | ✅ presentes |
-| `APP_PUBLIC_URL` | ❌ **em falta** |
-| `SUPABASE_URL` | ✅ presente |
+| Secret                                                                                 | Estado          |
+| -------------------------------------------------------------------------------------- | --------------- |
+| `SYNCPAY_API_BASE_URL`, `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET`                   | ✅ presentes    |
+| `SYNCPAY_WEBHOOK_TOKEN`                                                                | ❌ **em falta** |
+| `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN`, `VITE_MERCADOPAGO_PUBLIC_KEY` | ✅ presentes    |
+| `APP_PUBLIC_URL`                                                                       | ❌ **em falta** |
+| `SUPABASE_URL`                                                                         | ✅ presente     |
 
 Em teoria o gate **MP transparente** já deveria estar verde (todos os quatro presentes). Como o aviso ainda aparece, o Worker publicado provavelmente foi gerado **antes** dos secrets actuais terem sido adicionados — os secrets só ficam disponíveis para o Worker após **novo deploy / Publish → Update**.
 

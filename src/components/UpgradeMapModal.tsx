@@ -49,7 +49,7 @@ export function UpgradeMapModal({ open, onOpenChange }: Props) {
             Fechar
           </Button>
           <Button asChild className="bg-mystical text-white">
-            <Link to="/premium" onClick={() => onOpenChange(false)}>
+            <Link to="/assinatura" onClick={() => onOpenChange(false)}>
               Ver planos
             </Link>
           </Button>

@@ -17,6 +17,7 @@ import {
   createMercadoPagoPreferenceFn,
   getMercadoPagoAvailabilityFn,
   getMercadoPagoOrderStatusFn,
+  type MercadoPagoAvailabilityData,
 } from "@/lib/mercadopago.functions";
 import {
   createSyncPayPixOrderFn,
@@ -147,17 +148,19 @@ function PremiumPlansPage() {
 
   const checkoutReady = availabilityQuery.data?.available === true;
 
-  const mpAvailabilityQuery = useQuery({
+  const mpAvailabilityQuery = useQuery<MercadoPagoAvailabilityData>({
     queryKey: ["mercadopago-availability", user?.id],
-    queryFn: async () => {
+    queryFn: async (): Promise<MercadoPagoAvailabilityData> => {
       if (!session) {
         return {
-          checkoutPro: false as const,
-          transparent: false as const,
+          checkoutPro: false,
+          transparent: false,
           publicKey: undefined,
-        } as const;
+        };
       }
-      return getMercadoPagoAvailabilityFn({ ...withSupabaseAuth(session) });
+      return (await getMercadoPagoAvailabilityFn({
+        ...withSupabaseAuth(session),
+      })) as MercadoPagoAvailabilityData;
     },
     enabled: !!session && !!user?.id,
     staleTime: 60_000,

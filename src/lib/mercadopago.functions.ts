@@ -64,10 +64,29 @@ function userMessageFromMercadoPago(err: unknown): string {
   return "Erro ao comunicar com o pagamento.";
 }
 
+/** Resposta de `getMercadoPagoAvailabilityFn` (inclui gaps só quando o utilizador pode ver diagnóstico). */
+export type MercadoPagoAvailabilityData =
+  | {
+      checkoutPro: boolean;
+      transparent: boolean;
+      publicKey?: string;
+    }
+  | {
+      checkoutPro: boolean;
+      transparent: boolean;
+      publicKey?: string;
+      configurationGaps: {
+        checkoutPro: string[];
+        transparent: string[];
+      };
+    };
+
 export const getMercadoPagoAvailabilityFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(
-    timedServerFn("getMercadoPagoAvailabilityFn", async ({ context }) => {
+    timedServerFn(
+      "getMercadoPagoAvailabilityFn",
+      async ({ context }): Promise<MercadoPagoAvailabilityData> => {
       const publicKey = getMercadoPagoPublicKey();
       const checkoutPro = isMercadoPagoServerConfigured();
       const transparent = isMercadoPagoTransparentConfigured();
@@ -89,7 +108,8 @@ export const getMercadoPagoAvailabilityFn = createServerFn({ method: "POST" })
             },
           } as const)
         : base;
-    }),
+      }
+    ),
   );
 
 /** Cria preferência Checkout Pro e regista `mercadopago_orders` (id = external_reference). */

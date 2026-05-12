@@ -87,28 +87,28 @@ export const getMercadoPagoAvailabilityFn = createServerFn({ method: "POST" })
     timedServerFn(
       "getMercadoPagoAvailabilityFn",
       async ({ context }): Promise<MercadoPagoAvailabilityData> => {
-      const publicKey = getMercadoPagoPublicKey();
-      const checkoutPro = isMercadoPagoServerConfigured();
-      const transparent = isMercadoPagoTransparentConfigured();
-      const base = {
-        checkoutPro,
-        transparent,
-        publicKey: publicKey || undefined,
-      } as const;
-      const diagnostics = await shouldExposePaymentConfigurationGaps(
-        context.supabase,
-        context.userId,
-      );
-      return diagnostics
-        ? ({
-            ...base,
-            configurationGaps: {
-              checkoutPro: mercadoPagoCheckoutProGaps(),
-              transparent: mercadoPagoTransparentGaps(),
-            },
-          } as const)
-        : base;
-      }
+        const publicKey = getMercadoPagoPublicKey();
+        const checkoutPro = isMercadoPagoServerConfigured();
+        const transparent = isMercadoPagoTransparentConfigured();
+        const base = {
+          checkoutPro,
+          transparent,
+          publicKey: publicKey || undefined,
+        } as const;
+        const diagnostics = await shouldExposePaymentConfigurationGaps(
+          context.supabase,
+          context.userId,
+        );
+        return diagnostics
+          ? ({
+              ...base,
+              configurationGaps: {
+                checkoutPro: mercadoPagoCheckoutProGaps(),
+                transparent: mercadoPagoTransparentGaps(),
+              },
+            } as const)
+          : base;
+      },
     ),
   );
 

@@ -4,7 +4,32 @@ Checklist para colocar o AstroMap funcional fora da máquina local.
 
 ## Variáveis de ambiente
 
-Ver [`.env.example`](../.env.example). No cliente só podem existir segredos **anon** com prefixo `VITE_`. Chaves `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_*`, `TRANSIT_DIGEST_CRON_SECRET` e **todas as variáveis `AI_*` / chaves de LLM** ficam **só no servidor**.
+Ver [`.env.example`](../.env.example). No cliente só podem existir segredos **anon** com prefixo `VITE_`. Chaves `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_*`, `TRANSIT_DIGEST_CRON_SECRET`, **`SYNCPAY_*`** (só servidor) e **`MERCADOPAGO_ACCESS_TOKEN` / `MERCADOPAGO_WEBHOOK_TOKEN`** (só servidor) e **todas as variáveis `AI_*` / chaves de LLM** ficam **só no servidor**. A **`VITE_MERCADOPAGO_PUBLIC_KEY`** é pública e entra no **build** do frontend (Vite); opcionalmente **`MERCADOPAGO_PUBLIC_KEY`** no Worker se o runtime não expuser `VITE_*`.
+
+### Pagamentos SyncPay (Pix cash-in)
+
+1. Definir no **Worker / Lovable** (server functions): `SYNCPAY_API_BASE_URL` (URL absoluto só até ao host, **sem** sufixo `/api/partner/v1` e sem `/` final), `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET`.
+2. Gerar um segredo longo e aleatório para `SYNCPAY_WEBHOOK_TOKEN`; o mesmo valor deve estar na secret **`SYNCPAY_WEBHOOK_TOKEN`** da Edge Function `syncpay-webhook` (Supabase Dashboard → Edge Functions → Secrets).
+3. Deploy da função: `npx supabase functions deploy syncpay-webhook --no-verify-jwt` (ou script npm equivalente). O URL do webhook passado ao cash-in é `{SUPABASE_URL}/functions/v1/syncpay-webhook?token={SYNCPAY_WEBHOOK_TOKEN}` (o servidor monta-o automaticamente quando `SUPABASE_URL` e `SYNCPAY_WEBHOOK_TOKEN` existem). Use **esta** função (`syncpay-webhook`), não outro nome de endpoint; no painel SyncPay, evento de cash-in / recebimento conforme a doc do parceiro.
+4. No painel SyncPay, **autorizar IP** de egress (Worker e/ou Supabase Edge, conforme o que chama a API) e configurar webhooks conforme a documentação do parceiro.
+5. Utilizadores precisam de **nome**, **e-mail** (Auth), **CPF e telefone** em `profiles` (`billing_cpf`, `billing_phone`) — preenchidos em Configurações ou no fluxo Premium. O webhook de cash-in (incl. padrão OLD da doc SyncPay) pode trazer `data.id` e `data.idtransaction`; a função `syncpay-webhook` reconcilia o pedido se qualquer um coincidir com o `identifier` guardado em `syncpay_orders`.
+
+### Pagamentos Mercado Pago (Checkout Pro — cartão e outros meios no site do MP)
+
+1. No painel Mercado Pago, criar uma aplicação e obter o **Access Token** (produção ou teste). Definir no Worker: `MERCADOPAGO_ACCESS_TOKEN`. Nunca usar prefixo `VITE_`.
+2. Gerar um segredo longo para `MERCADOPAGO_WEBHOOK_TOKEN`; o **mesmo** valor na secret **`MERCADOPAGO_WEBHOOK_TOKEN`** da Edge Function `mercadopago-webhook` (Supabase → Edge Functions → Secrets).
+3. `SUPABASE_URL` no Worker permite montar `notification_url` apontando para `{SUPABASE_URL}/functions/v1/mercadopago-webhook?token=...`.
+4. Deploy: `npm run supabase:functions:deploy:mercadopago-webhook` (ou `npx supabase functions deploy mercadopago-webhook --no-verify-jwt`).
+5. No painel MP (Webhooks / notificações URL), configurar a mesma URL pública da Edge Function (produção). Consulte a documentação oficial sobre formato **GET** (IPN) e **POST** (webhooks) e allowlist de IPs se aplicável.
+6. `APP_PUBLIC_URL` deve ser a URL pública do site para `back_urls` do checkout (`/premium?mp=success|failure|pending`). Em local, use um túnel (ngrok, etc.) se precisar de voltar do checkout de teste.
+7. O checkout no domínio do Mercado Pago pode mostrar **Pix, cartão e outros** meios conforme a conta e a preferência; não é garantido «só cartão».
+
+### Checkout Transparente (cartão nesta página — Card Payment Brick)
+
+1. Requer os mesmos `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN` e `SUPABASE_URL` que o webhook.
+2. Definir **`VITE_MERCADOPAGO_PUBLIC_KEY`** (chave pública de produção ou teste, ex. `TEST-...`) no build do cliente/Worker. Opcionalmente duplicar como **`MERCADOPAGO_PUBLIC_KEY`** no servidor se o runtime não expuser `VITE_*`.
+3. **`SUPABASE_SERVICE_ROLE_KEY`** no Worker: a server function `createMercadoPagoTransparentPaymentFn` grava `mercadopago_orders` e actualiza `subscription_tier` com o cliente admin (o utilizador não tem permissão de `UPDATE` em `subscription_tier`).
+4. O formulário de cartão é renderizado pelo SDK do Mercado Pago; o token segue para `POST /v1/payments` no servidor.
 
 ### Interpretações com IA (`interpretation_ai_cache`)
 

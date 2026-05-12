@@ -3,3 +3,11 @@ project_id = "fxcoxnqqjgvqfukasfjb"
 # Cron HTTP POST com JSON { "cronSecret" }; não usar JWT de utilizador.
 [functions.transit-digest-cron]
 verify_jwt = false
+
+# Webhook SyncPay (POST sem JWT; validação por query ?token=)
+[functions.syncpay-webhook]
+verify_jwt = false
+
+# Webhook Mercado Pago (GET IPN e/ou POST; validação por query ?token=)
+[functions.mercadopago-webhook]
+verify_jwt = false

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { useProfile } from "@/hooks/use-profile";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trash2, Upload } from "lucide-react";
@@ -74,6 +74,8 @@ function Settings() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [billingCpf, setBillingCpf] = useState("");
+  const [billingPhone, setBillingPhone] = useState("");
 
   const { data: profile } = useProfile();
   const tierRaw = profile?.subscription_tier ?? "MENSAL";
@@ -134,6 +136,33 @@ function Settings() {
       });
     }
   }, [profile, nameForm, prefForm]);
+
+  useEffect(() => {
+    if (profile?.billing_cpf) setBillingCpf(profile.billing_cpf);
+    if (profile?.billing_phone) setBillingPhone(profile.billing_phone);
+  }, [profile?.billing_cpf, profile?.billing_phone]);
+
+  async function saveBilling() {
+    const cpf = billingCpf.replace(/\D/g, "");
+    const phone = billingPhone.replace(/\D/g, "");
+    if (cpf.length !== 11) {
+      toast.error("CPF deve ter 11 dígitos.");
+      return;
+    }
+    if (phone.length < 10 || phone.length > 11) {
+      toast.error("Telefone deve ter 10 ou 11 dígitos (com DDD).");
+      return;
+    }
+    const { error } = await supabase
+      .from("profiles")
+      .update({ billing_cpf: cpf, billing_phone: phone })
+      .eq("id", user!.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Dados de cobrança guardados");
+      qc.invalidateQueries({ queryKey: ["profile", user!.id] });
+    }
+  }
 
   async function saveName(values: { name: string }) {
     const { error } = await supabase
@@ -310,7 +339,7 @@ function Settings() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="assinatura" className="mt-4">
+        <TabsContent value="assinatura" className="mt-4 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -320,10 +349,44 @@ function Settings() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Checkout (mensal ou anual) ainda não disponível — em breve.
+                Pagamento Pix (SyncPay) na página Premium. Guarde CPF e telefone abaixo para
+                agilizar o checkout.
               </p>
               <Button asChild variant="outline" className="w-full sm:w-auto">
-                <Link to="/premium">Ver planos e preços</Link>
+                <Link to="/premium">Ver planos e pagar com Pix</Link>
+              </Button>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Dados para cobrança Pix</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Usados apenas para gerar o Pix na SyncPay. Armazenados no seu perfil.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-billing-cpf">CPF (11 dígitos)</Label>
+                  <Input
+                    id="cfg-billing-cpf"
+                    inputMode="numeric"
+                    value={billingCpf}
+                    onChange={(e) => setBillingCpf(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cfg-billing-phone">Telefone com DDD</Label>
+                  <Input
+                    id="cfg-billing-phone"
+                    inputMode="tel"
+                    value={billingPhone}
+                    onChange={(e) => setBillingPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+              <Button type="button" onClick={() => void saveBilling()}>
+                Guardar dados de cobrança
               </Button>
             </CardContent>
           </Card>

@@ -196,6 +196,8 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null;
+          billing_cpf: string | null;
+          billing_phone: string | null;
           created_at: string;
           email_notifications: boolean;
           house_system: string;
@@ -220,6 +222,8 @@ export type Database = {
         };
         Insert: {
           avatar_url?: string | null;
+          billing_cpf?: string | null;
+          billing_phone?: string | null;
           created_at?: string;
           email_notifications?: boolean;
           house_system?: string;
@@ -244,6 +248,8 @@ export type Database = {
         };
         Update: {
           avatar_url?: string | null;
+          billing_cpf?: string | null;
+          billing_phone?: string | null;
           created_at?: string;
           email_notifications?: boolean;
           house_system?: string;
@@ -312,6 +318,90 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      syncpay_orders: {
+        Row: {
+          amount: number;
+          created_at: string;
+          currency: string;
+          id: string;
+          plan: string;
+          raw_last_payload: Json | null;
+          status: string;
+          syncpay_identifier: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          currency?: string;
+          id?: string;
+          plan: string;
+          raw_last_payload?: Json | null;
+          status?: string;
+          syncpay_identifier: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          currency?: string;
+          id?: string;
+          plan?: string;
+          raw_last_payload?: Json | null;
+          status?: string;
+          syncpay_identifier?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      mercadopago_orders: {
+        Row: {
+          amount: number;
+          created_at: string;
+          currency: string;
+          external_reference: string;
+          id: string;
+          payment_id: string | null;
+          plan: string;
+          preference_id: string | null;
+          raw_last_payload: Json | null;
+          status: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          currency?: string;
+          external_reference: string;
+          id: string;
+          payment_id?: string | null;
+          plan: string;
+          preference_id?: string | null;
+          raw_last_payload?: Json | null;
+          status?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          currency?: string;
+          external_reference?: string;
+          id?: string;
+          payment_id?: string | null;
+          plan?: string;
+          preference_id?: string | null;
+          raw_last_payload?: Json | null;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
       };
       user_engagement_events: {
         Row: {

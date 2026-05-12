@@ -1,68 +1,43 @@
-## Objetivo
+## Diagnóstico
 
-Tornar `completeChat` resiliente: se o provedor primário falhar (erro de rede, 4xx/5xx, quota, timeout), tenta automaticamente o outro provedor antes de propagar o erro.
+A página `/premium` mostra o aviso quando **ambos** os gates falham no servidor:
 
-## Alterações
+- **SyncPay** (`isSyncPayServerConfigured`) exige: `SYNCPAY_API_BASE_URL`, `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET`, **`SYNCPAY_WEBHOOK_TOKEN`**, `SUPABASE_URL`.
+- **Mercado Pago Checkout Pro** (`isMercadoPagoServerConfigured`) exige: `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN`, `SUPABASE_URL`, **`APP_PUBLIC_URL`**.
+- **Mercado Pago Transparente / cartão** (`isMercadoPagoTransparentConfigured`) exige: `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN`, `SUPABASE_URL`, `VITE_MERCADOPAGO_PUBLIC_KEY` (ou `MERCADOPAGO_PUBLIC_KEY`).
 
-**Ficheiro único:** `src/lib/ai/llm-provider.ts`
+Comparando com os secrets já configurados no projeto:
 
-1. Refatorar `completeChat` para:
-   - Determinar provedor primário via `resolveAiProvider()` (mantém comportamento atual: respeita `AI_PROVIDER` ou primeira chave disponível).
-   - Determinar provedor de fallback: o "outro" provedor, **apenas se a respectiva API key estiver definida**.
-   - Tentar primário; em caso de erro lançado por `completeAnthropic`/`completeOpenAI`, registar `console.warn` estruturado (`{ aiFallback: true, from, to, reason }`) e tentar fallback.
-   - Se fallback também falhar (ou não existir), lançar erro combinado mencionando ambos provedores.
+| Secret | Estado |
+|---|---|
+| `SYNCPAY_API_BASE_URL`, `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET` | ✅ presentes |
+| `SYNCPAY_WEBHOOK_TOKEN` | ❌ **em falta** |
+| `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN`, `VITE_MERCADOPAGO_PUBLIC_KEY` | ✅ presentes |
+| `APP_PUBLIC_URL` | ❌ **em falta** |
+| `SUPABASE_URL` | ✅ presente |
 
-2. Não alterar:
-   - Assinaturas públicas (`completeChat`, `resolveAiProvider`, tipos).
-   - Lógica interna de `completeAnthropic` / `completeOpenAI` (timeout, sanitização, parsing).
-   - Comportamento quando só existe uma chave configurada (sem fallback possível → erro direto, como hoje).
+Em teoria o gate **MP transparente** já deveria estar verde (todos os quatro presentes). Como o aviso ainda aparece, o Worker publicado provavelmente foi gerado **antes** dos secrets actuais terem sido adicionados — os secrets só ficam disponíveis para o Worker após **novo deploy / Publish → Update**.
 
-3. Sem alterações em:
-   - Server functions que consomem `completeChat` (continuam a apanhar `Error` no `try/catch` existente em `ai-interpretation.functions.ts`).
-   - Schema de cache, quotas ou UI.
+## Plano
 
-## Detalhes técnicos
+1. **Adicionar os dois secrets em falta** (via tool de secrets, formulário seguro):
+   - `SYNCPAY_WEBHOOK_TOKEN` — string aleatória forte que vais também colar no painel SyncPay como token do webhook (`/functions/v1/syncpay-webhook?token=…`).
+   - `APP_PUBLIC_URL` — URL pública absoluta da app, ex.: `https://astrologiia.app` (sem `/` final). Usado nas `back_urls` do Checkout Pro do Mercado Pago.
 
-```ts
-export async function completeChat(system, user, opts?) {
-  const primary = resolveAiProvider();
-  if (!primary) throw new Error("LLM não configurado: defina ANTHROPIC_API_KEY ou OPENAI_API_KEY.");
+2. **Republicar o Worker** (Publish → Update no editor) para que os secrets fiquem disponíveis em `process.env` no SSR/Worker. Sem este passo, mesmo os secrets já existentes podem não estar a ser lidos pelo build em produção.
 
-  const fallback: AiProviderId | null =
-    primary === "anthropic" && process.env.OPENAI_API_KEY
-      ? "openai"
-      : primary === "openai" && process.env.ANTHROPIC_API_KEY
-        ? "anthropic"
-        : null;
+3. **Verificar no `/premium`**:
+   - O alerta "Pagamentos em configuração" deve desaparecer.
+   - Botão Pix (SyncPay) activo se `SYNCPAY_*` completos.
+   - Botão Mercado Pago Checkout Pro activo (precisa `APP_PUBLIC_URL`).
+   - Brick de cartão (transparente) activo (precisa `VITE_MERCADOPAGO_PUBLIC_KEY` no build do cliente — se não aparecer, é preciso garantir que esse `VITE_*` foi injectado no build e republicar).
 
-  const run = (p: AiProviderId) =>
-    p === "anthropic" ? completeAnthropic(system, user, opts) : completeOpenAI(system, user, opts);
+4. **Configurar webhooks nos providers** (passo operacional, fora do código):
+   - **SyncPay** → URL: `https://fxcoxnqqjgvqfukasfjb.supabase.co/functions/v1/syncpay-webhook?token=<SYNCPAY_WEBHOOK_TOKEN>`
+   - **Mercado Pago** → URL: `https://fxcoxnqqjgvqfukasfjb.supabase.co/functions/v1/mercadopago-webhook?token=<MERCADOPAGO_WEBHOOK_TOKEN>`
 
-  try {
-    return await run(primary);
-  } catch (primaryErr) {
-    if (!fallback) throw primaryErr;
-    console.warn(
-      JSON.stringify({
-        aiFallback: true,
-        from: primary,
-        to: fallback,
-        reason: (primaryErr as Error)?.message?.slice(0, 200),
-      }),
-    );
-    try {
-      return await run(fallback);
-    } catch (fallbackErr) {
-      throw new Error(
-        `Ambos provedores falharam — ${primary}: ${(primaryErr as Error).message} | ${fallback}: ${(fallbackErr as Error).message}`,
-      );
-    }
-  }
-}
-```
+## Notas técnicas
 
-## Notas
-
-- O fallback aplica-se a **qualquer** falha do primário (incluindo o "credit balance too low" da Anthropic que motivou o pedido).
-- `AI_PROVIDER` continua a determinar a preferência inicial; o fallback nunca é usado se só houver uma chave.
-- Logging via `console.warn` estruturado mantém o padrão de `timedServerFn` (sem PII).
+- Nenhuma alteração de código é necessária — só configuração de ambiente + redeploy.
+- Se quiseres só uma das passarelas (ex.: só Pix SyncPay), basta completar esse conjunto e o gate respectivo abre; a outra continua oculta sem partir nada.
+- Para `APP_PUBLIC_URL` em ambiente preview vs produção: usa o domínio final (`https://astrologiia.app`) — afecta apenas os `back_urls` do Checkout Pro (sucesso/falha/pendente).

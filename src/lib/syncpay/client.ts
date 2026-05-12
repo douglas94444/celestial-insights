@@ -1,3 +1,5 @@
+import { getSupabaseUrl } from "@/integrations/supabase/public-config";
+
 /**
  * Cliente HTTP da API Partner SyncPay (só servidor — usar a partir de server functions).
  * Token: POST /api/partner/v1/auth-token; renovar só quando expirar (margem de segurança).
@@ -176,12 +178,12 @@ export function isSyncPayServerConfigured(): boolean {
   const id = process.env.SYNCPAY_CLIENT_ID?.trim();
   const secret = process.env.SYNCPAY_CLIENT_SECRET?.trim();
   const hook = process.env.SYNCPAY_WEBHOOK_TOKEN?.trim();
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  const supabaseUrl = getSupabaseUrl().trim();
   return Boolean(base && id && secret && hook && supabaseUrl);
 }
 
 export function buildSyncPayWebhookUrl(): string {
-  const supabaseUrl = normalizeBaseUrl(process.env.SUPABASE_URL?.trim() ?? "");
+  const supabaseUrl = normalizeBaseUrl(getSupabaseUrl().trim());
   const hookToken = process.env.SYNCPAY_WEBHOOK_TOKEN?.trim();
   if (!supabaseUrl || !hookToken) {
     throw new SyncPayConfigError(

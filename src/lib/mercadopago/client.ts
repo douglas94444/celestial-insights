@@ -5,6 +5,7 @@
  */
 
 import type { SubscriptionPlanId } from "@/lib/subscription-pricing";
+import { getSupabaseUrl } from "@/integrations/supabase/public-config";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -67,6 +68,8 @@ function mercadoPagoPublicKeyForTransparent(): string {
   const viteKey = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY as string | undefined;
   const a = typeof viteKey === "string" ? viteKey.trim() : "";
   if (a) return a;
+  const runtimeViteKey = process.env.VITE_MERCADOPAGO_PUBLIC_KEY?.trim();
+  if (runtimeViteKey) return runtimeViteKey;
   return process.env.MERCADOPAGO_PUBLIC_KEY?.trim() ?? "";
 }
 
@@ -74,7 +77,7 @@ function mercadoPagoPublicKeyForTransparent(): string {
 export function isMercadoPagoServerConfigured(): boolean {
   const token = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim();
   const hook = process.env.MERCADOPAGO_WEBHOOK_TOKEN?.trim();
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  const supabaseUrl = getSupabaseUrl().trim();
   const appUrl = process.env.APP_PUBLIC_URL?.trim();
   return Boolean(token && hook && supabaseUrl && appUrl);
 }
@@ -83,7 +86,7 @@ export function isMercadoPagoServerConfigured(): boolean {
 export function isMercadoPagoTransparentConfigured(): boolean {
   const token = process.env.MERCADOPAGO_ACCESS_TOKEN?.trim();
   const hook = process.env.MERCADOPAGO_WEBHOOK_TOKEN?.trim();
-  const supabaseUrl = process.env.SUPABASE_URL?.trim();
+  const supabaseUrl = getSupabaseUrl().trim();
   return Boolean(token && hook && supabaseUrl && mercadoPagoPublicKeyForTransparent());
 }
 
@@ -93,7 +96,7 @@ export function getMercadoPagoPublicKey(): string {
 }
 
 export function buildMercadoPagoWebhookUrl(): string {
-  const supabaseUrl = normalizeBaseUrl(process.env.SUPABASE_URL?.trim() ?? "");
+  const supabaseUrl = normalizeBaseUrl(getSupabaseUrl().trim());
   const hookToken = process.env.MERCADOPAGO_WEBHOOK_TOKEN?.trim();
   if (!supabaseUrl || !hookToken) {
     throw new MercadoPagoConfigError(

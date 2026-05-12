@@ -8,16 +8,26 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { sanitizePostAuthRedirectPath } from "@/lib/auth-redirect";
 
 export const Route = createFileRoute("/auth")({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
+    const r = sanitizePostAuthRedirectPath(search.redirect);
+    return r ? { redirect: r } : {};
+  },
   component: AuthPage,
 });
 
-async function signInWithGoogle() {
+async function signInWithGoogle(redirectAfter: string | undefined) {
+  const origin = window.location.origin;
+  const redirectTo =
+    redirectAfter != null
+      ? `${origin}/auth?redirect=${encodeURIComponent(redirectAfter)}`
+      : `${origin}/dashboard`;
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: `${window.location.origin}/dashboard`,
+      redirectTo,
     },
   });
   if (error) toast.error(error.message);
@@ -26,12 +36,13 @@ async function signInWithGoogle() {
 function AuthPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const { redirect } = Route.useSearch();
 
   useEffect(() => {
     if (!loading && user) {
-      void navigate({ to: "/dashboard", replace: true });
+      void navigate({ to: redirect ?? "/dashboard", replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, navigate, redirect]);
 
   return (
     <div className="min-h-screen bg-cosmic text-white starfield grid place-items-center px-4 py-10">
@@ -67,7 +78,7 @@ function AuthPage() {
             type="button"
             variant="outline"
             className="mt-4 w-full border-white/20 bg-background/80"
-            onClick={() => signInWithGoogle()}
+            onClick={() => void signInWithGoogle(redirect)}
           >
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
               <path
@@ -100,6 +111,7 @@ function SignInForm() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
+  const { redirect } = Route.useSearch();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -122,6 +134,10 @@ function SignInForm() {
       return;
     }
     toast.success("Bem-vindo de volta!");
+    if (redirect) {
+      void navigate({ to: redirect, replace: true });
+      return;
+    }
     const { count } = await supabase
       .from("charts")
       .select("id", { count: "exact", head: true })
@@ -183,7 +199,7 @@ function SignUpForm() {
       password,
       options: {
         data: { name },
-        emailRedirectTo: `${window.location.origin}/onboarding`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
       },
     });
     setBusy(false);

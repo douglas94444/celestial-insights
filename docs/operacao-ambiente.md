@@ -31,6 +31,17 @@ Ver [`.env.example`](../.env.example). No cliente só podem existir segredos **a
 3. **`SUPABASE_SERVICE_ROLE_KEY`** no Worker: a server function `createMercadoPagoTransparentPaymentFn` grava `mercadopago_orders` e actualiza `subscription_tier` com o cliente admin (o utilizador não tem permissão de `UPDATE` em `subscription_tier`).
 4. O formulário de cartão é renderizado pelo SDK do Mercado Pago; o token segue para `POST /v1/payments` no servidor.
 
+### Página `/premium` sem pagamentos (botões Pix desactivados)
+
+Isto é **esperado** quando, no **mesmo runtime das server functions** (Worker / ambiente de deploy), **nenhum** meio está completo:
+
+- **Pix (SyncPay):** faltam `SYNCPAY_API_BASE_URL`, `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET`, `SYNCPAY_WEBHOOK_TOKEN` e `SUPABASE_URL` (ver secção SyncPay acima).
+- **Mercado Pago:** faltam token de acesso, webhook, `APP_PUBLIC_URL` (Checkout Pro) e/ou chave pública para cartão na página (ver secções MP acima).
+
+Depois de definir ou corrigir variáveis no painel do Worker, **volte a fazer deploy** (`npm run deploy:worker` ou o fluxo do seu hosting). Em desenvolvimento local, use um `.env` na raiz e reinicie `npm run dev`.
+
+Quando pelo menos um canal estiver activo, a página mostra o bloco **«Dados de cobrança»**; para Pix é ainda necessário **CPF (11 dígitos) e telefone (10–11)** para os botões deixarem de estar desactivados.
+
 ### Interpretações com IA (`interpretation_ai_cache`)
 
 1. Aplicar a migração que cria `interpretation_ai_cache` e o enum `interpretation_ai_kind` (`npm run supabase:push`).

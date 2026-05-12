@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, CreditCard, Loader2, Sparkles } from "lucide-react";
+import { Check, Copy, CreditCard, Info, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useProfile } from "@/hooks/use-profile";
 import { useAuth } from "@/hooks/use-auth";
+import { useUserIsAdmin } from "@/hooks/use-user-is-admin";
 import { MercadoPagoTransparentCardBrick } from "@/components/MercadoPagoTransparentCardBrick";
 import {
   createMercadoPagoPreferenceFn,
@@ -56,6 +57,8 @@ function PremiumPlansPage() {
   const { mp } = useSearch({ from: "/_authenticated/premium" });
   const { session, user } = useAuth();
   const { data: profile } = useProfile();
+  const { data: isAdmin } = useUserIsAdmin();
+  const showPaymentsOperatorHint = import.meta.env.DEV || isAdmin === true;
   const tier = profile?.subscription_tier ?? "MENSAL";
   const highlightMensal = tier === "MENSAL" || tier === "PREMIUM" || tier === "FREE";
   const highlightAnual = tier === "ANUAL";
@@ -349,12 +352,31 @@ function PremiumPlansPage() {
             </CardContent>
           </Card>
         ) : (
-          <p className="mx-auto max-w-2xl text-center text-xs text-muted-foreground">
-            Para ativar pagamentos, configure no servidor as variáveis em docs/operacao-ambiente.md:
-            SyncPay (`SYNCPAY_*`, `SUPABASE_URL`) e/ou Mercado Pago (`MERCADOPAGO_ACCESS_TOKEN`,
-            `MERCADOPAGO_WEBHOOK_TOKEN`, `APP_PUBLIC_URL` para Checkout Pro, mais
-            `VITE_MERCADOPAGO_PUBLIC_KEY` ou `MERCADOPAGO_PUBLIC_KEY` para cartão nesta página).
-          </p>
+          <div className="mx-auto max-w-2xl space-y-3">
+            <Alert className="border-muted bg-muted/30">
+              <Info className="h-4 w-4 text-muted-foreground" />
+              <AlertTitle>Pagamentos em configuração</AlertTitle>
+              <AlertDescription>
+                O checkout nesta página ainda não está activo neste ambiente: os botões de pagamento
+                ficam desactivados até o servidor ter pelo menos um meio configurado (Pix via
+                SyncPay e/ou Mercado Pago). Pode continuar a usar a app com o plano actual.
+              </AlertDescription>
+            </Alert>
+            {showPaymentsOperatorHint ? (
+              <p className="text-center text-xs text-muted-foreground">
+                Para activar: no Worker (ou `.env` local), configure conforme{" "}
+                <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code> — SyncPay
+                (`SYNCPAY_*`, <code className="rounded bg-muted px-1">SUPABASE_URL</code>) e/ou
+                Mercado Pago (
+                <code className="rounded bg-muted px-1">MERCADOPAGO_ACCESS_TOKEN</code>,{" "}
+                <code className="rounded bg-muted px-1">MERCADOPAGO_WEBHOOK_TOKEN</code>,{" "}
+                <code className="rounded bg-muted px-1">APP_PUBLIC_URL</code> para Checkout Pro; mais{" "}
+                <code className="rounded bg-muted px-1">VITE_MERCADOPAGO_PUBLIC_KEY</code> ou{" "}
+                <code className="rounded bg-muted px-1">MERCADOPAGO_PUBLIC_KEY</code> para cartão
+                nesta página). Depois de alterar secrets, faça novamente o deploy do Worker.
+              </p>
+            ) : null}
+          </div>
         )}
 
         {mpTransparent ? (

@@ -15,6 +15,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AuthenticatedTransitosRouteImport } from './routes/_authenticated/transitos'
 import { Route as AuthenticatedPremiumRouteImport } from './routes/_authenticated/premium'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
@@ -55,6 +56,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthRoute,
 } as any)
 const AuthenticatedTransitosRoute = AuthenticatedTransitosRouteImport.update({
   id: '/transitos',
@@ -116,7 +122,7 @@ const AuthenticatedMapasIdRoute = AuthenticatedMapasIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/terms': typeof TermsRoute
@@ -128,13 +134,14 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/premium': typeof AuthenticatedPremiumRoute
   '/transitos': typeof AuthenticatedTransitosRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/mapas/$id': typeof AuthenticatedMapasIdRoute
   '/mapas/novo': typeof AuthenticatedMapasNovoRoute
   '/mapas/': typeof AuthenticatedMapasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/terms': typeof TermsRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/premium': typeof AuthenticatedPremiumRoute
   '/transitos': typeof AuthenticatedTransitosRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/mapas/$id': typeof AuthenticatedMapasIdRoute
   '/mapas/novo': typeof AuthenticatedMapasNovoRoute
   '/mapas': typeof AuthenticatedMapasIndexRoute
@@ -154,7 +162,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/terms': typeof TermsRoute
@@ -166,6 +174,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/premium': typeof AuthenticatedPremiumRoute
   '/_authenticated/transitos': typeof AuthenticatedTransitosRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/_authenticated/mapas/$id': typeof AuthenticatedMapasIdRoute
   '/_authenticated/mapas/novo': typeof AuthenticatedMapasNovoRoute
   '/_authenticated/mapas/': typeof AuthenticatedMapasIndexRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/premium'
     | '/transitos'
+    | '/auth/callback'
     | '/mapas/$id'
     | '/mapas/novo'
     | '/mapas/'
@@ -204,6 +214,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/premium'
     | '/transitos'
+    | '/auth/callback'
     | '/mapas/$id'
     | '/mapas/novo'
     | '/mapas'
@@ -223,6 +234,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding'
     | '/_authenticated/premium'
     | '/_authenticated/transitos'
+    | '/auth/callback'
     | '/_authenticated/mapas/$id'
     | '/_authenticated/mapas/novo'
     | '/_authenticated/mapas/'
@@ -231,7 +243,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
   PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   TermsRoute: typeof TermsRoute
@@ -280,6 +292,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/_authenticated/transitos': {
       id: '/_authenticated/transitos'
@@ -393,10 +412,20 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface AuthRouteChildren {
+  AuthCallbackRoute: typeof AuthCallbackRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthCallbackRoute: AuthCallbackRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
   PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   TermsRoute: TermsRoute,

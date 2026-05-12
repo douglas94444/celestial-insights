@@ -9,6 +9,7 @@ export const ENGAGEMENT_ROUTES = {
   transitos: "transitos",
   compatibilidade: "compatibilidade",
   configuracoes: "configuracoes",
+  assinatura: "assinatura",
 } as const;
 
 /** Valores estáveis para `topic_key` + documentação do histórico agregado. */
@@ -26,6 +27,18 @@ export const ENGAGEMENT_TOPICS = {
   ai_transit_transitos: "ai_transit_transitos",
   ai_natal_executive: "ai_natal_executive",
   ai_natal_planet: "ai_natal_planet",
+  /** Vista `/assinatura` (dedupe ~90s por utilizador + produto). */
+  checkout_view: "checkout_view",
+  /** CPF e telefone válidos para pagamento (dedupe na mesma janela). */
+  checkout_billing_ready: "checkout_billing_ready",
+  /** Clique para gerar Pix (mensal, anual ou mapa). */
+  checkout_initiate_pix: "checkout_initiate_pix",
+  /** Redireccionamento Checkout Pro Mercado Pago. */
+  checkout_initiate_mp_checkout_pro: "checkout_initiate_mp_checkout_pro",
+  /** Pagamento com cartão transparente concluído (callback do brick). */
+  checkout_payment_confirmed_mp_transparent: "checkout_payment_confirmed_mp_transparent",
+  /** Webhook / polling confirmou pagamento (Pix SyncPay ou MP Pro). */
+  checkout_payment_confirmed: "checkout_payment_confirmed",
 } as const;
 
 /** Registo fire-and-forget de utilização (RLS: apenas o próprio utilizador). */
@@ -75,6 +88,8 @@ const DEDUPE_TOPIC_KEYS = new Set<string>([
   ENGAGEMENT_TOPICS.transitos_open,
   ENGAGEMENT_TOPICS.synastry_view,
   ENGAGEMENT_TOPICS.prefs_saved,
+  ENGAGEMENT_TOPICS.checkout_view,
+  ENGAGEMENT_TOPICS.checkout_billing_ready,
 ]);
 
 const lastEmittedAt = new Map<string, number>();
@@ -99,7 +114,64 @@ export function engagementDedupeKey(
   if (tk === ENGAGEMENT_TOPICS.synastry_view && m.synastry_id != null) {
     return `${base}|syn:${String(m.synastry_id)}`;
   }
+  if (tk === ENGAGEMENT_TOPICS.checkout_view && m.produto != null) {
+    const cr = m.checkoutReady === true ? "1" : "0";
+    const tr = m.mpTransparent === true ? "1" : "0";
+    const cp = m.mpCheckoutPro === true ? "1" : "0";
+    return `${base}|prod:${String(m.produto)}|cr:${cr}|tr:${tr}|cp:${cp}`;
+  }
+  if (tk === ENGAGEMENT_TOPICS.checkout_billing_ready && m.produto != null) {
+    return `${base}|prod:${String(m.produto)}`;
+  }
   return base;
+}
+
+/** Evento de funil no checkout (sem dedupe; usar para cliques e confirmações). */
+export function recordCheckoutEngagement(
+  client: SupabaseClient<Database>,
+  userId: string | undefined | null,
+  topicKey: string,
+  meta?: Json,
+): void {
+  if (!userId) return;
+  insertEngagementEvent(client, userId, {
+    route_key: ENGAGEMENT_ROUTES.assinatura,
+    topic_key: topicKey,
+    meta: meta ?? {},
+  });
+}
+
+/** Primeira vista da página de checkout (~90s dedupe por utilizador + produto). */
+export function recordCheckoutPageViewDeduped(
+  client: SupabaseClient<Database>,
+  userId: string | undefined | null,
+  meta: {
+    produto: "premium" | "mapa";
+    checkoutReady: boolean;
+    mpTransparent: boolean;
+    mpCheckoutPro: boolean;
+  },
+): void {
+  if (!userId) return;
+  insertEngagementEventDeduped(client, userId, {
+    route_key: ENGAGEMENT_ROUTES.assinatura,
+    topic_key: ENGAGEMENT_TOPICS.checkout_view,
+    meta: meta as Json,
+  });
+}
+
+/** Cobrança válida para activar botões de pagamento (dedupe por utilizador + produto). */
+export function recordCheckoutBillingReadyDeduped(
+  client: SupabaseClient<Database>,
+  userId: string | undefined | null,
+  meta: { produto: "premium" | "mapa" },
+): void {
+  if (!userId) return;
+  insertEngagementEventDeduped(client, userId, {
+    route_key: ENGAGEMENT_ROUTES.assinatura,
+    topic_key: ENGAGEMENT_TOPICS.checkout_billing_ready,
+    meta: meta as Json,
+  });
 }
 
 /** @internal Testes: limpar estado de dedupe entre casos. */

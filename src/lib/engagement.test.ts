@@ -108,6 +108,25 @@ describe("insertEngagementEventDeduped", () => {
       }),
     );
   });
+
+  it("checkout_view keys differ when payment availability flags change", () => {
+    const base = {
+      route_key: ENGAGEMENT_ROUTES.assinatura,
+      topic_key: ENGAGEMENT_TOPICS.checkout_view,
+      meta: {
+        produto: "premium",
+        checkoutReady: true,
+        mpTransparent: false,
+        mpCheckoutPro: false,
+      },
+    };
+    expect(engagementDedupeKey("u", base)).not.toEqual(
+      engagementDedupeKey("u", {
+        ...base,
+        meta: { ...base.meta, checkoutReady: false },
+      }),
+    );
+  });
 });
 
 describe("recordAiEngagement", () => {

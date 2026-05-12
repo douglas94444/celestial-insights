@@ -26,8 +26,20 @@ import {
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { formatSubscriptionPriceBrl, SUBSCRIPTION_PLAN_AMOUNTS } from "@/lib/subscription-pricing";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  ENGAGEMENT_TOPICS,
+  recordCheckoutBillingReadyDeduped,
+  recordCheckoutEngagement,
+  recordCheckoutPageViewDeduped,
+} from "@/lib/engagement";
+import { cn } from "@/lib/utils";
 
 const SESSION_MP_ORDER_REF = "astromap_mp_order_ref";
+
+type PremiumSubscriptionPlan = "mensal" | "anual";
+type PremiumPayMethod = "pix" | "mp_transparent" | "mp_checkout_pro";
+type MapaPayMethod = "pix" | "mp_checkout_pro";
 
 export const Route = createFileRoute("/_authenticated/assinatura")({
   validateSearch: (
@@ -110,7 +122,13 @@ function PremiumPlansPage() {
   const [txIdentifier, setTxIdentifier] = useState<string | null>(null);
   const [mpResumeExternalRef, setMpResumeExternalRef] = useState<string | null>(null);
   const mpFailureToastDone = useRef(false);
-  const [transparentPlan, setTransparentPlan] = useState<"mensal" | "anual">("mensal");
+  const [selectedPremiumPlan, setSelectedPremiumPlan] = useState<PremiumSubscriptionPlan | null>(
+    null,
+  );
+  const [premiumPayMethod, setPremiumPayMethod] = useState<PremiumPayMethod | null>(null);
+  const [mapaPayMethod, setMapaPayMethod] = useState<MapaPayMethod | null>(null);
+  const pixSuccessRecorded = useRef(false);
+  const mpProSuccessRecorded = useRef(false);
 
   useEffect(() => {
     if (profile?.billing_cpf) setBillingCpf(profile.billing_cpf);
@@ -150,6 +168,24 @@ function PremiumPlansPage() {
   const mpPublicKey = mpAvail?.publicKey ?? "";
   const mpTransparent = mpAvail?.transparent === true && mpPublicKey.length > 0;
   const showBillingForm = checkoutReady || mpCheckoutPro || mpTransparent;
+
+  useEffect(() => {
+    setSelectedPremiumPlan(null);
+    setPremiumPayMethod(null);
+    setMapaPayMethod(null);
+  }, [isMapa]);
+
+  useEffect(() => {
+    if (!txIdentifier) pixSuccessRecorded.current = false;
+  }, [txIdentifier]);
+
+  useEffect(() => {
+    setPremiumPayMethod(null);
+  }, [selectedPremiumPlan]);
+
+  useEffect(() => {
+    if (!mpResumeExternalRef) mpProSuccessRecorded.current = false;
+  }, [mpResumeExternalRef]);
 
   useEffect(() => {
     if (mp !== "success" && mp !== "pending") return;
@@ -203,6 +239,13 @@ function PremiumPlansPage() {
     const st = mpOrderPoll.data?.localStatus;
     if (!st || !mpResumeExternalRef || !user?.id) return;
     if (st === "approved") {
+      if (!mpProSuccessRecorded.current) {
+        mpProSuccessRecorded.current = true;
+        recordCheckoutEngagement(supabase, user.id, ENGAGEMENT_TOPICS.checkout_payment_confirmed, {
+          channel: "mp_checkout_pro",
+          produto: isMapa ? "mapa" : "premium",
+        });
+      }
       void qc.invalidateQueries({ queryKey: ["profile", user.id] });
       toast.success("Pagamento confirmado. O seu plano foi atualizado.");
       sessionStorage.removeItem(SESSION_MP_ORDER_REF);
@@ -215,7 +258,7 @@ function PremiumPlansPage() {
       setMpResumeExternalRef(null);
       void navigate({ to: "/assinatura", search: {}, replace: true });
     }
-  }, [mpOrderPoll.data?.localStatus, mpResumeExternalRef, navigate, qc, user?.id]);
+  }, [mpOrderPoll.data?.localStatus, mpResumeExternalRef, navigate, qc, user?.id, isMapa]);
 
   const pollQuery = useQuery({
     queryKey: ["syncpay-tx", txIdentifier, user?.id],
@@ -236,12 +279,19 @@ function PremiumPlansPage() {
 
   useEffect(() => {
     if (pollQuery.data?.remoteStatus === "completed" && user?.id) {
+      if (!pixSuccessRecorded.current) {
+        pixSuccessRecorded.current = true;
+        recordCheckoutEngagement(supabase, user.id, ENGAGEMENT_TOPICS.checkout_payment_confirmed, {
+          channel: "syncpay_pix",
+          produto: isMapa ? "mapa" : "premium",
+        });
+      }
       void qc.invalidateQueries({ queryKey: ["profile", user.id] });
       toast.success("Pagamento confirmado. O seu plano foi atualizado.");
       setPixCode(null);
       setTxIdentifier(null);
     }
-  }, [pollQuery.data?.remoteStatus, qc, user?.id]);
+  }, [pollQuery.data?.remoteStatus, qc, user?.id, isMapa]);
 
   const createOrder = useMutation({
     mutationFn: async (plan: "mensal" | "anual" | "mapa") => {
@@ -255,6 +305,11 @@ function PremiumPlansPage() {
           billing_phone: phone.length >= 10 && phone.length <= 11 ? billingPhone : undefined,
         },
         ...withSupabaseAuth(session),
+      });
+    },
+    onMutate: (plan) => {
+      recordCheckoutEngagement(supabase, user?.id, ENGAGEMENT_TOPICS.checkout_initiate_pix, {
+        plan,
       });
     },
     onSuccess: async (res) => {
@@ -279,6 +334,16 @@ function PremiumPlansPage() {
         ...withSupabaseAuth(session),
       });
     },
+    onMutate: (plan) => {
+      recordCheckoutEngagement(
+        supabase,
+        user?.id,
+        ENGAGEMENT_TOPICS.checkout_initiate_mp_checkout_pro,
+        {
+          plan,
+        },
+      );
+    },
     onSuccess: (res) => {
       sessionStorage.setItem(SESSION_MP_ORDER_REF, res.externalReference);
       window.location.href = res.redirectUrl;
@@ -288,6 +353,30 @@ function PremiumPlansPage() {
 
   const hasBillingForPayment =
     onlyDigits(billingCpf).length === 11 && onlyDigits(billingPhone).length >= 10;
+
+  useEffect(() => {
+    if (!user?.id) return;
+    if (availabilityQuery.isLoading || mpAvailabilityQuery.isLoading) return;
+    recordCheckoutPageViewDeduped(supabase, user.id, {
+      produto: isMapa ? "mapa" : "premium",
+      checkoutReady,
+      mpTransparent,
+      mpCheckoutPro,
+    });
+  }, [
+    user?.id,
+    isMapa,
+    checkoutReady,
+    mpTransparent,
+    mpCheckoutPro,
+    availabilityQuery.isLoading,
+    mpAvailabilityQuery.isLoading,
+  ]);
+
+  useEffect(() => {
+    if (!user?.id || !hasBillingForPayment) return;
+    recordCheckoutBillingReadyDeduped(supabase, user.id, { produto: isMapa ? "mapa" : "premium" });
+  }, [user?.id, hasBillingForPayment, isMapa]);
 
   const pollStatus = pollQuery.data?.remoteStatus;
   const pollLabel = useMemo(() => {
@@ -323,6 +412,73 @@ function PremiumPlansPage() {
     if (parts.length === 0) return "Pagamento em preparação";
     return parts.join(" · ");
   })();
+
+  const cpfDigits = onlyDigits(billingCpf);
+  const phoneDigits = onlyDigits(billingPhone);
+  const cpfFormatHint = billingCpf.length > 0 && cpfDigits.length !== 11;
+  const phoneFormatHint =
+    billingPhone.length > 0 && (phoneDigits.length < 10 || phoneDigits.length > 11);
+
+  const premiumPaymentOptionCount = useMemo(() => {
+    if (isMapa) return 0;
+    let n = 0;
+    if (checkoutReady) n++;
+    if (mpTransparent) n++;
+    if (mpCheckoutPro && !mpTransparent) n++;
+    return n;
+  }, [isMapa, checkoutReady, mpTransparent, mpCheckoutPro]);
+
+  const premiumMethodForUi = useMemo((): PremiumPayMethod | null => {
+    if (!selectedPremiumPlan || isMapa) return null;
+    if (premiumPaymentOptionCount === 1) {
+      if (checkoutReady) return "pix";
+      if (mpTransparent) return "mp_transparent";
+      if (mpCheckoutPro && !mpTransparent) return "mp_checkout_pro";
+      return null;
+    }
+    return premiumPayMethod;
+  }, [
+    selectedPremiumPlan,
+    isMapa,
+    premiumPaymentOptionCount,
+    checkoutReady,
+    mpTransparent,
+    mpCheckoutPro,
+    premiumPayMethod,
+  ]);
+
+  const mapaPaymentOptionCount = useMemo(() => {
+    if (!isMapa) return 0;
+    let n = 0;
+    if (checkoutReady) n++;
+    if (mpCheckoutPro) n++;
+    return n;
+  }, [isMapa, checkoutReady, mpCheckoutPro]);
+
+  const mapaMethodForUi = useMemo((): MapaPayMethod | null => {
+    if (!isMapa) return null;
+    if (mapaPaymentOptionCount === 1) {
+      if (checkoutReady) return "pix";
+      if (mpCheckoutPro) return "mp_checkout_pro";
+      return null;
+    }
+    return mapaPayMethod;
+  }, [isMapa, mapaPaymentOptionCount, checkoutReady, mpCheckoutPro, mapaPayMethod]);
+
+  const showPremiumMethodPicker =
+    !isMapa &&
+    showBillingForm &&
+    selectedPremiumPlan &&
+    premiumPaymentOptionCount > 1 &&
+    premiumPayMethod === null;
+
+  const showPremiumCheckoutStep =
+    !isMapa && showBillingForm && selectedPremiumPlan && premiumMethodForUi !== null;
+
+  const showMapaMethodPicker =
+    isMapa && showBillingForm && mapaPaymentOptionCount > 1 && mapaPayMethod === null;
+
+  const showMapaCheckoutStep = isMapa && showBillingForm && mapaMethodForUi !== null;
 
   return (
     <div className="relative">
@@ -374,6 +530,10 @@ function PremiumPlansPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="font-display text-3xl font-bold">{mapaPrice}</p>
+              <p className="text-xs text-muted-foreground">
+                Pagamento único. O mapa fica na sua conta com acesso permanente na app (sem
+                mensalidade nem data de expiração para consulta).
+              </p>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {[
                   "Roda natal interactiva",
@@ -391,54 +551,13 @@ function PremiumPlansPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card className="border bg-card shadow-soft">
-              <CardHeader>
-                <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
-                  Mensal
-                  {highlightMensal ? (
-                    <Badge className="bg-mystical text-white hover:bg-mystical/90">
-                      Plano atual
-                    </Badge>
-                  ) : null}
-                </CardTitle>
-                <CardDescription>Cobrança mês a mês</CardDescription>
-              </CardHeader>
-              <CardContent className="flex h-full flex-col space-y-2 sm:space-y-3">
-                <p className="font-display text-2xl sm:text-3xl font-bold">
-                  {mensalPrice}
-                  <span className="text-base font-normal text-muted-foreground">/mês</span>
-                </p>
-                <ul className="flex-1 space-y-2 text-sm text-muted-foreground">
-                  {PLAN_FEATURES.map((t) => (
-                    <li key={t} className="flex gap-2">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span>{t}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  className="mt-auto w-full bg-mystical text-white hover:opacity-90"
-                  disabled={
-                    !checkoutReady ||
-                    createOrder.isPending ||
-                    createMpPreference.isPending ||
-                    !hasBillingForPayment
-                  }
-                  onClick={() => createOrder.mutate("mensal")}
-                >
-                  {createOrder.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
-                    </>
-                  ) : (
-                    "Pagar mensal com Pix"
-                  )}
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="relative border-2 border-primary shadow-mystical">
+          <div className="grid gap-6 md:grid-cols-2 md:items-start">
+            <Card
+              className={cn(
+                "relative border-2 shadow-mystical",
+                selectedPremiumPlan === "anual" ? "border-primary" : "border-border",
+              )}
+            >
               <CardHeader>
                 <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
                   Anual
@@ -454,9 +573,9 @@ function PremiumPlansPage() {
                     </Badge>
                   ) : null}
                 </CardTitle>
-                <CardDescription>Melhor custo por mês</CardDescription>
+                <CardDescription>Predefinição sugerida — melhor valor por mês</CardDescription>
               </CardHeader>
-              <CardContent className="flex h-full flex-col space-y-2 sm:space-y-3">
+              <CardContent className="flex h-full min-h-0 flex-col space-y-2 sm:space-y-3">
                 <p className="font-display text-2xl sm:text-3xl font-bold">
                   {anualPrice}
                   <span className="text-base font-normal text-muted-foreground">/ano</span>
@@ -475,33 +594,162 @@ function PremiumPlansPage() {
                 </ul>
                 <Button
                   className="mt-auto w-full bg-mystical text-white hover:opacity-90"
-                  disabled={
-                    !checkoutReady ||
-                    createOrder.isPending ||
-                    createMpPreference.isPending ||
-                    !hasBillingForPayment
-                  }
-                  onClick={() => createOrder.mutate("anual")}
+                  disabled={!showBillingForm}
+                  onClick={() => setSelectedPremiumPlan("anual")}
                 >
-                  {createOrder.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
-                    </>
-                  ) : (
-                    "Pagar anual com Pix"
-                  )}
+                  {selectedPremiumPlan === "anual"
+                    ? "Plano anual seleccionado"
+                    : "Continuar com este plano"}
                 </Button>
               </CardContent>
             </Card>
+
+            <Card
+              className={cn(
+                "border bg-card shadow-soft",
+                selectedPremiumPlan === "mensal" ? "border-2 border-primary" : "",
+              )}
+            >
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center gap-2 font-display text-xl sm:text-2xl">
+                  Mensal
+                  {highlightMensal ? (
+                    <Badge className="bg-mystical text-white hover:bg-mystical/90">
+                      Plano atual
+                    </Badge>
+                  ) : null}
+                </CardTitle>
+                <CardDescription>Cobrança mês a mês</CardDescription>
+              </CardHeader>
+              <CardContent className="flex h-full min-h-0 flex-col space-y-2 sm:space-y-3">
+                <p className="font-display text-2xl sm:text-3xl font-bold">
+                  {mensalPrice}
+                  <span className="text-base font-normal text-muted-foreground">/mês</span>
+                </p>
+                <ul className="flex-1 space-y-2 text-sm text-muted-foreground">
+                  {PLAN_FEATURES.map((t) => (
+                    <li key={t} className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span>{t}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  className="mt-auto w-full bg-mystical text-white hover:opacity-90"
+                  disabled={!showBillingForm}
+                  onClick={() => setSelectedPremiumPlan("mensal")}
+                >
+                  {selectedPremiumPlan === "mensal"
+                    ? "Plano mensal seleccionado"
+                    : "Continuar com este plano"}
+                </Button>
+              </CardContent>
+            </Card>
+
+            {selectedPremiumPlan ? (
+              <div className="relative z-10 col-span-full flex justify-center border-t border-border/40 pt-4 sm:justify-start">
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="text-primary"
+                  onClick={() => setSelectedPremiumPlan(null)}
+                >
+                  Alterar plano
+                </Button>
+              </div>
+            ) : null}
           </div>
         )}
 
-        {showBillingForm ? (
+        {showPremiumMethodPicker ? (
+          <Card className="border bg-card shadow-soft">
+            <CardHeader>
+              <CardTitle className="font-display text-lg">Como quer pagar?</CardTitle>
+              <CardDescription>
+                Plano{" "}
+                {selectedPremiumPlan === "anual"
+                  ? `anual (${anualPrice})`
+                  : `mensal (${mensalPrice})`}
+                .
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-2">
+              {checkoutReady ? (
+                <Button
+                  type="button"
+                  className="h-auto min-h-14 flex-col gap-1 bg-mystical py-4 text-white hover:opacity-90"
+                  onClick={() => setPremiumPayMethod("pix")}
+                >
+                  <span className="font-medium">Pix</span>
+                  <span className="text-xs font-normal opacity-90">Confirmação na app</span>
+                </Button>
+              ) : null}
+              {mpTransparent ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-auto min-h-14 flex-col gap-1 py-4"
+                  onClick={() => setPremiumPayMethod("mp_transparent")}
+                >
+                  <span className="font-medium">Cartão nesta página</span>
+                  <span className="text-xs text-muted-foreground">Checkout Transparente</span>
+                </Button>
+              ) : null}
+              {mpCheckoutPro && !mpTransparent ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-auto min-h-14 flex-col gap-1 py-4 sm:col-span-2"
+                  onClick={() => setPremiumPayMethod("mp_checkout_pro")}
+                >
+                  <span className="font-medium">Cartão no Mercado Pago</span>
+                  <span className="text-xs text-muted-foreground">
+                    Abre o site do MP (nova página)
+                  </span>
+                </Button>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {showMapaMethodPicker ? (
+          <Card className="mx-auto max-w-md border bg-card shadow-soft">
+            <CardHeader>
+              <CardTitle className="font-display text-lg">Como quer pagar?</CardTitle>
+              <CardDescription>Mapa Natal completo — {mapaPrice}</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {checkoutReady ? (
+                <Button
+                  type="button"
+                  className="bg-mystical text-white hover:opacity-90"
+                  onClick={() => setMapaPayMethod("pix")}
+                >
+                  Pix
+                </Button>
+              ) : null}
+              {mpCheckoutPro ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setMapaPayMethod("mp_checkout_pro")}
+                >
+                  Mercado Pago (nova página)
+                </Button>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {showBillingForm &&
+        ((isMapa && showMapaCheckoutStep) || (!isMapa && showPremiumCheckoutStep)) ? (
           <Card className="border bg-card shadow-soft">
             <CardHeader>
               <CardTitle className="font-display text-lg">Dados de cobrança</CardTitle>
               <CardDescription>
-                CPF (11 dígitos) e telefone (10 ou 11 dígitos, com DDD). Pode guardá-los também em{" "}
+                CPF (11 dígitos) e telefone com DDD (10 ou 11 dígitos). São exigidos pelo Pix e pelo
+                Mercado Pago no Brasil. Pode guardá-los também em{" "}
                 <Link to="/configuracoes" className="text-primary underline">
                   Configurações
                 </Link>
@@ -518,7 +766,14 @@ function PremiumPlansPage() {
                   placeholder="Somente números"
                   value={billingCpf}
                   onChange={(e) => setBillingCpf(e.target.value)}
+                  aria-invalid={cpfFormatHint}
+                  className={cn(
+                    cpfFormatHint && "border-destructive focus-visible:ring-destructive",
+                  )}
                 />
+                {cpfFormatHint ? (
+                  <p className="text-xs text-destructive">Use 11 dígitos (sem pontos ou traços).</p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="billing-phone">Telefone (celular)</Label>
@@ -529,19 +784,59 @@ function PremiumPlansPage() {
                   placeholder="Somente números com DDD"
                   value={billingPhone}
                   onChange={(e) => setBillingPhone(e.target.value)}
+                  aria-invalid={phoneFormatHint}
+                  className={cn(
+                    phoneFormatHint && "border-destructive focus-visible:ring-destructive",
+                  )}
                 />
+                {phoneFormatHint ? (
+                  <p className="text-xs text-destructive">
+                    Inclua DDD + número (10 ou 11 dígitos no total).
+                  </p>
+                ) : null}
               </div>
             </CardContent>
           </Card>
-        ) : (
+        ) : null}
+
+        {!showBillingForm ? (
           <div className="mx-auto max-w-2xl space-y-3">
             <Alert className="border-muted bg-muted/30">
               <Info className="h-4 w-4 text-muted-foreground" />
               <AlertTitle>Pagamentos em configuração</AlertTitle>
-              <AlertDescription>
-                O checkout nesta página ainda não está ativo neste ambiente: os botões de pagamento
-                ficam desativados até o servidor ter pelo menos um meio configurado (Pix via SyncPay
-                e/ou Mercado Pago). Você pode continuar usando o app com o plano atual.
+              <AlertDescription className="space-y-3">
+                <p>
+                  O checkout nesta página ainda não está ativo: os botões ficam desativados até o
+                  servidor (Cloudflare Worker ou ambiente local) ter Pix via SyncPay e/ou Mercado
+                  Pago corretamente configurados. Pode continuar a usar o app com o plano atual.
+                </p>
+                <ul className="list-inside list-disc space-y-1 text-sm">
+                  <li>
+                    Confirme que está no endereço (URL) oficial da aplicação, o mesmo que costuma
+                    usar.
+                  </li>
+                  <li>
+                    Se acabou de fazer deploy, aguarde alguns minutos e atualize a página;
+                    alterações de secrets no Worker só aplicam após novo deploy.
+                  </li>
+                  <li>
+                    Em ambiente de teste ou self-hosted, quem gere a infraestrutura deve validar
+                    variáveis e URL pública conforme o guia no repositório (
+                    <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code>).
+                  </li>
+                </ul>
+                {import.meta.env.VITE_APP_GITHUB_URL ? (
+                  <p className="text-sm">
+                    <a
+                      href={`${String(import.meta.env.VITE_APP_GITHUB_URL).replace(/\/$/, "")}/blob/main/docs/operacao-ambiente.md`}
+                      className="text-primary underline underline-offset-2"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Abrir guia de ambiente no GitHub
+                    </a>
+                  </p>
+                ) : null}
               </AlertDescription>
             </Alert>
             {showPaymentsOperatorHint ? (
@@ -617,108 +912,76 @@ function PremiumPlansPage() {
               </Card>
             ) : null}
           </div>
-        )}
+        ) : null}
 
-        {isMapa && showBillingForm ? (
-          <Card className="mx-auto max-w-md border bg-card shadow-soft">
+        {!isMapa && showPremiumCheckoutStep && premiumMethodForUi === "pix" ? (
+          <Card className="border bg-card shadow-soft">
             <CardHeader>
-              <CardTitle className="font-display text-lg">Pagamento</CardTitle>
+              <CardTitle className="font-display text-lg">Pagamento com Pix</CardTitle>
               <CardDescription>
-                Gere o Pix ou pague com Mercado Pago após preencher o CPF e o telefone em cima.
+                Gere o código Pix para o plano{" "}
+                {selectedPremiumPlan === "anual"
+                  ? `anual (${anualPrice})`
+                  : `mensal (${mensalPrice})`}
+                .
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent>
               <Button
                 className="w-full bg-mystical text-white hover:opacity-90"
                 disabled={
                   !checkoutReady ||
+                  !hasBillingForPayment ||
                   createOrder.isPending ||
                   createMpPreference.isPending ||
-                  !hasBillingForPayment
+                  !selectedPremiumPlan
                 }
-                onClick={() => createOrder.mutate("mapa")}
+                onClick={() => {
+                  if (selectedPremiumPlan) createOrder.mutate(selectedPremiumPlan);
+                }}
               >
                 {createOrder.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
                   </>
                 ) : (
-                  `Pagar ${mapaPrice} com Pix`
+                  `Gerar Pix — ${selectedPremiumPlan === "anual" ? "Anual" : "Mensal"}`
                 )}
               </Button>
-              {mpCheckoutPro ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="w-full"
-                  disabled={
-                    !mpCheckoutPro ||
-                    !hasBillingForPayment ||
-                    createMpPreference.isPending ||
-                    createOrder.isPending
-                  }
-                  onClick={() => createMpPreference.mutate("mapa")}
-                >
-                  {createMpPreference.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A abrir checkout…
-                    </>
-                  ) : (
-                    <>
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Pagar com Mercado Pago
-                    </>
-                  )}
-                </Button>
-              ) : null}
             </CardContent>
           </Card>
         ) : null}
 
-        {!isMapa && mpTransparent ? (
+        {!isMapa &&
+        showPremiumCheckoutStep &&
+        premiumMethodForUi === "mp_transparent" &&
+        selectedPremiumPlan ? (
           <Card className="border bg-card shadow-soft">
-            <CardHeader>
+            <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 font-display text-lg">
                 <CreditCard className="h-5 w-5 text-primary" />
                 Cartão nesta página (Checkout Transparente)
               </CardTitle>
-              <CardDescription>
-                Formulário seguro do Mercado Pago. Os dados do cartão não passam pelos nossos
-                servidores. Escolha o plano e conclua o pagamento abaixo.
-              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={transparentPlan === "mensal" ? "default" : "outline"}
-                  onClick={() => setTransparentPlan("mensal")}
-                >
-                  Mensal — {mensalPrice}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={transparentPlan === "anual" ? "default" : "outline"}
-                  onClick={() => setTransparentPlan("anual")}
-                >
-                  Anual — {anualPrice}
-                </Button>
-              </div>
+            <CardContent>
               {session && user?.email && hasBillingForPayment ? (
                 <MercadoPagoTransparentCardBrick
                   publicKey={mpPublicKey}
-                  plan={transparentPlan}
-                  amount={
-                    transparentPlan === "mensal"
-                      ? SUBSCRIPTION_PLAN_AMOUNTS.mensal
-                      : SUBSCRIPTION_PLAN_AMOUNTS.anual
-                  }
+                  plan={selectedPremiumPlan}
+                  amount={SUBSCRIPTION_PLAN_AMOUNTS[selectedPremiumPlan]}
                   payerEmail={user.email}
                   identificationNumber={onlyDigits(billingCpf)}
                   session={session}
                   disabled={createOrder.isPending || createMpPreference.isPending}
+                  onMercadoPagoTransparentOutcome={({ status }) => {
+                    if (!user?.id || !selectedPremiumPlan) return;
+                    recordCheckoutEngagement(
+                      supabase,
+                      user.id,
+                      ENGAGEMENT_TOPICS.checkout_payment_confirmed_mp_transparent,
+                      { status, plan: selectedPremiumPlan },
+                    );
+                  }}
                   onSubscriptionActivated={() => {
                     if (user?.id) {
                       void qc.invalidateQueries({ queryKey: ["profile", user.id] });
@@ -735,7 +998,10 @@ function PremiumPlansPage() {
           </Card>
         ) : null}
 
-        {!isMapa && mpCheckoutPro ? (
+        {!isMapa &&
+        showPremiumCheckoutStep &&
+        premiumMethodForUi === "mp_checkout_pro" &&
+        selectedPremiumPlan ? (
           <Card className="border bg-card shadow-soft">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 font-display text-lg">
@@ -744,22 +1010,23 @@ function PremiumPlansPage() {
               </CardTitle>
               <CardDescription>
                 Será redirecionado para o site seguro do Mercado Pago. O plano atualiza após
-                confirmação do pagamento. O checkout pode mostrar outros meios além do cartão,
-                conforme a sua conta MP.
+                confirmação do pagamento.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3 sm:flex-row">
+            <CardContent>
               <Button
                 type="button"
                 variant="secondary"
-                className="flex-1"
+                className="w-full"
                 disabled={
                   !mpCheckoutPro ||
                   !hasBillingForPayment ||
                   createMpPreference.isPending ||
                   createOrder.isPending
                 }
-                onClick={() => createMpPreference.mutate("mensal")}
+                onClick={() => {
+                  if (selectedPremiumPlan) createMpPreference.mutate(selectedPremiumPlan);
+                }}
               >
                 {createMpPreference.isPending ? (
                   <>
@@ -768,44 +1035,100 @@ function PremiumPlansPage() {
                 ) : (
                   <>
                     <CreditCard className="mr-2 h-4 w-4" />
-                    Mensal — {mensalPrice}
-                  </>
-                )}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                className="flex-1"
-                disabled={
-                  !mpCheckoutPro ||
-                  !hasBillingForPayment ||
-                  createMpPreference.isPending ||
-                  createOrder.isPending
-                }
-                onClick={() => createMpPreference.mutate("anual")}
-              >
-                {createMpPreference.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A abrir checkout…
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="mr-2 h-4 w-4" />
-                    Anual — {anualPrice}
+                    {selectedPremiumPlan === "anual"
+                      ? `Anual — ${anualPrice}`
+                      : `Mensal — ${mensalPrice}`}
                   </>
                 )}
               </Button>
             </CardContent>
-            {mpResumeExternalRef && (mp === "success" || mp === "pending") ? (
-              <CardContent className="border-t pt-4 text-sm text-muted-foreground">
-                {mpOrderPoll.data?.localStatus === "pending" ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />A aguardar confirmação do Mercado
-                    Pago…
-                  </span>
-                ) : null}
-              </CardContent>
-            ) : null}
+          </Card>
+        ) : null}
+
+        {isMapa && showMapaCheckoutStep && mapaMethodForUi === "pix" ? (
+          <Card className="mx-auto max-w-md border bg-card shadow-soft">
+            <CardHeader>
+              <CardTitle className="font-display text-lg">Pagamento com Pix</CardTitle>
+              <CardDescription>Mapa Natal completo — {mapaPrice}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                className="w-full bg-mystical text-white hover:opacity-90"
+                disabled={
+                  !checkoutReady ||
+                  createOrder.isPending ||
+                  createMpPreference.isPending ||
+                  !hasBillingForPayment
+                }
+                onClick={() => createOrder.mutate("mapa")}
+              >
+                {createOrder.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A gerar Pix…
+                  </>
+                ) : (
+                  `Gerar Pix — ${mapaPrice}`
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {isMapa && showMapaCheckoutStep && mapaMethodForUi === "mp_checkout_pro" ? (
+          <Card className="mx-auto max-w-md border bg-card shadow-soft">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 font-display text-lg">
+                <CreditCard className="h-5 w-5 text-primary" />
+                Mercado Pago (nova página)
+              </CardTitle>
+              <CardDescription>Pagamento único do mapa — {mapaPrice}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                disabled={
+                  !mpCheckoutPro ||
+                  !hasBillingForPayment ||
+                  createMpPreference.isPending ||
+                  createOrder.isPending
+                }
+                onClick={() => createMpPreference.mutate("mapa")}
+              >
+                {createMpPreference.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> A abrir checkout…
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Pagar com Mercado Pago
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {mpResumeExternalRef && (mp === "success" || mp === "pending") && mpCheckoutPro ? (
+          <Card className="border bg-card shadow-soft">
+            <CardHeader>
+              <CardTitle className="font-display text-base">Confirmação Mercado Pago</CardTitle>
+              <CardDescription>
+                Se já concluiu o pagamento no site do Mercado Pago, aguarde a confirmação abaixo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {mpOrderPoll.data?.localStatus === "pending" ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />A aguardar confirmação do Mercado
+                  Pago…
+                </span>
+              ) : (
+                <span>A verificar estado do pagamento…</span>
+              )}
+            </CardContent>
           </Card>
         ) : null}
 
@@ -850,18 +1173,6 @@ function PremiumPlansPage() {
             </CardContent>
           </Card>
         ) : null}
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
-          <Button asChild variant="outline">
-            <Link to="/configuracoes">Preferências e perfil</Link>
-          </Button>
-          <Button asChild className="bg-mystical text-white hover:opacity-90">
-            <Link to="/dashboard">
-              <Sparkles className="mr-2 h-4 w-4" />
-              Voltar ao painel
-            </Link>
-          </Button>
-        </div>
       </div>
     </div>
   );

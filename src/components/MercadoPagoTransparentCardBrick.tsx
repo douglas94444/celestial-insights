@@ -17,6 +17,8 @@ type Props = {
   session: Session;
   disabled?: boolean;
   onSubscriptionActivated: () => void;
+  /** Chamado após resposta do servidor com pagamento aprovado ou em análise (instrumentação). */
+  onMercadoPagoTransparentOutcome?: (payload: { status: "approved" | "pending" }) => void;
 };
 
 export function MercadoPagoTransparentCardBrick({
@@ -28,6 +30,7 @@ export function MercadoPagoTransparentCardBrick({
   session,
   disabled,
   onSubscriptionActivated,
+  onMercadoPagoTransparentOutcome,
 }: Props) {
   const initDone = useRef(false);
   const [sdkReady, setSdkReady] = useState(false);
@@ -82,12 +85,14 @@ export function MercadoPagoTransparentCardBrick({
             });
             if (res.status === "approved") {
               toast.success("Pagamento aprovado. O seu plano foi atualizado.");
+              onMercadoPagoTransparentOutcome?.({ status: "approved" });
               onSubscriptionActivated();
             } else if (res.status === "pending") {
               toast.message("Pagamento em análise", {
                 description:
                   "O plano será atualizado após confirmação do Mercado Pago. Pode atualizar esta página daqui a instantes.",
               });
+              onMercadoPagoTransparentOutcome?.({ status: "pending" });
               onSubscriptionActivated();
             } else {
               toast.error("Pagamento não aprovado.");

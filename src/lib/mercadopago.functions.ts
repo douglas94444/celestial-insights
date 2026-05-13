@@ -228,6 +228,7 @@ export const createMercadoPagoPreferenceFn = createServerFn({ method: "POST" })
 
         return {
           redirectUrl,
+          mercadoPagoRedirectUrl: redirectUrl,
           externalReference,
           preferenceId: preferenceId,
         } as const;

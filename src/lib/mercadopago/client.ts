@@ -24,6 +24,20 @@ export type MercadoPagoPreferenceResponse = {
   sandbox_init_point?: string;
 };
 
+/** Normaliza a resposta JSON da API (snake_case; tolera variações raras de chave). */
+export function normalizeMercadoPagoPreferenceResponse(
+  raw: unknown,
+): MercadoPagoPreferenceResponse {
+  if (!raw || typeof raw !== "object") return {};
+  const o = raw as Record<string, unknown>;
+  const str = (k: string) => (typeof o[k] === "string" ? (o[k] as string).trim() : undefined);
+  return {
+    id: str("id"),
+    init_point: str("init_point") ?? str("initPoint"),
+    sandbox_init_point: str("sandbox_init_point") ?? str("sandboxInitPoint"),
+  };
+}
+
 export type MercadoPagoPayment = {
   id?: number | string;
   status?: string;
@@ -182,7 +196,7 @@ export async function mercadoPagoCreatePreference(
   if (!res.ok) {
     throw new MercadoPagoApiError(res.status, text);
   }
-  return JSON.parse(text) as MercadoPagoPreferenceResponse;
+  return normalizeMercadoPagoPreferenceResponse(JSON.parse(text) as unknown);
 }
 
 export async function mercadoPagoGetPayment(paymentId: string): Promise<MercadoPagoPayment> {
@@ -205,7 +219,12 @@ export function mercadoPagoCheckoutRedirectUrl(pref: MercadoPagoPreferenceRespon
     ? (pref.sandbox_init_point ?? pref.init_point)
     : (pref.init_point ?? pref.sandbox_init_point);
   if (!url || typeof url !== "string") {
-    throw new MercadoPagoConfigError("Resposta Mercado Pago sem init_point.");
+    const keys = pref && typeof pref === "object" ? Object.keys(pref as object).join(", ") : "";
+    throw new MercadoPagoConfigError(
+      keys
+        ? `Resposta Mercado Pago sem URL de checkout (init_point). Chaves: ${keys}.`
+        : "Resposta Mercado Pago sem URL de checkout (init_point).",
+    );
   }
   return url;
 }

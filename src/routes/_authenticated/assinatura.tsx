@@ -177,10 +177,8 @@ function PremiumPlansPage() {
   const mpPublicKey = mpAvail?.publicKey ?? "";
   const mpTransparent = mpAvail?.transparent === true && mpPublicKey.length > 0;
   const showBillingForm = checkoutReady || mpCheckoutPro || mpTransparent;
-  const paymentsAvailabilityLoading =
-    availabilityQuery.isLoading || mpAvailabilityQuery.isLoading;
-  const paymentsAvailabilityError =
-    availabilityQuery.isError || mpAvailabilityQuery.isError;
+  const paymentsAvailabilityLoading = availabilityQuery.isLoading || mpAvailabilityQuery.isLoading;
+  const paymentsAvailabilityError = availabilityQuery.isError || mpAvailabilityQuery.isError;
 
   useEffect(() => {
     setSelectedPremiumPlan(null);
@@ -408,8 +406,24 @@ function PremiumPlansPage() {
       );
     },
     onSuccess: (res) => {
-      sessionStorage.setItem(SESSION_MP_ORDER_REF, res.externalReference);
-      window.location.href = res.redirectUrl;
+      const ref = typeof res?.externalReference === "string" ? res.externalReference : "";
+      const raw =
+        typeof res?.redirectUrl === "string"
+          ? res.redirectUrl
+          : typeof (res as { mercadoPagoRedirectUrl?: string })?.mercadoPagoRedirectUrl === "string"
+            ? (res as { mercadoPagoRedirectUrl: string }).mercadoPagoRedirectUrl
+            : "";
+      const url = raw.trim();
+      if (!ref || !url || !/^https?:\/\//i.test(url)) {
+        console.error("[assinatura] Resposta MP sem redirectUrl válido:", res);
+        toast.error("Não foi possível abrir o checkout do Mercado Pago.", {
+          description:
+            "Tente novamente ou use outro meio de pagamento. Se persistir, verifique as variáveis no servidor (APP_PUBLIC_URL e token MP).",
+        });
+        return;
+      }
+      sessionStorage.setItem(SESSION_MP_ORDER_REF, ref);
+      window.location.href = url;
     },
     onError: (e) => void toastServerFnError(e),
   });
@@ -880,8 +894,9 @@ function PremiumPlansPage() {
                   </p>
                   <p className="text-muted-foreground">
                     Se o problema ocorrer só no domínio custom, confira no Cloudflare se o hostname
-                    aponta para o mesmo Worker que em <code className="rounded bg-muted px-1">*.workers.dev</code>{" "}
-                    e se o Supabase inclui esse domínio nas URLs de autenticação (
+                    aponta para o mesmo Worker que em{" "}
+                    <code className="rounded bg-muted px-1">*.workers.dev</code> e se o Supabase
+                    inclui esse domínio nas URLs de autenticação (
                     <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code>).
                   </p>
                 </AlertDescription>
@@ -893,15 +908,15 @@ function PremiumPlansPage() {
                   <AlertTitle>Meios de pagamento indisponíveis</AlertTitle>
                   <AlertDescription className="space-y-3">
                     <p>
-                      Não foi possível ativar Pix ou Mercado Pago nesta sessão: os botões de pagamento
-                      ficam desativados até o servidor (Cloudflare Worker ou ambiente local) ter SyncPay
-                      e/ou Mercado Pago corretamente configurados. Pode continuar a usar o app com o
-                      plano atual.
+                      Não foi possível ativar Pix ou Mercado Pago nesta sessão: os botões de
+                      pagamento ficam desativados até o servidor (Cloudflare Worker ou ambiente
+                      local) ter SyncPay e/ou Mercado Pago corretamente configurados. Pode continuar
+                      a usar o app com o plano atual.
                     </p>
                     <ul className="list-inside list-disc space-y-1 text-sm">
                       <li>
-                        Confirme que está no endereço (URL) oficial da aplicação, o mesmo que costuma
-                        usar.
+                        Confirme que está no endereço (URL) oficial da aplicação, o mesmo que
+                        costuma usar.
                       </li>
                       <li>
                         Se acabou de fazer deploy, aguarde alguns minutos e atualize a página;
@@ -930,15 +945,16 @@ function PremiumPlansPage() {
                 {showPaymentsOperatorHint ? (
                   <p className="text-center text-xs text-muted-foreground">
                     Para ativar: no Worker (ou `.env` local), configure conforme{" "}
-                    <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code> — SyncPay
-                    (`SYNCPAY_*`, <code className="rounded bg-muted px-1">SUPABASE_URL</code>) e/ou
-                    Mercado Pago (
+                    <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code> —
+                    SyncPay (`SYNCPAY_*`,{" "}
+                    <code className="rounded bg-muted px-1">SUPABASE_URL</code>) e/ou Mercado Pago (
                     <code className="rounded bg-muted px-1">MERCADOPAGO_ACCESS_TOKEN</code>,{" "}
                     <code className="rounded bg-muted px-1">MERCADOPAGO_WEBHOOK_TOKEN</code>,{" "}
                     <code className="rounded bg-muted px-1">APP_PUBLIC_URL</code> para Checkout Pro;
-                    mais <code className="rounded bg-muted px-1">VITE_MERCADOPAGO_PUBLIC_KEY</code> ou{" "}
-                    <code className="rounded bg-muted px-1">MERCADOPAGO_PUBLIC_KEY</code> para cartão
-                    nesta página). Depois de alterar secrets, faça novamente o deploy do Worker.
+                    mais <code className="rounded bg-muted px-1">VITE_MERCADOPAGO_PUBLIC_KEY</code>{" "}
+                    ou <code className="rounded bg-muted px-1">MERCADOPAGO_PUBLIC_KEY</code> para
+                    cartão nesta página). Depois de alterar secrets, faça novamente o deploy do
+                    Worker.
                   </p>
                 ) : null}
                 {showPaymentsOperatorHint ? (
@@ -951,8 +967,8 @@ function PremiumPlansPage() {
                         Variáveis em falta no processo que executa as server functions (por exemplo{" "}
                         <code className="rounded bg-muted px-0.5">vite</code> local ou o Worker). A
                         ausência de <code className="rounded bg-muted px-0.5">APP_PUBLIC_URL</code>{" "}
-                        impede o Checkout Pro; a chave pública é necessária à parte para cartão nesta
-                        página.
+                        impede o Checkout Pro; a chave pública é necessária à parte para cartão
+                        nesta página.
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">

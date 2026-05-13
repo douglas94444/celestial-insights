@@ -19,5 +19,10 @@ export function useUserIsAdmin() {
       return !!data;
     },
     enabled: !!user?.id,
+    /** Promoções a admin em SQL não invalidam cache global (60s); este gate deve ser fresco. */
+    staleTime: 0,
+    gcTime: 5 * 60_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }

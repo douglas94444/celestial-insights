@@ -5,11 +5,11 @@ import { toast } from "sonner";
 import { createMercadoPagoTransparentPaymentFn } from "@/lib/mercadopago.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
-import type { SubscriptionPlanId } from "@/lib/subscription-pricing";
+import type { SubscriptionProductId } from "@/lib/subscription-pricing";
 
 type Props = {
   publicKey: string;
-  plan: SubscriptionPlanId;
+  plan: SubscriptionProductId;
   amount: number;
   payerEmail: string;
   /** CPF apenas dígitos (11) */
@@ -84,13 +84,22 @@ export function MercadoPagoTransparentCardBrick({
               ...withSupabaseAuth(session),
             });
             if (res.status === "approved") {
-              toast.success("Pagamento aprovado. O seu plano foi atualizado.");
+              if (plan === "mapa") {
+                toast.success("Pagamento aprovado.", {
+                  description:
+                    "O mapa natal foi ativado na sua conta. A seguir, indique data, hora e local de nascimento para gerar a roda.",
+                });
+              } else {
+                toast.success("Pagamento aprovado. O seu plano foi atualizado.");
+              }
               onMercadoPagoTransparentOutcome?.({ status: "approved" });
               onSubscriptionActivated();
             } else if (res.status === "pending") {
               toast.message("Pagamento em análise", {
                 description:
-                  "O plano será atualizado após confirmação do Mercado Pago. Pode atualizar esta página daqui a instantes.",
+                  plan === "mapa"
+                    ? "O mapa natal ficará disponível após confirmação do Mercado Pago. Pode atualizar esta página daqui a instantes."
+                    : "O plano será atualizado após confirmação do Mercado Pago. Pode atualizar esta página daqui a instantes.",
               });
               onMercadoPagoTransparentOutcome?.({ status: "pending" });
               onSubscriptionActivated();

@@ -46,7 +46,7 @@ const SESSION_MP_ORDER_REF = "astromap_mp_order_ref";
 
 type PremiumSubscriptionPlan = "mensal" | "anual";
 type PremiumPayMethod = "pix" | "mp_transparent" | "mp_checkout_pro";
-type MapaPayMethod = "pix" | "mp_checkout_pro";
+type MapaPayMethod = "pix" | "mp_transparent" | "mp_checkout_pro";
 
 export const Route = createFileRoute("/_authenticated/assinatura")({
   validateSearch: (
@@ -136,6 +136,7 @@ function PremiumPlansPage() {
   const [mapaPayMethod, setMapaPayMethod] = useState<MapaPayMethod | null>(null);
   const pixSuccessRecorded = useRef(false);
   const mpProSuccessRecorded = useRef(false);
+  const mapaTransparentSuccessRecorded = useRef(false);
 
   useEffect(() => {
     if (profile?.billing_cpf) setBillingCpf(profile.billing_cpf);
@@ -195,6 +196,10 @@ function PremiumPlansPage() {
     if (mp === "success" || mp === "pending") return;
     clearCheckoutMapaIntent();
   }, [isMapa, mp]);
+
+  useEffect(() => {
+    mapaTransparentSuccessRecorded.current = false;
+  }, [mapaPayMethod]);
 
   useEffect(() => {
     if (!txIdentifier) pixSuccessRecorded.current = false;
@@ -530,19 +535,21 @@ function PremiumPlansPage() {
     if (!isMapa) return 0;
     let n = 0;
     if (checkoutReady) n++;
-    if (mpCheckoutPro) n++;
+    if (mpTransparent) n++;
+    if (mpCheckoutPro && !mpTransparent) n++;
     return n;
-  }, [isMapa, checkoutReady, mpCheckoutPro]);
+  }, [isMapa, checkoutReady, mpTransparent, mpCheckoutPro]);
 
   const mapaMethodForUi = useMemo((): MapaPayMethod | null => {
     if (!isMapa) return null;
     if (mapaPaymentOptionCount === 1) {
       if (checkoutReady) return "pix";
-      if (mpCheckoutPro) return "mp_checkout_pro";
+      if (mpTransparent) return "mp_transparent";
+      if (mpCheckoutPro && !mpTransparent) return "mp_checkout_pro";
       return null;
     }
     return mapaPayMethod;
-  }, [isMapa, mapaPaymentOptionCount, checkoutReady, mpCheckoutPro, mapaPayMethod]);
+  }, [isMapa, mapaPaymentOptionCount, checkoutReady, mpTransparent, mpCheckoutPro, mapaPayMethod]);
 
   const showPremiumMethodPicker =
     !isMapa &&
@@ -802,7 +809,18 @@ function PremiumPlansPage() {
                   Pix
                 </Button>
               ) : null}
-              {mpCheckoutPro ? (
+              {mpTransparent ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-auto min-h-12 flex-col gap-0.5 py-3"
+                  onClick={() => setMapaPayMethod("mp_transparent")}
+                >
+                  <span className="font-medium">Cartão nesta página</span>
+                  <span className="text-xs text-muted-foreground">Checkout Transparente</span>
+                </Button>
+              ) : null}
+              {mpCheckoutPro && !mpTransparent ? (
                 <Button
                   type="button"
                   variant="secondary"
@@ -1168,6 +1186,68 @@ function PremiumPlansPage() {
                   `Gerar Pix — ${mapaPrice}`
                 )}
               </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {isMapa && showMapaCheckoutStep && mapaMethodForUi === "mp_transparent" ? (
+          <Card className="mx-auto max-w-md border bg-card shadow-soft">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 font-display text-lg">
+                <CreditCard className="h-5 w-5 text-primary" />
+                Cartão nesta página (Checkout Transparente)
+              </CardTitle>
+              <CardDescription>Pagamento único do mapa — {mapaPrice}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {session && user?.email && hasBillingForPayment ? (
+                <MercadoPagoTransparentCardBrick
+                  publicKey={mpPublicKey}
+                  plan="mapa"
+                  amount={SUBSCRIPTION_PLAN_AMOUNTS.mapa}
+                  payerEmail={user.email}
+                  identificationNumber={onlyDigits(billingCpf)}
+                  session={session}
+                  disabled={createOrder.isPending || createMpPreference.isPending}
+                  onMercadoPagoTransparentOutcome={({ status }) => {
+                    if (!user?.id) return;
+                    recordCheckoutEngagement(
+                      supabase,
+                      user.id,
+                      ENGAGEMENT_TOPICS.checkout_payment_confirmed_mp_transparent,
+                      { status, plan: "mapa" },
+                    );
+                    if (status === "approved") {
+                      if (!mapaTransparentSuccessRecorded.current) {
+                        mapaTransparentSuccessRecorded.current = true;
+                        recordCheckoutEngagement(
+                          supabase,
+                          user.id,
+                          ENGAGEMENT_TOPICS.checkout_payment_confirmed,
+                          { channel: "mp_transparent", produto: "mapa" },
+                        );
+                      }
+                      clearCheckoutMapaIntent();
+                      if (user?.id) {
+                        void qc.invalidateQueries({ queryKey: ["profile", user.id] });
+                        void qc.invalidateQueries({ queryKey: ["charts", user.id] });
+                      }
+                      void navigate({ to: "/onboarding", replace: true });
+                    }
+                  }}
+                  onSubscriptionActivated={() => {
+                    if (user?.id) {
+                      void qc.invalidateQueries({ queryKey: ["profile", user.id] });
+                      void qc.invalidateQueries({ queryKey: ["charts", user.id] });
+                    }
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Preencha CPF e telefone em cima (ou em Configurações) e confirme que a sua conta
+                  tem email para usar o cartão aqui.
+                </p>
+              )}
             </CardContent>
           </Card>
         ) : null}

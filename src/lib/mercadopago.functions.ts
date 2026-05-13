@@ -446,19 +446,37 @@ export const createMercadoPagoTransparentPaymentFn = createServerFn({ method: "P
         const mpStatus = orderStatusFromMpPayment(pay.status);
         const rawPayload = { payment: pay, flow: "transparent" } as unknown as Json;
 
-        const { error: upErr } = await admin
-          .from("mercadopago_orders")
-          .update({
-            status: mpStatus,
-            payment_id: paymentIdStr || null,
-            raw_last_payload: rawPayload,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", orderId)
-          .eq("user_id", userId);
+        if (plan === "mapa") {
+          const mapaRowStatus =
+            mpStatus === "approved" ? "completed" : mpStatus === "rejected" ? "failed" : "pending";
+          const { error: upErr } = await admin
+            .from("mapa_orders")
+            .update({
+              status: mapaRowStatus,
+              raw_last_payload: rawPayload,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", orderId)
+            .eq("user_id", userId);
 
-        if (upErr) {
-          throw jsonError(500, "ORDER_UPDATE", upErr.message);
+          if (upErr) {
+            throw jsonError(500, "ORDER_UPDATE", upErr.message);
+          }
+        } else {
+          const { error: upErr } = await admin
+            .from("mercadopago_orders")
+            .update({
+              status: mpStatus,
+              payment_id: paymentIdStr || null,
+              raw_last_payload: rawPayload,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", orderId)
+            .eq("user_id", userId);
+
+          if (upErr) {
+            throw jsonError(500, "ORDER_UPDATE", upErr.message);
+          }
         }
 
         if (mpStatus === "approved") {
@@ -473,14 +491,6 @@ export const createMercadoPagoTransparentPaymentFn = createServerFn({ method: "P
 
           if (profErr) {
             throw jsonError(500, "PROFILE_UPDATE", profErr.message);
-          }
-
-          if (plan === "mapa") {
-            await admin
-              .from("mapa_orders")
-              .update({ status: "completed", updated_at: new Date().toISOString() })
-              .eq("id", orderId)
-              .eq("user_id", userId);
           }
         }
 

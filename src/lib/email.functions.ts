@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { userHasAdminRole } from "@/integrations/supabase/user-has-admin-role";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { ASPECT_LABELS } from "@/data/chart-detail-interpretations";
 import type { HouseSystemId } from "@/lib/astrology/calculate";
@@ -184,7 +185,15 @@ export const sendTransitDigestEmailFn = createServerFn({ method: "POST" })
       const dayIdx = getRolloutDayIndexSp(profile?.created_at ?? new Date().toISOString());
       const applies = rolloutGateEnforcementActive(tier, dayIdx);
       const gates = rolloutGatesForTier(tier, dayIdx);
-      assertRolloutGate(applies, gates.digestEmail, "digestEmail", dayIdx, { tier });
+      let isAdmin = false;
+      try {
+        isAdmin = await userHasAdminRole(supabase, userId);
+      } catch (e) {
+        throw jsonError(500, "DB", e instanceof Error ? e.message : "Erro ao verificar admin.");
+      }
+      if (!isAdmin) {
+        assertRolloutGate(applies, gates.digestEmail, "digestEmail", dayIdx, { tier });
+      }
       if (authErr || !authUser.user?.email) {
         throw jsonError(400, "NO_EMAIL", "Não foi possível obter o email da sua conta.");
       }

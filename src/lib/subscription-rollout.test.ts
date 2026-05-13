@@ -1,13 +1,56 @@
 import { describe, expect, it } from "vitest";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 import {
+  assertPaidRolloutAiAccess,
   buildRolloutGatesForDay,
   calendarDaysBetweenYmd,
+  fetchProfileRolloutState,
+  FULL_ROLLOUT_GATES,
   getRolloutDayIndexSp,
   paidRolloutApplies,
   rolloutGateEnforcementActive,
   rolloutGatesForTier,
   ymdSaoPaulo,
 } from "@/lib/subscription-rollout";
+
+function mockSupabaseForRollout(opts: {
+  admin: boolean;
+  tier?: Database["public"]["Enums"]["subscription_tier"];
+}): SupabaseClient<Database> {
+  const tier = opts.tier ?? "FREE";
+  return {
+    from(table: string) {
+      if (table === "profiles") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: { subscription_tier: tier, created_at: "2026-01-01T12:00:00.000Z" },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "user_roles") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: opts.admin ? { user_id: "user-1" } : null,
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected table: ${table}`);
+    },
+  } as unknown as SupabaseClient<Database>;
+}
 
 describe("subscription-rollout", () => {
   it("calendarDaysBetweenYmd same day is 0", () => {
@@ -79,5 +122,34 @@ describe("subscription-rollout", () => {
   it("rolloutGateEnforcementActive for MENSAL matches paid ramp only", () => {
     expect(rolloutGateEnforcementActive("MENSAL", 0)).toBe(true);
     expect(rolloutGateEnforcementActive("MENSAL", 7)).toBe(false);
+  });
+
+  it("fetchProfileRolloutState for admin returns full gates and applies false", async () => {
+    const supabase = mockSupabaseForRollout({ admin: true, tier: "FREE" });
+    const state = await fetchProfileRolloutState(supabase, "user-1");
+    expect(state.gates).toEqual(FULL_ROLLOUT_GATES);
+    expect(state.applies).toBe(false);
+    expect(state.tier).toBe("FREE");
+  });
+
+  it("fetchProfileRolloutState for non-admin FREE keeps FREE gates", async () => {
+    const supabase = mockSupabaseForRollout({ admin: false, tier: "FREE" });
+    const state = await fetchProfileRolloutState(supabase, "user-1");
+    expect(state.gates).toEqual(rolloutGatesForTier("FREE", state.dayIndex));
+    expect(state.applies).toBe(false);
+  });
+
+  it("assertPaidRolloutAiAccess allows any kind for admin on MAPA tier", async () => {
+    const supabase = mockSupabaseForRollout({ admin: true, tier: "MAPA" });
+    await expect(
+      assertPaidRolloutAiAccess(supabase, "user-1", "MAPA", "2026-01-01T12:00:00.000Z", "synastry"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("assertPaidRolloutAiAccess blocks non-natal kinds for MAPA when not admin", async () => {
+    const supabase = mockSupabaseForRollout({ admin: false, tier: "MAPA" });
+    await expect(
+      assertPaidRolloutAiAccess(supabase, "user-1", "MAPA", "2026-01-01T12:00:00.000Z", "synastry"),
+    ).rejects.toSatisfy((r: unknown) => r instanceof Response && (r as Response).status === 403);
   });
 });

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { useProfile } from "@/hooks/use-profile";
+import { useUserIsAdmin } from "@/hooks/use-user-is-admin";
 import {
   buildRolloutGatesForDay,
   getRolloutDayIndexSp,
@@ -38,6 +39,7 @@ async function fetchAiUsageThisMonth(userId: string): Promise<number> {
 export function useAiQuota(): AiQuota | null {
   const { user } = useAuth();
   const { data: profile } = useProfile();
+  const adminGate = useUserIsAdmin();
 
   const tier = profile?.subscription_tier;
   const tierStr = tier ?? "MENSAL";
@@ -50,14 +52,19 @@ export function useAiQuota(): AiQuota | null {
   const isPremium =
     isMapa || ((tier === "MENSAL" || tier === "ANUAL" || tier === "PREMIUM") && !earlyPaidRamp);
 
+  const isAdmin = adminGate.data === true;
   const { data: used = 0 } = useQuery({
     queryKey: ["ai-quota-month", user?.id],
     queryFn: () => fetchAiUsageThisMonth(user!.id),
-    enabled: !!user && !isPremium,
+    enabled: !!user && !isPremium && !isAdmin && !adminGate.isPending,
     staleTime: 5 * 60_000,
   });
 
   if (!user || !profile) return null;
+  if (adminGate.isPending) return null;
+  if (adminGate.data === true) {
+    return { used: 0, limit: Infinity, remaining: Infinity, isPremium: true, nearLimit: false };
+  }
 
   if (isPremium) {
     return { used: 0, limit: Infinity, remaining: Infinity, isPremium: true, nearLimit: false };

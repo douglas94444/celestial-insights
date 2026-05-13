@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
+import { userHasAdminRole } from "@/integrations/supabase/user-has-admin-role";
 
 /** Resposta JSON de erro (sem importar server-fn-http — evita `node:crypto` no bundle cliente). */
 function rolloutJsonError(status: number, code: string, message: string): Response {
@@ -226,15 +227,29 @@ export async function fetchProfileRolloutState(
   userId: string,
   now?: Date,
 ): Promise<ProfileRolloutState> {
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("subscription_tier, created_at")
-    .eq("id", userId)
-    .single();
+  const [{ data: profile, error }, isAdmin] = await Promise.all([
+    supabase.from("profiles").select("subscription_tier, created_at").eq("id", userId).single(),
+    userHasAdminRole(supabase, userId).catch((e) => {
+      throw rolloutJsonError(
+        500,
+        "DB",
+        e instanceof Error ? e.message : "Erro ao verificar admin.",
+      );
+    }),
+  ]);
   if (error || !profile)
     throw rolloutJsonError(500, "PROFILE", error?.message ?? "Perfil não encontrado.");
   const tier = profile.subscription_tier;
   const dayIndex = getRolloutDayIndexSp(profile.created_at, now);
+  if (isAdmin) {
+    return {
+      tier,
+      createdAt: profile.created_at,
+      dayIndex,
+      gates: FULL_ROLLOUT_GATES,
+      applies: false,
+    };
+  }
   const gates = rolloutGatesForTier(tier, dayIndex);
   const applies = rolloutGateEnforcementActive(tier, dayIndex);
   return {
@@ -254,6 +269,12 @@ export async function assertPaidRolloutAiAccess(
   kind: InterpretationAiKind,
   now?: Date,
 ): Promise<void> {
+  try {
+    if (await userHasAdminRole(supabase, userId)) return;
+  } catch (e) {
+    throw rolloutJsonError(500, "DB", e instanceof Error ? e.message : "Erro ao verificar admin.");
+  }
+
   const dayIndex = getRolloutDayIndexSp(createdAtIso, now);
 
   if (isMapaTier(tier)) {

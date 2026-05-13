@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, CreditCard, Info, Loader2, Sparkles } from "lucide-react";
+import { AlertCircle, Check, Copy, CreditCard, Info, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -177,6 +177,10 @@ function PremiumPlansPage() {
   const mpPublicKey = mpAvail?.publicKey ?? "";
   const mpTransparent = mpAvail?.transparent === true && mpPublicKey.length > 0;
   const showBillingForm = checkoutReady || mpCheckoutPro || mpTransparent;
+  const paymentsAvailabilityLoading =
+    availabilityQuery.isLoading || mpAvailabilityQuery.isLoading;
+  const paymentsAvailabilityError =
+    availabilityQuery.isError || mpAvailabilityQuery.isError;
 
   useEffect(() => {
     setSelectedPremiumPlan(null);
@@ -856,80 +860,102 @@ function PremiumPlansPage() {
 
         {!showBillingForm ? (
           <div className="mx-auto max-w-2xl space-y-3">
-            <Alert className="border-muted bg-muted/30">
-              <Info className="h-4 w-4 text-muted-foreground" />
-              <AlertTitle>Meios de pagamento indisponíveis</AlertTitle>
-              <AlertDescription className="space-y-3">
-                <p>
-                  Não foi possível ativar Pix ou Mercado Pago nesta sessão: os botões de pagamento
-                  ficam desativados até o servidor (Cloudflare Worker ou ambiente local) ter SyncPay
-                  e/ou Mercado Pago corretamente configurados. Pode continuar a usar o app com o
-                  plano atual.
-                </p>
-                <ul className="list-inside list-disc space-y-1 text-sm">
-                  <li>
-                    Confirme que está no endereço (URL) oficial da aplicação, o mesmo que costuma
-                    usar.
-                  </li>
-                  <li>
-                    Se acabou de fazer deploy, aguarde alguns minutos e atualize a página;
-                    alterações de secrets no Worker só aplicam após novo deploy.
-                  </li>
-                  <li>
-                    Em ambiente de teste ou self-hosted, quem gere a infraestrutura deve validar
-                    variáveis e URL pública conforme o guia no repositório (
+            {paymentsAvailabilityLoading ? (
+              <Alert className="border-muted bg-muted/30">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <AlertTitle>A carregar meios de pagamento</AlertTitle>
+                <AlertDescription className="text-sm text-muted-foreground">
+                  A confirmar com o servidor se Pix, Mercado Pago ou ambos estão disponíveis neste
+                  ambiente…
+                </AlertDescription>
+              </Alert>
+            ) : paymentsAvailabilityError ? (
+              <Alert className="border-destructive/35 bg-destructive/[0.06]">
+                <AlertCircle className="h-4 w-4 text-destructive" />
+                <AlertTitle>Não foi possível contactar o servidor</AlertTitle>
+                <AlertDescription className="space-y-2 text-sm">
+                  <p>
+                    Não recebemos resposta válida sobre SyncPay ou Mercado Pago. Verifique a ligação
+                    à Internet, atualize a página ou tente mais tarde.
+                  </p>
+                  <p className="text-muted-foreground">
+                    Se o problema ocorrer só no domínio custom, confira no Cloudflare se o hostname
+                    aponta para o mesmo Worker que em <code className="rounded bg-muted px-1">*.workers.dev</code>{" "}
+                    e se o Supabase inclui esse domínio nas URLs de autenticação (
                     <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code>).
-                  </li>
-                </ul>
-                {import.meta.env.VITE_APP_GITHUB_URL ? (
-                  <p className="text-sm">
-                    <a
-                      href={`${String(import.meta.env.VITE_APP_GITHUB_URL).replace(/\/$/, "")}/blob/main/docs/operacao-ambiente.md`}
-                      className="text-primary underline underline-offset-2"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Abrir guia de ambiente no GitHub
-                    </a>
+                  </p>
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <Alert className="border-muted bg-muted/30">
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                  <AlertTitle>Meios de pagamento indisponíveis</AlertTitle>
+                  <AlertDescription className="space-y-3">
+                    <p>
+                      Não foi possível ativar Pix ou Mercado Pago nesta sessão: os botões de pagamento
+                      ficam desativados até o servidor (Cloudflare Worker ou ambiente local) ter SyncPay
+                      e/ou Mercado Pago corretamente configurados. Pode continuar a usar o app com o
+                      plano atual.
+                    </p>
+                    <ul className="list-inside list-disc space-y-1 text-sm">
+                      <li>
+                        Confirme que está no endereço (URL) oficial da aplicação, o mesmo que costuma
+                        usar.
+                      </li>
+                      <li>
+                        Se acabou de fazer deploy, aguarde alguns minutos e atualize a página;
+                        alterações de secrets no Worker só aplicam após novo deploy.
+                      </li>
+                      <li>
+                        Em ambiente de teste ou self-hosted, quem gere a infraestrutura deve validar
+                        variáveis e URL pública conforme o guia no repositório (
+                        <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code>).
+                      </li>
+                    </ul>
+                    {import.meta.env.VITE_APP_GITHUB_URL ? (
+                      <p className="text-sm">
+                        <a
+                          href={`${String(import.meta.env.VITE_APP_GITHUB_URL).replace(/\/$/, "")}/blob/main/docs/operacao-ambiente.md`}
+                          className="text-primary underline underline-offset-2"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Abrir guia de ambiente no GitHub
+                        </a>
+                      </p>
+                    ) : null}
+                  </AlertDescription>
+                </Alert>
+                {showPaymentsOperatorHint ? (
+                  <p className="text-center text-xs text-muted-foreground">
+                    Para ativar: no Worker (ou `.env` local), configure conforme{" "}
+                    <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code> — SyncPay
+                    (`SYNCPAY_*`, <code className="rounded bg-muted px-1">SUPABASE_URL</code>) e/ou
+                    Mercado Pago (
+                    <code className="rounded bg-muted px-1">MERCADOPAGO_ACCESS_TOKEN</code>,{" "}
+                    <code className="rounded bg-muted px-1">MERCADOPAGO_WEBHOOK_TOKEN</code>,{" "}
+                    <code className="rounded bg-muted px-1">APP_PUBLIC_URL</code> para Checkout Pro;
+                    mais <code className="rounded bg-muted px-1">VITE_MERCADOPAGO_PUBLIC_KEY</code> ou{" "}
+                    <code className="rounded bg-muted px-1">MERCADOPAGO_PUBLIC_KEY</code> para cartão
+                    nesta página). Depois de alterar secrets, faça novamente o deploy do Worker.
                   </p>
                 ) : null}
-              </AlertDescription>
-            </Alert>
-            {showPaymentsOperatorHint ? (
-              <p className="text-center text-xs text-muted-foreground">
-                Para ativar: no Worker (ou `.env` local), configure conforme{" "}
-                <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code> — SyncPay
-                (`SYNCPAY_*`, <code className="rounded bg-muted px-1">SUPABASE_URL</code>) e/ou
-                Mercado Pago (
-                <code className="rounded bg-muted px-1">MERCADOPAGO_ACCESS_TOKEN</code>,{" "}
-                <code className="rounded bg-muted px-1">MERCADOPAGO_WEBHOOK_TOKEN</code>,{" "}
-                <code className="rounded bg-muted px-1">APP_PUBLIC_URL</code> para Checkout Pro;
-                mais <code className="rounded bg-muted px-1">VITE_MERCADOPAGO_PUBLIC_KEY</code> ou{" "}
-                <code className="rounded bg-muted px-1">MERCADOPAGO_PUBLIC_KEY</code> para cartão
-                nesta página). Depois de alterar secrets, faça novamente o deploy do Worker.
-              </p>
-            ) : null}
-            {showPaymentsOperatorHint ? (
-              <Card className="border-amber-500/25 bg-amber-500/[0.04] shadow-none">
-                <CardHeader className="space-y-1 pb-2">
-                  <CardTitle className="font-display text-base">
-                    Diagnóstico (dev ou administrador)
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Variáveis em falta no processo que executa as server functions (por exemplo{" "}
-                    <code className="rounded bg-muted px-0.5">vite</code> local ou o Worker). A
-                    ausência de <code className="rounded bg-muted px-0.5">APP_PUBLIC_URL</code>{" "}
-                    impede o Checkout Pro; a chave pública é necessária à parte para cartão nesta
-                    página.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {availabilityQuery.isLoading || mpAvailabilityQuery.isLoading ? (
-                    <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> A carregar diagnóstico…
-                    </p>
-                  ) : (
-                    <>
+                {showPaymentsOperatorHint ? (
+                  <Card className="border-amber-500/25 bg-amber-500/[0.04] shadow-none">
+                    <CardHeader className="space-y-1 pb-2">
+                      <CardTitle className="font-display text-base">
+                        Diagnóstico (dev ou administrador)
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Variáveis em falta no processo que executa as server functions (por exemplo{" "}
+                        <code className="rounded bg-muted px-0.5">vite</code> local ou o Worker). A
+                        ausência de <code className="rounded bg-muted px-0.5">APP_PUBLIC_URL</code>{" "}
+                        impede o Checkout Pro; a chave pública é necessária à parte para cartão nesta
+                        página.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
                       <PaymentEnvGapBlock
                         label="SyncPay (Pix)"
                         gaps={
@@ -962,11 +988,11 @@ function PremiumPlansPage() {
                           }
                         />
                       </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-            ) : null}
+                    </CardContent>
+                  </Card>
+                ) : null}
+              </>
+            )}
           </div>
         ) : null}
 

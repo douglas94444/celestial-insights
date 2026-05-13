@@ -30,6 +30,7 @@ import { chartRowToChartData } from "@/lib/chart-from-row";
 import { birthInputFromChartRow } from "@/lib/composite.functions";
 import { deriveChartPatterns } from "@/lib/chart-patterns";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { userHasAdminRole } from "@/integrations/supabase/user-has-admin-role";
 import type { Database } from "@/integrations/supabase/types";
 import {
   parseSynastryDeepCached,
@@ -145,6 +146,12 @@ async function assertAiGenerationAllowed(
   userId: string,
   tier: Tier,
 ): Promise<void> {
+  try {
+    if (await userHasAdminRole(supabase, userId)) return;
+  } catch (e) {
+    throw jsonError(500, "DB", e instanceof Error ? e.message : "Erro ao verificar admin.");
+  }
+
   const requirePremium = process.env.AI_INTERPRETATION_REQUIRE_PREMIUM === "true";
   if (requirePremium && !isPaidSubscriptionTier(tier)) {
     throw jsonError(

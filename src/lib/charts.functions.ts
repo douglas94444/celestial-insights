@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { userHasAdminRole } from "@/integrations/supabase/user-has-admin-role";
 import type { HouseSystemId } from "@/lib/astrology/calculate";
 import { calculateChart } from "@/lib/astrology/calculate";
 import { birthChartInputSchema } from "@/lib/schemas/birth-chart";
@@ -50,9 +51,17 @@ export const createChartFn = createServerFn({ method: "POST" })
       const dayIndex = getRolloutDayIndexSp(createdAt);
       const gates = rolloutGatesForTier(tier, dayIndex);
       const applies = rolloutGateEnforcementActive(tier, dayIndex);
-      assertRolloutGate(applies, gates.extraCharts || existing === 0, "extraCharts", dayIndex, {
-        tier,
-      });
+      let isAdmin = false;
+      try {
+        isAdmin = await userHasAdminRole(supabase, userId);
+      } catch (e) {
+        throw jsonError(500, "DB", e instanceof Error ? e.message : "Erro ao verificar admin.");
+      }
+      if (!isAdmin) {
+        assertRolloutGate(applies, gates.extraCharts || existing === 0, "extraCharts", dayIndex, {
+          tier,
+        });
+      }
 
       const birthTime = data.birthTimeKnown ? data.birthTime : "12:00";
       const houseSystem = (profile?.house_system as HouseSystemId | undefined) ?? "placidus";

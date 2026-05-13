@@ -10,6 +10,7 @@ export function titleForAuthenticatedPath(pathname: string): string {
   if (pathname.startsWith("/mapas")) return "Meus mapas";
   if (pathname.startsWith("/compatibilidade")) return "Compatibilidade";
   if (pathname.startsWith("/transitos")) return "Trânsitos";
+  if (pathname.startsWith("/admin")) return "Administração";
   if (pathname.startsWith("/configuracoes")) return "Configurações";
   return "AstroMap";
 }

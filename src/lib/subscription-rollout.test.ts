@@ -4,6 +4,8 @@ import {
   calendarDaysBetweenYmd,
   getRolloutDayIndexSp,
   paidRolloutApplies,
+  rolloutGateEnforcementActive,
+  rolloutGatesForTier,
   ymdSaoPaulo,
 } from "@/lib/subscription-rollout";
 
@@ -54,5 +56,28 @@ describe("subscription-rollout", () => {
     expect(paidRolloutApplies("MENSAL", 6)).toBe(true);
     expect(paidRolloutApplies("MENSAL", 7)).toBe(false);
     expect(paidRolloutApplies("FREE", 0)).toBe(false);
+  });
+
+  it("rolloutGatesForTier MAPA is fixed MAPA gates regardless of day", () => {
+    const g0 = rolloutGatesForTier("MAPA", 0);
+    const g99 = rolloutGatesForTier("MAPA", 99);
+    expect(g0).toEqual(g99);
+    expect(g0.transits).toBe(false);
+    expect(g0.extraCharts).toBe(false);
+    expect(g0.digestEmail).toBe(false);
+  });
+
+  it("rolloutGatesForTier MENSAL day 0 matches ramp", () => {
+    expect(rolloutGatesForTier("MENSAL", 0)).toEqual(buildRolloutGatesForDay(0));
+  });
+
+  it("rolloutGateEnforcementActive is true for MAPA always", () => {
+    expect(rolloutGateEnforcementActive("MAPA", 0)).toBe(true);
+    expect(rolloutGateEnforcementActive("MAPA", 100)).toBe(true);
+  });
+
+  it("rolloutGateEnforcementActive for MENSAL matches paid ramp only", () => {
+    expect(rolloutGateEnforcementActive("MENSAL", 0)).toBe(true);
+    expect(rolloutGateEnforcementActive("MENSAL", 7)).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ test.describe("smoke público", () => {
     await expect(
       page.getByRole("heading", { level: 1, name: /O céu sabia antes de você/i }),
     ).toBeVisible();
+    await expect(page.locator("#comprar-mapa")).toContainText("37");
   });
 
   test("auth mostra separadores Entrar / Criar conta", async ({ page }) => {
@@ -16,8 +17,7 @@ test.describe("smoke público", () => {
 
   test("dashboard sem sessão redireciona para auth", async ({ page }) => {
     await page.goto("/dashboard");
-    await page.waitForURL(/\/auth/, { timeout: 15_000 });
-    await expect(page).toHaveURL(/\/auth/);
+    await expect(page).toHaveURL(/\/auth/, { timeout: 15_000 });
   });
 });
 

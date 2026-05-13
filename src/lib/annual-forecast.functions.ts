@@ -25,6 +25,7 @@ export const generateAnnualForecastFn = createServerFn({ method: "POST" })
         rollout.gates.annualForecast,
         "annualForecast",
         rollout.dayIndex,
+        { tier: rollout.tier },
       );
 
       const { data: chart, error } = await supabase

@@ -23,7 +23,9 @@ export const calculateAndSaveSynastryFn = createServerFn({ method: "POST" })
       const userId = context.userId;
 
       const rollout = await fetchProfileRolloutState(supabase, userId);
-      assertRolloutGate(rollout.applies, rollout.gates.synastry, "synastry", rollout.dayIndex);
+      assertRolloutGate(rollout.applies, rollout.gates.synastry, "synastry", rollout.dayIndex, {
+        tier: rollout.tier,
+      });
 
       if (data.chart1Id === data.chart2Id) {
         throw jsonError(400, "SAME_CHART", "Escolha dois mapas diferentes.");

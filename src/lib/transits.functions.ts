@@ -38,7 +38,9 @@ export const calculateTransitsFn = createServerFn({ method: "POST" })
       }
 
       const rollout = await fetchProfileRolloutState(supabase, userId);
-      assertRolloutGate(rollout.applies, rollout.gates.transits, "transits", rollout.dayIndex);
+      assertRolloutGate(rollout.applies, rollout.gates.transits, "transits", rollout.dayIndex, {
+        tier: rollout.tier,
+      });
 
       const { data: chart, error } = await supabase
         .from("charts")

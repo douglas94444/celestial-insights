@@ -137,6 +137,22 @@ export function buildRolloutGatesForDay(dayIndex: number): RolloutGates {
   };
 }
 
+/** Gates efectivos por tier: FREE/MAPA fixos; planos pagos seguem a rampa de 7 dias. */
+export function rolloutGatesForTier(tier: string, dayIndex: number): RolloutGates {
+  if (isFreeTier(tier)) return FREE_TIER_GATES;
+  if (isMapaTier(tier)) return MAPA_TIER_GATES;
+  return buildRolloutGatesForDay(dayIndex);
+}
+
+/**
+ * Quando as gates devem ser aplicadas com erro 403 (MAPA sempre; pagos só na rampa;
+ * FREE nunca — UI e outras regras tratam o tier gratuito).
+ */
+export function rolloutGateEnforcementActive(tier: string, dayIndex: number): boolean {
+  if (isMapaTier(tier)) return true;
+  return paidRolloutApplies(tier, dayIndex);
+}
+
 export function paidRolloutApplies(tier: string, dayIndex: number): boolean {
   return isPaidRolloutTier(tier) && dayIndex < ROLLOUT_WINDOW_DAYS;
 }
@@ -148,14 +164,27 @@ export function rolloutLockedMessage(feature: keyof RolloutGates, dayIndex: numb
   return `Esta função abre no ${opensOnDay}.º dia após criar a conta (horário de São Paulo). Agora está no ${youAreOn}.º dia.`;
 }
 
+/** Mensagem quando o utilizador tem tier MAPA e pede uma feature Premium. */
+export const MAPA_ROLLOUT_LOCKED_MESSAGE =
+  "Esta função faz parte do plano Premium. O plano Mapa Natal inclui o mapa de nascimento e as interpretações associadas.";
+
+export type AssertRolloutGateOptions = {
+  tier?: string;
+};
+
 export function assertRolloutGate(
   applies: boolean,
   gate: boolean,
   feature: keyof RolloutGates,
   dayIndex: number,
+  options?: AssertRolloutGateOptions,
 ): void {
   if (!applies || gate) return;
-  throw rolloutJsonError(403, "ROLLOUT_LOCKED", rolloutLockedMessage(feature, dayIndex));
+  const msg =
+    options?.tier && isMapaTier(options.tier)
+      ? MAPA_ROLLOUT_LOCKED_MESSAGE
+      : rolloutLockedMessage(feature, dayIndex);
+  throw rolloutJsonError(403, "ROLLOUT_LOCKED", msg);
 }
 
 export type InterpretationAiKind = Database["public"]["Enums"]["interpretation_ai_kind"];
@@ -206,8 +235,8 @@ export async function fetchProfileRolloutState(
     throw rolloutJsonError(500, "PROFILE", error?.message ?? "Perfil não encontrado.");
   const tier = profile.subscription_tier;
   const dayIndex = getRolloutDayIndexSp(profile.created_at, now);
-  const gates = buildRolloutGatesForDay(dayIndex);
-  const applies = paidRolloutApplies(tier, dayIndex);
+  const gates = rolloutGatesForTier(tier, dayIndex);
+  const applies = rolloutGateEnforcementActive(tier, dayIndex);
   return {
     tier,
     createdAt: profile.created_at,
@@ -226,6 +255,15 @@ export async function assertPaidRolloutAiAccess(
   now?: Date,
 ): Promise<void> {
   const dayIndex = getRolloutDayIndexSp(createdAtIso, now);
+
+  if (isMapaTier(tier)) {
+    const natalOk = (ROLLOUT_EARLY_NATAL_AI_KINDS as readonly string[]).includes(kind);
+    if (!natalOk) {
+      throw rolloutJsonError(403, "ROLLOUT_LOCKED", MAPA_ROLLOUT_LOCKED_MESSAGE);
+    }
+    return;
+  }
+
   const applies = paidRolloutApplies(tier, dayIndex);
   if (!applies) return;
   const gates = buildRolloutGatesForDay(dayIndex);

@@ -1,11 +1,10 @@
 import { useMemo } from "react";
 import { useProfile } from "@/hooks/use-profile";
 import {
-  buildRolloutGatesForDay,
-  FREE_TIER_GATES,
   getRolloutDayIndexSp,
   isFreeTier,
-  paidRolloutApplies,
+  rolloutGateEnforcementActive,
+  rolloutGatesForTier,
   type RolloutGates,
 } from "@/lib/subscription-rollout";
 
@@ -25,8 +24,8 @@ export function useSubscriptionRollout(): SubscriptionRollout | null {
     if (!profile) return null;
     const dayIndex = getRolloutDayIndexSp(profile.created_at);
     const isFree = isFreeTier(profile.subscription_tier);
-    const gates = isFree ? FREE_TIER_GATES : buildRolloutGatesForDay(dayIndex);
-    const active = paidRolloutApplies(profile.subscription_tier, dayIndex);
+    const gates = rolloutGatesForTier(profile.subscription_tier, dayIndex);
+    const active = rolloutGateEnforcementActive(profile.subscription_tier, dayIndex);
     return { dayIndex, gates, active, freeRestricted: isFree };
   }, [profile]);
 }

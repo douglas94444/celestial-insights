@@ -34,6 +34,12 @@ import {
   recordCheckoutEngagement,
   recordCheckoutPageViewDeduped,
 } from "@/lib/engagement";
+import {
+  MAPA_CHECKOUT_CARD_LINES,
+  clearCheckoutMapaIntent,
+  hasCheckoutMapaIntent,
+  markCheckoutMapaIntent,
+} from "@/lib/mapa-product-copy";
 import { cn } from "@/lib/utils";
 
 const SESSION_MP_ORDER_REF = "astromap_mp_order_ref";
@@ -178,6 +184,16 @@ function PremiumPlansPage() {
     setMapaPayMethod(null);
   }, [isMapa]);
 
+  /** Retorno do MP não inclui `?produto=mapa`; mantemos intenção até sucesso ou sair do fluxo mapa. */
+  useEffect(() => {
+    if (isMapa) {
+      markCheckoutMapaIntent();
+      return;
+    }
+    if (mp === "success" || mp === "pending") return;
+    clearCheckoutMapaIntent();
+  }, [isMapa, mp]);
+
   useEffect(() => {
     if (!txIdentifier) pixSuccessRecorded.current = false;
   }, [txIdentifier]);
@@ -196,13 +212,15 @@ function PremiumPlansPage() {
     if (r) {
       setMpResumeExternalRef(r);
       toast.message("A confirmar o pagamento…", {
-        description:
-          "Se já concluiu no Mercado Pago, o plano atualiza em segundos. Pode fechar esta mensagem.",
+        description: hasCheckoutMapaIntent()
+          ? "Se já concluiu no Mercado Pago, o mapa natal fica disponível em segundos. Pode fechar esta mensagem."
+          : "Se já concluiu no Mercado Pago, o plano atualiza em segundos. Pode fechar esta mensagem.",
       });
     } else {
       toast.message("Voltou do checkout Mercado Pago", {
-        description:
-          "Se o pagamento foi concluído, aguarde alguns segundos e atualize a página ou confira o seu plano em Configurações.",
+        description: hasCheckoutMapaIntent()
+          ? "Se o pagamento foi concluído, aguarde alguns segundos nesta página. Depois vamos recolher os dados de nascimento para gerar o mapa."
+          : "Se o pagamento foi concluído, aguarde alguns segundos e atualize a página ou confira o seu plano em Configurações.",
       });
     }
   }, [mp]);
@@ -212,7 +230,12 @@ function PremiumPlansPage() {
     mpFailureToastDone.current = true;
     toast.error("Pagamento Mercado Pago não concluído ou cancelado.");
     sessionStorage.removeItem(SESSION_MP_ORDER_REF);
-    void navigate({ to: "/assinatura", search: {}, replace: true });
+    const backToMapa = hasCheckoutMapaIntent();
+    void navigate({
+      to: "/assinatura",
+      search: backToMapa ? { produto: "mapa" as const } : {},
+      replace: true,
+    });
   }, [mp, navigate]);
 
   const mpOrderPoll = useQuery({
@@ -241,27 +264,44 @@ function PremiumPlansPage() {
   useEffect(() => {
     const st = mpOrderPoll.data?.localStatus;
     if (!st || !mpResumeExternalRef || !user?.id) return;
+    const mapaFlow = hasCheckoutMapaIntent();
     if (st === "approved") {
       if (!mpProSuccessRecorded.current) {
         mpProSuccessRecorded.current = true;
         recordCheckoutEngagement(supabase, user.id, ENGAGEMENT_TOPICS.checkout_payment_confirmed, {
           channel: "mp_checkout_pro",
-          produto: isMapa ? "mapa" : "premium",
+          produto: mapaFlow ? "mapa" : "premium",
         });
       }
       void qc.invalidateQueries({ queryKey: ["profile", user.id] });
-      toast.success("Pagamento confirmado. O seu plano foi atualizado.");
+      void qc.invalidateQueries({ queryKey: ["charts", user.id] });
       sessionStorage.removeItem(SESSION_MP_ORDER_REF);
       setMpResumeExternalRef(null);
-      void navigate({ to: "/assinatura", search: {}, replace: true });
+      if (mapaFlow) {
+        clearCheckoutMapaIntent();
+        toast.success("Pagamento confirmado.", {
+          description:
+            "O mapa natal foi ativado na sua conta. A seguir, indique data, hora e local de nascimento para gerar a roda.",
+        });
+        void navigate({ to: "/onboarding", replace: true });
+      } else {
+        clearCheckoutMapaIntent();
+        toast.success("Pagamento confirmado. O seu plano foi atualizado.");
+        void navigate({ to: "/assinatura", search: {}, replace: true });
+      }
     }
     if (st === "rejected" || st === "cancelled") {
       toast.error("Pagamento não aprovado.");
       sessionStorage.removeItem(SESSION_MP_ORDER_REF);
       setMpResumeExternalRef(null);
-      void navigate({ to: "/assinatura", search: {}, replace: true });
+      const backToMapa = hasCheckoutMapaIntent();
+      void navigate({
+        to: "/assinatura",
+        search: backToMapa ? { produto: "mapa" as const } : {},
+        replace: true,
+      });
     }
-  }, [mpOrderPoll.data?.localStatus, mpResumeExternalRef, navigate, qc, user?.id, isMapa]);
+  }, [mpOrderPoll.data?.localStatus, mpResumeExternalRef, navigate, qc, user?.id]);
 
   const pollQuery = useQuery({
     queryKey: ["syncpay-tx", txIdentifier, user?.id],
@@ -282,19 +322,31 @@ function PremiumPlansPage() {
 
   useEffect(() => {
     if (pollQuery.data?.remoteStatus === "completed" && user?.id) {
+      const mapaFlow = isMapa || hasCheckoutMapaIntent();
       if (!pixSuccessRecorded.current) {
         pixSuccessRecorded.current = true;
         recordCheckoutEngagement(supabase, user.id, ENGAGEMENT_TOPICS.checkout_payment_confirmed, {
           channel: "syncpay_pix",
-          produto: isMapa ? "mapa" : "premium",
+          produto: mapaFlow ? "mapa" : "premium",
         });
       }
       void qc.invalidateQueries({ queryKey: ["profile", user.id] });
-      toast.success("Pagamento confirmado. O seu plano foi atualizado.");
+      void qc.invalidateQueries({ queryKey: ["charts", user.id] });
       setPixCode(null);
       setTxIdentifier(null);
+      if (mapaFlow) {
+        clearCheckoutMapaIntent();
+        toast.success("Pagamento confirmado.", {
+          description:
+            "O mapa natal foi ativado na sua conta. A seguir, indique data, hora e local de nascimento para gerar a roda.",
+        });
+        void navigate({ to: "/onboarding", replace: true });
+      } else {
+        clearCheckoutMapaIntent();
+        toast.success("Pagamento confirmado. O seu plano foi atualizado.");
+      }
     }
-  }, [pollQuery.data?.remoteStatus, qc, user?.id, isMapa]);
+  }, [pollQuery.data?.remoteStatus, qc, user?.id, isMapa, navigate]);
 
   const createOrder = useMutation({
     mutationFn: async (plan: "mensal" | "anual" | "mapa") => {
@@ -311,16 +363,19 @@ function PremiumPlansPage() {
       });
     },
     onMutate: (plan) => {
+      if (plan === "mapa") markCheckoutMapaIntent();
       recordCheckoutEngagement(supabase, user?.id, ENGAGEMENT_TOPICS.checkout_initiate_pix, {
         plan,
       });
     },
-    onSuccess: async (res) => {
+    onSuccess: async (res, plan) => {
       setPixCode(res.pix_code);
       setTxIdentifier(res.identifier);
       toast.message("Pix gerado", {
         description:
-          "Copie o código ou pague pelo QR no app do banco. O plano atualiza após confirmação.",
+          plan === "mapa"
+            ? "Copie o código ou pague pelo QR no app do banco. Após confirmação, ativamos o mapa natal — pode levar alguns minutos."
+            : "Copie o código ou pague pelo QR no app do banco. O plano atualiza após confirmação.",
       });
       if (user?.id) {
         await qc.invalidateQueries({ queryKey: ["profile", user.id] });
@@ -338,6 +393,7 @@ function PremiumPlansPage() {
       });
     },
     onMutate: (plan) => {
+      if (plan === "mapa") markCheckoutMapaIntent();
       recordCheckoutEngagement(
         supabase,
         user?.id,
@@ -401,6 +457,8 @@ function PremiumPlansPage() {
   }
 
   const mapaPrice = formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mapa);
+  /** Inclui retorno do MP sem `produto=mapa` na URL (intenção em sessionStorage). */
+  const mapaCheckoutContext = isMapa || hasCheckoutMapaIntent();
   const mensalPrice = formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mensal);
   const anualPrice = formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual);
   const anualSavings = formatSubscriptionPriceBrl(
@@ -538,13 +596,7 @@ function PremiumPlansPage() {
                 mensalidade nem data de expiração para consulta).
               </p>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                {[
-                  "Roda natal interactiva",
-                  "Planetas, casas e aspectos completos",
-                  "IA: Sol, Lua, Ascendente, planetas e essência natal",
-                  "Configurações especiais (Grand Trine, T-Square, Yod…)",
-                  "Acesso permanente",
-                ].map((t) => (
+                {MAPA_CHECKOUT_CARD_LINES.map((t) => (
                   <li key={t} className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <span>{t}</span>
@@ -1118,12 +1170,22 @@ function PremiumPlansPage() {
         {mpResumeExternalRef && (mp === "success" || mp === "pending") && mpCheckoutPro ? (
           <Card className="border bg-card shadow-soft">
             <CardHeader>
-              <CardTitle className="font-display text-base">Confirmação Mercado Pago</CardTitle>
+              <CardTitle className="font-display text-base">
+                {mapaCheckoutContext ? "Confirmação — Mapa Natal" : "Confirmação Mercado Pago"}
+              </CardTitle>
               <CardDescription>
-                Se já concluiu o pagamento no site do Mercado Pago, aguarde a confirmação abaixo.
+                {mapaCheckoutContext
+                  ? "Se já concluiu o pagamento no site do Mercado Pago, aguarde a confirmação do mapa natal abaixo (pode levar um minuto)."
+                  : "Se já concluiu o pagamento no site do Mercado Pago, aguarde a confirmação abaixo."}
               </CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              {mapaCheckoutContext ? (
+                <p>
+                  Após a confirmação, vamos pedir data, hora e local de nascimento para gerar a roda
+                  na app.
+                </p>
+              ) : null}
               {mpOrderPoll.data?.localStatus === "pending" ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />A aguardar confirmação do Mercado
@@ -1150,6 +1212,12 @@ function PremiumPlansPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+              {mapaCheckoutContext ? (
+                <p className="text-xs text-muted-foreground">
+                  Após pagar no app do banco, a confirmação pode levar alguns minutos. Quando
+                  concluir, seguimos para recolher os dados de nascimento e gerar o mapa.
+                </p>
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="secondary" onClick={() => void copyPix()}>
                   <Copy className="mr-2 h-4 w-4" />

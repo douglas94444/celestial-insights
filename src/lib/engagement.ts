@@ -41,6 +41,12 @@ export const ENGAGEMENT_TOPICS = {
   checkout_payment_confirmed: "checkout_payment_confirmed",
 } as const;
 
+/*
+ * Funil checkout (`route_key` assinatura): `checkout_view` e `checkout_billing_ready` usam
+ * `meta.produto` "mapa" | "premium" (ver engagementDedupeKey). `checkout_initiate_*` envia
+ * `plan` ou `status`. `checkout_payment_confirmed` envia `channel` + `produto` após sucesso.
+ */
+
 /** Registo fire-and-forget de utilização (RLS: apenas o próprio utilizador). */
 function insertEngagementEvent(
   client: SupabaseClient<Database>,

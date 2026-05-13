@@ -35,7 +35,9 @@ export const calculateCompositeFn = createServerFn({ method: "POST" })
       const userId = context.userId;
 
       const rollout = await fetchProfileRolloutState(supabase, userId);
-      assertRolloutGate(rollout.applies, rollout.gates.composite, "composite", rollout.dayIndex);
+      assertRolloutGate(rollout.applies, rollout.gates.composite, "composite", rollout.dayIndex, {
+        tier: rollout.tier,
+      });
 
       if (data.chart1Id === data.chart2Id) {
         throw jsonError(400, "SAME", "Escolha dois mapas diferentes.");

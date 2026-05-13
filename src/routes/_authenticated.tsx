@@ -29,7 +29,7 @@ function AuthenticatedErrorFallback() {
 export const Route = createFileRoute("/_authenticated")({
   errorComponent: AuthenticatedErrorFallback,
   beforeLoad: async ({ location }) => {
-    const safeRedirect = sanitizePostAuthRedirectPath(location.pathname);
+    const safeRedirect = sanitizePostAuthRedirectPath(`${location.pathname}${location.searchStr}`);
     const authSearch = safeRedirect ? { redirect: safeRedirect } : {};
     try {
       if (typeof window !== "undefined") {
@@ -56,14 +56,14 @@ function AuthenticatedLayout() {
 
   useEffect(() => {
     if (!loading && !user) {
-      const red = sanitizePostAuthRedirectPath(location.pathname);
+      const red = sanitizePostAuthRedirectPath(`${location.pathname}${location.searchStr}`);
       void navigate({
         to: "/auth",
         search: red ? { redirect: red } : {},
         replace: true,
       });
     }
-  }, [user, loading, navigate, location.pathname]);
+  }, [user, loading, navigate, location.pathname, location.searchStr]);
 
   if (loading || !user) {
     return <AuthenticatedSessionSkeleton />;

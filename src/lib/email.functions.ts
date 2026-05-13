@@ -15,9 +15,9 @@ import { jsonError, secretsMatchConstantTime, throwValidationResponse } from "@/
 import { timedServerFn } from "@/lib/server-fn-observe";
 import {
   assertRolloutGate,
-  buildRolloutGatesForDay,
   getRolloutDayIndexSp,
-  paidRolloutApplies,
+  rolloutGateEnforcementActive,
+  rolloutGatesForTier,
 } from "@/lib/subscription-rollout";
 
 const SP_TZ = "America/Sao_Paulo";
@@ -182,8 +182,9 @@ export const sendTransitDigestEmailFn = createServerFn({ method: "POST" })
       }
       const tier = profile?.subscription_tier ?? "MENSAL";
       const dayIdx = getRolloutDayIndexSp(profile?.created_at ?? new Date().toISOString());
-      const gates = buildRolloutGatesForDay(dayIdx);
-      assertRolloutGate(paidRolloutApplies(tier, dayIdx), gates.digestEmail, "digestEmail", dayIdx);
+      const applies = rolloutGateEnforcementActive(tier, dayIdx);
+      const gates = rolloutGatesForTier(tier, dayIdx);
+      assertRolloutGate(applies, gates.digestEmail, "digestEmail", dayIdx, { tier });
       if (authErr || !authUser.user?.email) {
         throw jsonError(400, "NO_EMAIL", "Não foi possível obter o email da sua conta.");
       }
@@ -301,7 +302,7 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
 
         const dIdx = getRolloutDayIndexSp(row.created_at);
         const t = row.subscription_tier ?? "MENSAL";
-        if (paidRolloutApplies(t, dIdx) && !buildRolloutGatesForDay(dIdx).digestEmail) {
+        if (rolloutGateEnforcementActive(t, dIdx) && !rolloutGatesForTier(t, dIdx).digestEmail) {
           skipped++;
           continue;
         }
@@ -377,7 +378,10 @@ export const processTransitDigestCronFn = createServerFn({ method: "POST" })
 
         const dIdxM = getRolloutDayIndexSp(row.created_at);
         const tM = row.subscription_tier ?? "MENSAL";
-        if (paidRolloutApplies(tM, dIdxM) && !buildRolloutGatesForDay(dIdxM).digestEmail) {
+        if (
+          rolloutGateEnforcementActive(tM, dIdxM) &&
+          !rolloutGatesForTier(tM, dIdxM).digestEmail
+        ) {
           momentSkipped++;
           continue;
         }

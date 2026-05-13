@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
+import { META_PIXEL_ID_META_NAME } from "@/lib/meta-pixel-html";
 
 declare global {
   interface Window {
@@ -30,18 +31,35 @@ function loadFbeventsJs(): Promise<void> {
   return fbeventsLoadPromise;
 }
 
+/** Prioridade: `VITE_META_PIXEL_ID` (build) → `<meta name="meta-pixel-id">` (Worker / HTMLRewriter). */
+export function readMetaPixelId(): string | undefined {
+  const vite = (import.meta.env.VITE_META_PIXEL_ID as string | undefined)?.trim();
+  if (vite) return vite;
+  if (typeof document !== "undefined") {
+    const fromMeta = document
+      .querySelector(`meta[name="${META_PIXEL_ID_META_NAME}"]`)
+      ?.getAttribute("content")
+      ?.trim();
+    if (fromMeta) return fromMeta;
+  }
+  return undefined;
+}
+
 /**
- * Meta Pixel (Facebook) — só activo quando `VITE_META_PIXEL_ID` está definido.
+ * Meta Pixel (Facebook).
+ * - Com `VITE_META_PIXEL_ID` no build: activo em dev e prod.
+ * - Só com `META_PIXEL_ID` no Cloudflare Worker: o `server.ts` injeta meta no HTML; o cliente lê e carrega o script (sem rebuild por VITE).
  * PageView após `fbq('init')`; PageView em navegações SPA (pathname + search).
  */
 export function MetaPixel() {
-  const pixelId = (import.meta.env.VITE_META_PIXEL_ID as string | undefined)?.trim();
+  const pixelIdVite = (import.meta.env.VITE_META_PIXEL_ID as string | undefined)?.trim();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr ?? "" });
   const fullPath = `${pathname}${searchStr}`;
   const prevPathRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const pixelId = readMetaPixelId();
     if (!pixelId) return;
 
     let cancelled = false;
@@ -75,11 +93,11 @@ export function MetaPixel() {
     return () => {
       cancelled = true;
     };
-  }, [pixelId, fullPath]);
+  }, [fullPath]);
 
-  if (!pixelId) return null;
+  if (!pixelIdVite) return null;
 
-  const noscriptSrc = `https://www.facebook.com/tr?id=${encodeURIComponent(pixelId)}&ev=PageView&noscript=1`;
+  const noscriptSrc = `https://www.facebook.com/tr?id=${encodeURIComponent(pixelIdVite)}&ev=PageView&noscript=1`;
 
   return (
     <noscript>

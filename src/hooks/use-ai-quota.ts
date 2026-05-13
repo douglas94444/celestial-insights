@@ -5,7 +5,9 @@ import { useProfile } from "@/hooks/use-profile";
 import {
   buildRolloutGatesForDay,
   getRolloutDayIndexSp,
+  isMapaTier,
   paidRolloutApplies,
+  rolloutGatesForTier,
 } from "@/lib/subscription-rollout";
 
 const FREE_MONTHLY_LIMIT = 3;
@@ -40,9 +42,13 @@ export function useAiQuota(): AiQuota | null {
   const tier = profile?.subscription_tier;
   const tierStr = tier ?? "MENSAL";
   const dayIdx = profile ? getRolloutDayIndexSp(profile.created_at) : 0;
-  const gates = buildRolloutGatesForDay(dayIdx);
+  const gates = profile
+    ? rolloutGatesForTier(profile.subscription_tier, dayIdx)
+    : buildRolloutGatesForDay(0);
+  const isMapa = !!profile && isMapaTier(profile.subscription_tier);
   const earlyPaidRamp = !!profile && paidRolloutApplies(tierStr, dayIdx) && !gates.aiFullKinds;
-  const isPremium = (tier === "MENSAL" || tier === "ANUAL" || tier === "PREMIUM") && !earlyPaidRamp;
+  const isPremium =
+    isMapa || ((tier === "MENSAL" || tier === "ANUAL" || tier === "PREMIUM") && !earlyPaidRamp);
 
   const { data: used = 0 } = useQuery({
     queryKey: ["ai-quota-month", user?.id],

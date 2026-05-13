@@ -9,9 +9,9 @@ import { jsonError, throwValidationResponse } from "@/lib/server-fn-http";
 import { timedServerFn } from "@/lib/server-fn-observe";
 import {
   assertRolloutGate,
-  buildRolloutGatesForDay,
   getRolloutDayIndexSp,
-  paidRolloutApplies,
+  rolloutGateEnforcementActive,
+  rolloutGatesForTier,
 } from "@/lib/subscription-rollout";
 import { parseTimezoneLabelToMinutes } from "@/lib/timezone-br";
 
@@ -48,9 +48,11 @@ export const createChartFn = createServerFn({ method: "POST" })
       const tier = profile?.subscription_tier ?? "MENSAL";
       const createdAt = profile?.created_at ?? new Date().toISOString();
       const dayIndex = getRolloutDayIndexSp(createdAt);
-      const gates = buildRolloutGatesForDay(dayIndex);
-      const applies = paidRolloutApplies(tier, dayIndex);
-      assertRolloutGate(applies, gates.extraCharts || existing === 0, "extraCharts", dayIndex);
+      const gates = rolloutGatesForTier(tier, dayIndex);
+      const applies = rolloutGateEnforcementActive(tier, dayIndex);
+      assertRolloutGate(applies, gates.extraCharts || existing === 0, "extraCharts", dayIndex, {
+        tier,
+      });
 
       const birthTime = data.birthTimeKnown ? data.birthTime : "12:00";
       const houseSystem = (profile?.house_system as HouseSystemId | undefined) ?? "placidus";

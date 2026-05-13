@@ -3,7 +3,7 @@ export function getInstagramBrandHandle(): string {
   const raw = import.meta.env.VITE_APP_INSTAGRAM_HANDLE as string | undefined;
   const trimmed = raw?.trim();
   if (trimmed) return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
-  return "@AstroMap";
+  return "@astrologiia.app";
 }
 
 /** URL pública para CTA no cartão / legenda (fallback: origem actual no cliente). */

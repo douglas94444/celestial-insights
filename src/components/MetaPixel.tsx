@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { META_PIXEL_ID_META_NAME } from "@/lib/meta-pixel-html";
 
@@ -52,14 +52,21 @@ export function readMetaPixelId(): string | undefined {
  * PageView após `fbq('init')`; PageView em navegações SPA (pathname + search).
  */
 export function MetaPixel() {
-  const pixelIdVite = (import.meta.env.VITE_META_PIXEL_ID as string | undefined)?.trim();
+  const [resolvedPixelId, setResolvedPixelId] = useState<string | undefined>(
+    () => (import.meta.env.VITE_META_PIXEL_ID as string | undefined)?.trim() || undefined,
+  );
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const searchStr = useRouterState({ select: (s) => s.location.searchStr ?? "" });
   const fullPath = `${pathname}${searchStr}`;
   const prevPathRef = useRef<string | null>(null);
 
+  useLayoutEffect(() => {
+    setResolvedPixelId(readMetaPixelId());
+  }, []);
+
   useEffect(() => {
     const pixelId = readMetaPixelId();
+    setResolvedPixelId(pixelId);
     if (!pixelId) return;
 
     let cancelled = false;
@@ -95,9 +102,9 @@ export function MetaPixel() {
     };
   }, [fullPath]);
 
-  if (!pixelIdVite) return null;
+  if (!resolvedPixelId) return null;
 
-  const noscriptSrc = `https://www.facebook.com/tr?id=${encodeURIComponent(pixelIdVite)}&ev=PageView&noscript=1`;
+  const noscriptSrc = `https://www.facebook.com/tr?id=${encodeURIComponent(resolvedPixelId)}&ev=PageView&noscript=1`;
 
   return (
     <noscript>

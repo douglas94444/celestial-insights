@@ -122,12 +122,8 @@ const ShareableMomentCardInner = forwardRef<HTMLDivElement, ShareableMomentCardP
             ) : null}
 
             {quoteLines.length > 0 ? (
-              <blockquote className="mt-10 max-w-[920px] text-center font-display text-[34px] font-normal italic leading-[1.35] text-violet-100/95">
-                {quoteLines.map((line, i) => (
-                  <span key={i} className="block">
-                    {line}
-                  </span>
-                ))}
+              <blockquote className="mt-10 w-full max-w-[920px] break-words text-center font-display text-[34px] font-normal italic leading-[1.35] text-violet-100/95">
+                <p className="m-0 whitespace-pre-line">{quoteLines.join("\n")}</p>
               </blockquote>
             ) : null}
 
@@ -147,25 +143,29 @@ const ShareableMomentCardInner = forwardRef<HTMLDivElement, ShareableMomentCardP
                 </p>
               ) : null}
               {todayColor ? (
-                <div className="flex flex-wrap items-center gap-4 text-white/88">
-                  <span className="font-semibold text-amber-100/90">Cor de hoje:</span>
-                  <span
-                    className="inline-block shrink-0 rounded-md ring-2 ring-white/25"
-                    style={{
-                      width: 34,
-                      height: 34,
-                      backgroundColor: todayColor.hex,
-                    }}
-                    aria-hidden
-                  />
-                  <span className="font-normal">
-                    {todayColor.label} <span className="text-white/65">({todayColor.hex})</span>
+                <div className="flex w-full flex-col items-start gap-2 text-white/88">
+                  <span className="whitespace-nowrap font-semibold text-amber-100/90">
+                    Cor de hoje:
                   </span>
+                  <div className="flex flex-row flex-wrap items-center gap-3">
+                    <span
+                      className="inline-block shrink-0 rounded-md ring-2 ring-white/25"
+                      style={{
+                        width: 34,
+                        height: 34,
+                        backgroundColor: todayColor.hex,
+                      }}
+                      aria-hidden
+                    />
+                    <span className="font-normal">
+                      {todayColor.label} <span className="text-white/65">({todayColor.hex})</span>
+                    </span>
+                  </div>
                 </div>
               ) : null}
             </div>
 
-            <ul className="mt-6 w-full max-w-[920px] list-none space-y-2 font-display text-[26px] leading-snug text-white/82">
+            <ul className="mt-10 w-full max-w-[920px] list-none space-y-2 font-display text-[26px] leading-snug text-white/82">
               {astroBullets.map((line, i) => (
                 <li key={i} className="border-l-2 border-violet-400/50 pl-4">
                   {line}

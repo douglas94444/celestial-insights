@@ -60,8 +60,9 @@ export function AdminInstagramSignCards() {
       const safeSign = selectedSign.normalize("NFD").replace(/\p{M}/gu, "");
       await downloadBlob(blob, `astromap-cartao-admin-${civilDate}-${safeSign}.png`);
       toast.success("PNG guardado.");
-    } catch {
-      toast.error("Não foi possível gerar o PNG.");
+    } catch (err) {
+      console.error("[AdminInstagramSignCards] PNG export failed", err);
+      toast.error("Não foi possível gerar o PNG. Abra a consola (F12) para detalhes.");
     } finally {
       setExporting(false);
     }

@@ -40,6 +40,10 @@ export function wrapQuoteLines(text: string, maxLines = 4): string[] {
   let cur = "";
   const softMax = 42;
   for (const w of words) {
+    if (lines.length >= maxLines - 1) {
+      cur = cur ? `${cur} ${w}` : w;
+      continue;
+    }
     const next = cur ? `${cur} ${w}` : w;
     if (next.length > softMax && cur) {
       lines.push(cur);
@@ -47,7 +51,6 @@ export function wrapQuoteLines(text: string, maxLines = 4): string[] {
     } else {
       cur = next;
     }
-    if (lines.length >= maxLines - 1) break;
   }
   if (cur) lines.push(cur);
   return lines.slice(0, maxLines);

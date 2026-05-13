@@ -1,4 +1,4 @@
-import { toPng } from "html-to-image";
+import { toBlob } from "html-to-image";
 
 const CARD_BG = "#0f0a1a";
 
@@ -6,7 +6,9 @@ const BASE_OPTS = {
   pixelRatio: 1,
   cacheBust: true,
   backgroundColor: CARD_BG,
-} satisfies NonNullable<Parameters<typeof toPng>[1]>;
+} satisfies NonNullable<Parameters<typeof toBlob>[1]>;
+
+type HtmlToImageOpts = Partial<NonNullable<Parameters<typeof toBlob>[1]>>;
 
 async function waitFonts(): Promise<void> {
   if (typeof document === "undefined" || !document.fonts?.ready) return;
@@ -29,13 +31,10 @@ function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function toPngBlob(
-  el: HTMLElement,
-  overrides: Partial<NonNullable<Parameters<typeof toPng>[1]>> = {},
-): Promise<Blob> {
-  const dataUrl = await toPng(el, { ...BASE_OPTS, ...overrides });
-  const res = await fetch(dataUrl);
-  return res.blob();
+async function elementToPngBlob(el: HTMLElement, overrides: HtmlToImageOpts = {}): Promise<Blob> {
+  const blob = await toBlob(el, { ...BASE_OPTS, ...overrides });
+  if (!blob) throw new Error("html-to-image: toBlob devolveu null");
+  return blob;
 }
 
 /** Blob SVG precisa de xmlns; sem isto alguns browsers falham ao decodificar o <img>. */
@@ -97,6 +96,26 @@ async function serializeSvgsToImages(el: HTMLElement): Promise<() => void> {
   return () => restoreFns.forEach((fn) => fn());
 }
 
+async function tryCaptureOnce(
+  el: HTMLElement,
+  overrides: HtmlToImageOpts,
+  useSvgRaster: boolean,
+): Promise<Blob> {
+  let restoreSvgs: () => void = () => {};
+  if (useSvgRaster) {
+    try {
+      restoreSvgs = await serializeSvgsToImages(el);
+    } catch {
+      restoreSvgs = () => {};
+    }
+  }
+  try {
+    return await elementToPngBlob(el, overrides);
+  } finally {
+    restoreSvgs();
+  }
+}
+
 export async function captureMomentShareCardPng(
   el: HTMLElement,
   opts: { pixelRatio?: 1 | 2; backgroundColor?: string } = {},
@@ -105,28 +124,30 @@ export async function captureMomentShareCardPng(
   await waitFonts();
   await waitTwoFrames();
   await delay(60);
-  let restoreSvgs: () => void = () => {};
-  try {
-    restoreSvgs = await serializeSvgsToImages(el);
-  } catch {
-    restoreSvgs = () => {};
-  }
-  try {
-    return await toPngBlob(el, { pixelRatio, backgroundColor });
-  } catch {
+
+  const baseOverrides: HtmlToImageOpts = { pixelRatio, backgroundColor };
+
+  const attempts: Array<{ overrides: HtmlToImageOpts; svgRaster: boolean }> = [
+    { overrides: { ...baseOverrides, skipFonts: true }, svgRaster: false },
+    { overrides: { ...baseOverrides, skipFonts: true }, svgRaster: true },
+    { overrides: { ...baseOverrides, skipFonts: false }, svgRaster: true },
+    {
+      overrides: { ...baseOverrides, skipFonts: true, skipAutoScale: true },
+      svgRaster: true,
+    },
+  ];
+
+  let lastError: unknown;
+  for (const att of attempts) {
     try {
-      return await toPngBlob(el, { pixelRatio, backgroundColor, skipFonts: true });
-    } catch {
-      return await toPngBlob(el, {
-        pixelRatio,
-        backgroundColor,
-        skipFonts: true,
-        skipAutoScale: true,
-      });
+      return await tryCaptureOnce(el, att.overrides, att.svgRaster);
+    } catch (e) {
+      lastError = e;
     }
-  } finally {
-    restoreSvgs();
   }
+
+  if (lastError instanceof Error) throw lastError;
+  throw new Error(typeof lastError === "string" ? lastError : "Falha ao gerar PNG do cartão");
 }
 
 export async function downloadBlob(blob: Blob, filename: string): Promise<void> {

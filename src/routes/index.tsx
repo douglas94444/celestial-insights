@@ -8,11 +8,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { MAPA_INCLUDED_ITEMS } from "@/lib/mapa-product-copy";
 import { amountForSubscriptionPlan, formatSubscriptionPriceBrl } from "@/lib/subscription-pricing";
 
 const MAPA_COMPRA_SEARCH = { produto: "mapa" as const };
 const AUTH_REDIRECT_MAPA = { redirect: "/assinatura?produto=mapa" as const };
+
+/** Ficheiros em `public/landing/` (servidos em `/landing/…`). */
+const LANDING_PUBLIC = "/landing";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -23,7 +25,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Mapa natal completo: roda interativa com planetas, casas e aspectos, mais interpretações em português geradas a partir da sua data, hora e local de nascimento. Pagamento único, acesso permanente na app.",
+          "Mapa natal completo com roda interativa e interpretações em português. Pagamento único, acesso permanente. Pix ou cartão.",
       },
     ],
     links: [{ rel: "prefetch", href: "/auth" }],
@@ -31,96 +33,167 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-/** Bullets da pré-visualização (exemplo ilustrativo, não mapa real). */
-const HERO_MOCKUP_LINES = [
-  "13 pontos celestes nas casas (planetas e pontos sensíveis usados na app)",
-  "Aspectos desenhados na roda (por exemplo: trígono, quadratura, oposição)",
-  "Sol em Leão · Casa 10",
-  "Lua em Câncer · Casa 4",
-  "Ascendente em Escorpião",
-] as const;
+const HERO_MOCKUP_INSIGHTS: { label: string; hint: string; accent?: "red" }[] = [
+  {
+    label: "Sol em Áries · Casa 10",
+    hint: "Identidade ligada à carreira",
+  },
+  {
+    label: "Lua em Câncer · Casa 4",
+    hint: "Emoções conectadas ao lar",
+  },
+  {
+    label: "Saturno em quadratura ao Sol",
+    hint: "Tensão entre impulso e estrutura",
+    accent: "red",
+  },
+];
 
-const DIFFERENTIATION_POINTS = [
-  {
-    title: "Roda explorável",
-    body: "Toque num ponto e leia a interpretação desse lugar no seu mapa.",
-  },
-  {
-    title: "Textos com contexto",
-    body: "Signo, casa e aspectos — não frases genéricas só por signo solar.",
-  },
-  {
-    title: "Gerado a partir do seu mapa calculado",
-    body: "Data, hora e local definem a geometria e as leituras.",
-  },
-] as const;
+type RoadmapStep = {
+  title: string;
+  body?: string;
+  mockup?: string;
+  imageSrc?: string;
+  imageAlt?: string;
+  imageCaption?: string;
+};
 
-const FOR_WHO_BULLETS = [
-  "Quer ver o seu mapa desenhado com dados de nascimento — não um texto genérico de signo solar.",
-  "Valoriza casas, aspectos e uma roda em que pode explorar cada ponto individualmente.",
-  "Prefere um pagamento único e manter o mapa na conta para sempre.",
-  "Quer leituras em português ancoradas no mapa calculado com o seu nascimento.",
-] as const;
+const ROADMAP_STEPS: RoadmapStep[] = [
+  {
+    title: "Crie sua conta em 30 segundos",
+    body: "(ou faça login se já tiver)",
+    imageSrc: `${LANDING_PUBLIC}/onboarding-welcome.png`,
+    imageAlt:
+      "Tela de boas-vindas do AstroMap com título Bem-vindo ao AstroMap e botão Começar para iniciar o primeiro mapa",
+  },
+  {
+    title: "Escolha Pix ou cartão na página de pagamento",
+    mockup: "Tela de checkout com botões Pix/Cartão",
+  },
+  {
+    title: "Coloque data, hora e local de nascimento",
+    imageSrc: `${LANDING_PUBLIC}/birth-form.png`,
+    imageAlt:
+      "Formulário Seus dados de nascimento com campos de nome, data, hora, local e botão Calcular meu mapa",
+  },
+  {
+    title: "Seu mapa é gerado na hora",
+    imageSrc: `${LANDING_PUBLIC}/chart-aspectos.png`,
+    imageAlt:
+      "Mapa natal na tela: roda com planetas e linhas de aspectos coloridas, com lista de aspectos ao lado",
+  },
+  {
+    title: "Explore cada planeta tocando na roda",
+    imageSrc: `${LANDING_PUBLIC}/hero-essencia.png`,
+    imageAlt:
+      "Roda natal ao lado do painel Essência com cartões de interpretação para Sol, Lua e Ascendente",
+  },
+  {
+    title: "O mapa fica na sua conta para sempre",
+    body: "Volte quando quiser — sem mensalidade",
+  },
+];
 
-const MAPA_DETAIL_BLOCKS = [
-  {
-    title: "Planetas principais",
-    body: "Sol, Lua, Ascendente — a base da leitura natal.",
-  },
-  {
-    title: "Planetas pessoais",
-    body: "Mercúrio (comunicação), Vênus (afeto), Marte (ação).",
-  },
-  {
-    title: "Planetas sociais",
-    body: "Júpiter (expansão), Saturno (estrutura).",
-  },
-  {
-    title: "Planetas exteriores",
-    body: "Urano (mudança), Netuno (sonhos), Plutão (transformação).",
-  },
-  {
-    title: "Pontos sensíveis",
-    body: "Quíron, Nodo Norte, Nodo Sul — quando fazem parte do desenho.",
-  },
-  {
-    title: "Padrões especiais",
-    body: "Grand Trine, T-Square, Yod… quando aparecem no seu mapa.",
-  },
-  {
-    title: "Essência natal",
-    body: "Síntese personalizada que liga o conjunto.",
-  },
-] as const;
+function forWhoBullets(mapaPrice: string): string[] {
+  return [
+    "Quer o SEU mapa desenhado com dados reais de nascimento",
+    "Valoriza casas, aspectos e exploração individual de cada planeta",
+    `Prefere pagar uma vez (${mapaPrice}) e ter acesso permanente`,
+    "Quer leituras em português ancoradas no céu do seu nascimento",
+  ];
+}
 
-const HOW_IT_WORKS_STEPS = [
-  "Crie a sua conta (ou faça login).",
-  "Vá à página de assinatura e escolha o produto mapa natal.",
-  "No checkout, escolha Pix ou cartão — os meios disponíveis aparecem aí.",
-  "Indique data, hora e local de nascimento (ou complete depois na app, conforme o fluxo).",
-  "Após confirmação do pagamento, o mapa fica disponível na sua conta.",
-] as const;
+type DetailBlock = {
+  title: string;
+  body: string;
+  imageSrc?: string;
+  imageAlt?: string;
+  imageCaption?: string;
+};
 
-function IncludedChecklist({ className }: { className?: string }) {
+const DETAIL_BLOCKS: DetailBlock[] = [
+  {
+    title: "Roda natal interativa completa",
+    body: "13 planetas posicionados nas 12 casas. Aspectos desenhados (trígonos, quadraturas, oposições…).",
+    imageSrc: `${LANDING_PUBLIC}/chart-aspectos.png`,
+    imageAlt:
+      "Roda natal com linhas de aspectos entre planetas e lista de aspectos com tipos e órbitas",
+    imageCaption: "Aspectos listados ao lado da roda, com filtros na app.",
+  },
+  {
+    title: "Interpretações de cada posição",
+    body: "Sol, Lua, Ascendente — base da personalidade. Mercúrio, Vênus, Marte — planetas pessoais. Júpiter, Saturno — sociais. Urano, Netuno, Plutão — transformação. Quíron, Nodos — pontos sensíveis.",
+    imageSrc: `${LANDING_PUBLIC}/hero-essencia.png`,
+    imageAlt:
+      "Painel Essência com textos de interpretação para Sol em signo, Lua em signo e Ascendente",
+  },
+  {
+    title: "Padrões especiais (quando existirem)",
+    body: "Grand Trine, T-Square, Yod, Stellium.",
+    imageSrc: `${LANDING_PUBLIC}/hero-essencia.png`,
+    imageAlt:
+      "Vista do mapa no AstroMap com roda e painel de conteúdo; na app, padrões geométricos aparecem destacados quando existem",
+    imageCaption:
+      "Na app, padrões como Grand Trine ou Yod surgem no separador Essência quando o mapa os tiver.",
+  },
+  {
+    title: "Essência natal personalizada",
+    body: "Síntese conectando todos os elementos.",
+    imageSrc: `${LANDING_PUBLIC}/hero-essencia.png`,
+    imageAlt:
+      "Mesma área de trabalho do mapa com separador Essência e cartões de leitura para pontos principais do mapa",
+    imageCaption: "Resumo e síntese no fluxo real do detalhe do mapa.",
+  },
+];
+
+function SectionRule() {
+  return <div className="my-16 border-t border-border/60" aria-hidden />;
+}
+
+function MockupPlaceholder({ label }: { label: string }) {
   return (
-    <ul className={className}>
-      {MAPA_INCLUDED_ITEMS.map((item) => (
-        <li key={item.title} className="flex items-start gap-2 text-sm text-muted-foreground">
-          <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-          <span>
-            <strong className="text-foreground">{item.title}</strong>
-            {" — "}
-            {item.body}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <div className="mt-3 rounded-lg border border-dashed border-primary/30 bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground">
+      [Screenshot: {label}]
+    </div>
+  );
+}
+
+function LandingScreenshot({
+  src,
+  alt,
+  caption,
+  priority,
+}: {
+  src: string;
+  alt: string;
+  caption?: string;
+  priority?: boolean;
+}) {
+  return (
+    <figure className="mt-3">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-muted/30 shadow-mystical md:rounded-2xl">
+        <img
+          src={src}
+          alt={alt}
+          className="max-h-[420px] w-full object-cover object-top md:max-h-[520px]"
+          loading={priority ? "eager" : "lazy"}
+          decoding="async"
+          {...(priority ? ({ fetchPriority: "high" } as const) : {})}
+        />
+      </div>
+      {caption ? (
+        <figcaption className="mt-2 text-center text-xs text-muted-foreground">
+          {caption}
+        </figcaption>
+      ) : null}
+    </figure>
   );
 }
 
 function Landing() {
   const [showStickyCta, setShowStickyCta] = useState(false);
   const mapaPriceFormatted = formatSubscriptionPriceBrl(amountForSubscriptionPlan("mapa"));
+  const forWho = forWhoBullets(mapaPriceFormatted);
 
   useEffect(() => {
     const onScroll = () => setShowStickyCta(window.scrollY > 500);
@@ -155,139 +228,120 @@ function Landing() {
         </div>
       </header>
 
-      {/* Dobra 1 — TL;DR (sem CTA no corpo do hero) */}
+      {/* Dobra 1 — TL;DR (sem botão no corpo) */}
       <section className="relative overflow-hidden pt-32 pb-20 texture-grain">
         <div className="pointer-events-none absolute inset-0 bg-cosmic opacity-[0.07]" />
         <div className="pointer-events-none absolute inset-0 bg-shell-glow" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-glow opacity-[0.85]" />
         <div className="pointer-events-none absolute inset-0 starfield opacity-[0.22]" />
         <div className="container relative z-[1] mx-auto px-4 text-center">
-          <h1 className="mt-4 font-display text-4xl font-bold md:text-6xl md:leading-[1.1] text-gradient-mystical">
-            O seu mapa natal, desenhado a partir do nascimento.
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Resumo</p>
+          <h1 className="mt-4 font-display text-4xl font-bold md:text-5xl md:leading-[1.15] text-gradient-mystical">
+            Seu mapa natal completo por {mapaPriceFormatted}
           </h1>
-          <p className="mx-auto mt-4 font-display text-2xl font-semibold text-primary md:text-3xl">
-            {mapaPriceFormatted}{" "}
-            <span className="text-base font-normal text-muted-foreground md:text-lg">
-              pagamento único
-            </span>
-          </p>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            Roda interativa e interpretações em português geradas a partir da{" "}
-            <strong className="text-foreground">data, hora e local</strong> do seu nascimento — não
-            a partir do signo solar isolado.
+            Roda interativa + interpretações de cada planeta em signo e casa
           </p>
 
-          <div className="mx-auto mt-12 max-w-md rounded-2xl border bg-card/80 p-6 text-left shadow-mystical backdrop-blur-sm">
-            <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-              Pré-visualização do mapa
-            </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Exemplo ilustrativo — o seu mapa será calculado com os seus dados.
-            </p>
-            <ul className="mt-4 space-y-2">
-              {HERO_MOCKUP_LINES.map((line) => (
-                <li key={line} className="flex gap-2 text-sm text-muted-foreground">
-                  <span className="text-primary" aria-hidden>
-                    ·
-                  </span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
+          <div className="mx-auto mt-12 grid max-w-5xl gap-8 md:grid-cols-2 md:items-start md:text-left">
+            <div>
+              <LandingScreenshot
+                src={`${LANDING_PUBLIC}/hero-essencia.png`}
+                alt="Interface do AstroMap: roda natal e painel Essência com interpretações de Sol, Lua e Ascendente"
+                priority
+                caption="Interface real do produto — o seu mapa reflete só os seus dados de nascimento."
+              />
+              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+                A imagem mostra <strong className="text-foreground">outro mapa de exemplo</strong>{" "}
+                na interface. Os textos à direita são{" "}
+                <strong className="text-foreground">exemplos do tipo de leitura</strong> (Sol em
+                Áries na Casa 10, etc.) — não coincidem com os signos e casas dessa captura.
+              </p>
+            </div>
+            <div className="rounded-2xl border bg-card/90 p-6 text-left shadow-mystical backdrop-blur-sm">
+              <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+                Pré-visualização (exemplo)
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Ilustração do tipo de leitura — o seu mapa usa os seus dados de nascimento.
+              </p>
+              <ul className="mt-5 space-y-4">
+                {HERO_MOCKUP_INSIGHTS.map((row) => (
+                  <li
+                    key={row.label}
+                    className={
+                      row.accent === "red"
+                        ? "border-l-4 border-destructive/80 pl-3"
+                        : "border-l-4 border-primary/40 pl-3"
+                    }
+                  >
+                    <p className="text-sm font-medium text-foreground">{row.label}</p>
+                    <p
+                      className={
+                        row.accent === "red"
+                          ? "mt-1 text-sm text-destructive/90"
+                          : "mt-1 text-sm text-muted-foreground"
+                      }
+                    >
+                      {row.hint}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
 
-          <p className="mx-auto mt-10 max-w-xl text-sm text-muted-foreground">
-            {mapaPriceFormatted} · acesso permanente na app · sem mensalidade
+          <p className="mx-auto mt-10 max-w-xl text-base font-medium text-foreground">
+            {mapaPriceFormatted} pagamento único
+          </p>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+            Acesso permanente · sem mensalidade
           </p>
           <p className="mx-auto mt-2 text-xs text-muted-foreground">
-            Pix ou cartão · ligação encriptada (HTTPS/TLS)
+            Pix ou cartão · dados criptografados (HTTPS/TLS)
           </p>
         </div>
       </section>
 
-      {/* Dobra 2 — O que leva na compra */}
-      <section id="o-que-leva" className="py-20">
-        <div className="container mx-auto max-w-3xl px-4">
-          <h2 className="font-display text-3xl font-bold md:text-4xl">
-            O que está incluído no {mapaPriceFormatted}
-          </h2>
-          <ul className="mt-10 space-y-4">
-            {MAPA_INCLUDED_ITEMS.map((item) => (
-              <li key={item.title} className="rounded-xl border bg-card p-4 text-left">
-                <p className="font-medium text-foreground">{item.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{item.body}</p>
-              </li>
-            ))}
-          </ul>
-          <Button asChild size="lg" variant="outline" className="mt-10">
-            <a href="#diferenca">Por que não é horóscopo ↓</a>
-          </Button>
-        </div>
-      </section>
+      <SectionRule />
 
-      {/* Dobra 3 — Diferenciação */}
-      <section id="diferenca" className="bg-muted/30 py-20">
+      {/* Dobra 2 — Roadmap (primeiro botão principal) */}
+      <section id="roadmap" className="py-20">
         <div className="container mx-auto max-w-3xl px-4">
-          <h2 className="font-display text-3xl font-bold md:text-4xl">
-            Não é horóscopo de revista. É o mapa da sua vida.
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+            Depois da compra
+          </p>
+          <h2 className="mt-3 font-display text-3xl font-bold md:text-4xl">
+            O que acontece depois da compra
           </h2>
-          <p className="mt-8 text-lg leading-relaxed text-muted-foreground">
-            O mapa natal regista onde estavam Sol, Lua, planetas e pontos sensíveis no{" "}
-            <strong className="text-foreground">instante</strong> em que você nasceu — não um resumo
-            por signo solar para milhões de pessoas.
-          </p>
-          <p className="mt-6 text-sm font-semibold uppercase tracking-wide text-primary">
-            O AstroMap mostra
-          </p>
-          <ul className="mt-6 space-y-4">
-            {DIFFERENTIATION_POINTS.map((pt) => (
-              <li key={pt.title} className="rounded-xl border bg-card p-4">
-                <p className="font-medium text-foreground">{pt.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{pt.body}</p>
+          <ol className="mt-10 space-y-8">
+            {ROADMAP_STEPS.map((step, i) => (
+              <li key={step.title} className="rounded-xl border bg-card p-5 text-left">
+                <p className="font-display text-lg font-semibold text-foreground">
+                  <span className="mr-2 tabular-nums text-primary">{i + 1}.</span>
+                  {step.title}
+                </p>
+                {step.body ? (
+                  <p className="mt-2 text-sm text-muted-foreground">{step.body}</p>
+                ) : null}
+                {step.imageSrc && step.imageAlt ? (
+                  <LandingScreenshot
+                    src={step.imageSrc}
+                    alt={step.imageAlt}
+                    caption={step.imageCaption}
+                  />
+                ) : null}
+                {step.mockup ? <MockupPlaceholder label={step.mockup} /> : null}
               </li>
             ))}
-          </ul>
-          <p className="mt-8 text-lg text-muted-foreground">
-            Paga <strong className="text-foreground">uma vez</strong>. O mapa continua na sua conta.
+          </ol>
+          <p className="mt-10 text-center text-sm font-medium text-primary">
+            Processo leva menos de 2 minutos do pagamento até ver seu mapa
           </p>
           <Button
             asChild
             size="lg"
-            className="mt-8 bg-mystical text-white shadow-mystical hover:opacity-90"
-          >
-            <Link to="/auth" search={AUTH_REDIRECT_MAPA}>
-              Criar conta e ir ao checkout →
-            </Link>
-          </Button>
-        </div>
-      </section>
-
-      {/* Dobra 4 — Para quem é */}
-      <section id="para-quem" className="py-20">
-        <div className="container mx-auto max-w-3xl px-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">
-            <Zap className="h-3 w-3" aria-hidden />É para você se…
-          </div>
-          <h2 className="mt-4 font-display text-3xl font-bold md:text-4xl">
-            Feito para quem quer o mapa a sério
-          </h2>
-          <ul className="mt-10 space-y-4">
-            {FOR_WHO_BULLETS.map((item) => (
-              <li key={item} className="flex items-start gap-3 rounded-xl border bg-card p-4">
-                <Check className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
-                <span className="text-sm text-muted-foreground">{item}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-10 text-sm text-muted-foreground">
-            Na área autenticada existem <strong className="text-foreground">planos Premium</strong>{" "}
-            (trânsitos diários, sinastria, previsão anual, etc.) — <strong>à parte</strong> desta
-            compra e opcionais.
-          </p>
-          <Button
-            asChild
-            size="lg"
-            className="mt-6 bg-mystical text-white shadow-mystical hover:opacity-90"
+            className="mt-8 w-full bg-mystical text-white shadow-mystical hover:opacity-90 sm:w-auto"
           >
             <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
               Comprar por {mapaPriceFormatted}
@@ -297,179 +351,207 @@ function Landing() {
         </div>
       </section>
 
-      {/* Dobra 5 — Detalhamento do produto */}
-      <section id="detalhe" className="bg-muted/30 py-20">
-        <div className="container mx-auto max-w-3xl px-4">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">
-            <Stars className="h-3 w-3" aria-hidden />
-            Mapa natal completo
-          </div>
-          <h2 className="mt-4 font-display text-3xl font-bold md:text-4xl">
-            Uma compra. Acesso permanente.
+      <SectionRule />
+
+      {/* Dobra 3 — Diferenciação */}
+      <section id="diferenca" className="bg-muted/30 py-20">
+        <div className="container mx-auto max-w-4xl px-4">
+          <h2 className="font-display text-3xl font-bold md:text-4xl">
+            Não é horóscopo de revista. É o mapa da sua vida.
           </h2>
-          <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-            Treze corpos celestes nas casas e os aspectos do momento do nascimento, exploráveis na
-            roda interativa, com leituras por posição e padrões quando existirem no desenho.
-          </p>
-          <ol className="mt-10 space-y-4">
-            {MAPA_DETAIL_BLOCKS.map((block, i) => (
-              <li key={block.title} className="flex gap-4 rounded-xl border bg-card p-4">
-                <span className="font-display text-xl font-bold text-primary tabular-nums">
-                  {i + 1}
-                </span>
-                <div>
-                  <p className="font-medium text-foreground">{block.title}</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{block.body}</p>
-                </div>
-              </li>
-            ))}
-          </ol>
-          <div className="mt-10 rounded-xl border bg-background/80 p-6">
-            <p className="text-sm font-semibold text-foreground">O que você recebe</p>
-            <IncludedChecklist className="mt-4 space-y-3" />
+          <div className="mt-10 grid gap-6 md:grid-cols-2">
+            <div className="rounded-xl border bg-card p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Horóscopo de revista
+              </p>
+              <p className="mt-3 text-sm italic text-muted-foreground">
+                &quot;Leão: semana de sorte no amor&quot;
+              </p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Genérico para uma fatia da população — não o seu céu de nascimento.
+              </p>
+            </div>
+            <div className="rounded-xl border-2 border-primary/30 bg-card p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                AstroMap mapa natal ({mapaPriceFormatted})
+              </p>
+              <p className="mt-3 text-sm text-foreground">
+                &quot;Seu Sol em Leão na Casa 5 forma trígono com Júpiter — criatividade expansiva
+                aplicada a romance e auto-expressão&quot;
+              </p>
+              <p className="mt-3 text-sm font-medium text-primary">Específico para você</p>
+            </div>
           </div>
-          <Button asChild variant="outline" className="mt-8">
+          <p className="mt-8 text-lg text-muted-foreground">
+            Você paga <strong className="text-foreground">uma vez</strong>, o mapa fica para sempre.
+          </p>
+          <Button
+            asChild
+            size="lg"
+            className="mt-8 bg-mystical text-white shadow-mystical hover:opacity-90"
+          >
             <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Seguir para pagamento →
+              Quero meu mapa
+              <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
         </div>
       </section>
 
-      {/* Dobra 6 — Preço e forma de pagamento */}
-      <section id="comprar-mapa" className="py-20">
-        <div className="container mx-auto max-w-lg px-4">
-          <div className="text-center">
-            <h2 className="font-display text-3xl font-bold md:text-4xl">Mapa natal</h2>
-            <p className="mx-auto mt-3 max-w-md text-lg font-medium text-foreground">
-              Pagamento único de {mapaPriceFormatted}
-            </p>
-            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-              Acesso permanente ao mapa na app — sem mensalidade neste produto.
+      <SectionRule />
+
+      {/* Dobra 4 — Para quem é */}
+      <section id="para-quem" className="py-20">
+        <div className="container mx-auto max-w-3xl px-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">
+            <Zap className="h-3 w-3" aria-hidden />
+            Para quem é
+          </div>
+          <h2 className="mt-4 font-display text-3xl font-bold md:text-4xl">É para você se:</h2>
+          <ul className="mt-10 space-y-4">
+            {forWho.map((item) => (
+              <li key={item} className="flex items-start gap-3 rounded-xl border bg-card p-4">
+                <Check className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
+                <span className="text-sm text-muted-foreground">{item}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-10 rounded-lg border border-primary/20 bg-primary/5 p-4 text-sm text-muted-foreground">
+            <p>
+              <strong className="text-foreground">Esta compra é só o seu mapa natal.</strong>{" "}
+              Trânsitos diários, sinastria e mapas de outras pessoas fazem parte dos planos Premium
+              (mensais ou anuais) — opcionais e à parte.
             </p>
           </div>
-          <div className="mt-10 rounded-2xl border-2 border-primary bg-card p-8 shadow-mystical">
-            <div className="flex flex-col items-center text-center">
-              <p className="font-display text-5xl font-bold text-primary">{mapaPriceFormatted}</p>
-              <p className="mt-1 text-sm text-muted-foreground">pagamento único</p>
-            </div>
-            <p className="mt-6 text-sm font-semibold text-foreground">O que está incluído</p>
-            <IncludedChecklist className="mt-4 space-y-3" />
-            <div className="mt-8 border-t pt-8 text-left">
-              <p className="text-sm font-semibold text-foreground">Como funciona</p>
-              <ol className="mt-4 list-decimal space-y-3 pl-5 text-sm text-muted-foreground">
-                {HOW_IT_WORKS_STEPS.map((step) => (
-                  <li key={step}>{step}</li>
-                ))}
-              </ol>
-            </div>
-            <p className="mt-6 rounded-md border border-primary/25 bg-primary/5 px-3 py-2 text-center text-xs font-medium text-foreground">
-              Cobrança só após confirmar o pagamento no checkout.
-            </p>
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              Pix ou cartão (conforme disponível na página de pagamento).
-            </p>
+        </div>
+      </section>
+
+      <SectionRule />
+
+      {/* Dobra 5 — Detalhamento */}
+      <section id="detalhe" className="bg-muted/30 py-20">
+        <div className="container mx-auto max-w-3xl px-4">
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-medium text-primary">
+            <Stars className="h-3 w-3" aria-hidden />
+            Detalhamento
+          </div>
+          <h2 className="mt-4 font-display text-3xl font-bold md:text-4xl">Mapa natal completo</h2>
+          <p className="mt-2 text-lg text-muted-foreground">Uma compra. Acesso permanente.</p>
+          <p className="mt-6 text-sm font-semibold uppercase tracking-wide text-foreground">
+            O que você recebe:
+          </p>
+          <ol className="mt-6 space-y-6">
+            {DETAIL_BLOCKS.map((block, i) => (
+              <li key={block.title} className="rounded-xl border bg-card p-5">
+                <p className="font-display text-lg font-bold text-primary tabular-nums">
+                  [{i + 1}]
+                </p>
+                <p className="mt-2 font-medium text-foreground">{block.title}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{block.body}</p>
+                {block.imageSrc && block.imageAlt ? (
+                  <LandingScreenshot
+                    src={block.imageSrc}
+                    alt={block.imageAlt}
+                    caption={block.imageCaption}
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ol>
+          <Button
+            asChild
+            size="lg"
+            className="mt-10 w-full bg-mystical text-white shadow-mystical hover:opacity-90 sm:w-auto"
+          >
+            <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
+              Comprar agora
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+      </section>
+
+      <SectionRule />
+
+      {/* Dobra 6 — Preço */}
+      <section id="comprar-mapa" className="py-20">
+        <div className="container mx-auto max-w-lg px-4">
+          <h2 className="text-center font-display text-3xl font-bold md:text-4xl">
+            Mapa Natal — {mapaPriceFormatted}
+          </h2>
+          <div className="mt-10 rounded-2xl border-2 border-primary bg-card p-8 text-center shadow-mystical">
+            <p className="font-display text-5xl font-bold text-primary">{mapaPriceFormatted}</p>
+            <p className="mt-1 text-sm text-muted-foreground">pagamento único</p>
+            <p className="mt-4 text-sm text-muted-foreground">Acesso permanente ao seu mapa</p>
             <Button asChild className="mt-8 w-full bg-mystical text-white hover:opacity-90">
               <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
                 Comprar agora
               </Link>
             </Button>
-            <Button asChild variant="outline" className="mt-3 w-full">
-              <Link to="/auth" search={AUTH_REDIRECT_MAPA}>
-                Criar conta e comprar
-              </Link>
-            </Button>
           </div>
+          <ul className="mx-auto mt-8 max-w-md space-y-2 text-center text-sm text-muted-foreground">
+            <li>Pix ou cartão (Mercado Pago)</li>
+            <li>Cobrança só após confirmar no checkout</li>
+            <li>Mapa disponível imediatamente após pagamento</li>
+          </ul>
         </div>
       </section>
+
+      <SectionRule />
 
       {/* Dobra 7 — FAQ */}
       <section id="faq" className="bg-muted/30 py-20">
         <div className="container mx-auto max-w-2xl px-4">
           <h2 className="text-center font-display text-3xl font-bold md:text-4xl">
-            Dúvidas sobre o mapa
+            Perguntas frequentes
           </h2>
           <Accordion type="single" collapsible className="mt-8">
             <AccordionItem value="1">
-              <AccordionTrigger>O que recebo exatamente?</AccordionTrigger>
-              <AccordionContent className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  Roda natal interativa com treze pontos nas casas do momento do nascimento,
-                  aspectos desenhados na roda e interpretações completas por posição: Sol, Lua,
-                  Ascendente, planetas pessoais e exteriores, Quíron e Nodos quando fizerem parte do
-                  mapa.
-                </p>
-                <p>
-                  Quando existirem padrões especiais (Grand Trine, T-Square, Yod…), você recebe a
-                  explicação detalhada. Também recebe a{" "}
-                  <strong className="text-foreground">essência natal</strong> — síntese do tema
-                  central. Acesso permanente na app, sem mensalidade neste produto.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="2">
               <AccordionTrigger>Preciso da hora exata de nascimento?</AccordionTrigger>
               <AccordionContent className="space-y-3 text-sm text-muted-foreground">
                 <p>
                   <strong className="text-foreground">Sim, para casas e Ascendente fiáveis.</strong>{" "}
-                  Sem hora exata, as casas perdem precisão e parte da interpretação perde contexto.
-                  O Ascendente depende da hora para ser calculado de forma consistente.
+                  Sem hora exata, as casas perdem precisão. Pode usar certidão com horário ou uma
+                  hora aproximada (com limitações).
                 </p>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="2">
+              <AccordionTrigger>Como pago?</AccordionTrigger>
+              <AccordionContent className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  Se não souber, pode pedir certidão de nascimento com horário. Também pode usar uma
-                  hora aproximada; o mapa será menos preciso e a app pode indicar limitações.
+                  Crie a conta ou faça login, vá ao checkout do mapa natal ({mapaPriceFormatted},
+                  pagamento único). Pix ou cartão conforme o que aparecer na página de pagamento.
                 </p>
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="3">
-              <AccordionTrigger>Como pago?</AccordionTrigger>
+              <AccordionTrigger>Os meus dados são privados?</AccordionTrigger>
               <AccordionContent className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  Crie a sua conta ou faça login, vá à página de assinatura e escolha o produto mapa
-                  natal. No checkout, o valor é {mapaPriceFormatted} (pagamento único). Pode pagar
-                  com Pix ou cartão —{" "}
-                  <strong className="text-foreground">
-                    os meios disponíveis aparecem na página de pagamento
-                  </strong>{" "}
-                  no momento da compra.
-                </p>
-                <p>
-                  Após confirmação do pagamento, o mapa fica disponível na app. O processamento é
-                  feito de forma segura; a cobrança só após a confirmação no checkout.
+                  Sim. Dados de nascimento ficam na sua conta. Pode gerir em Configurações. Não
+                  vendemos os seus dados para marketing.
                 </p>
               </AccordionContent>
             </AccordionItem>
             <AccordionItem value="4">
-              <AccordionTrigger>Os meus dados são privados?</AccordionTrigger>
+              <AccordionTrigger>Posso pedir reembolso?</AccordionTrigger>
               <AccordionContent className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  Sim. Data, hora e local de nascimento ficam associados à sua conta privada. Pode
-                  gerir dados e privacidade em Configurações. Não vendemos os seus dados a terceiros
-                  para marketing.
-                </p>
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="5">
-              <AccordionTrigger>Posso cancelar ou pedir reembolso?</AccordionTrigger>
-              <AccordionContent className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  Como é <strong className="text-foreground">pagamento único</strong> (não é
-                  assinatura), não há &quot;cancelamento&quot; de plano: o mapa permanece na conta
-                  após a compra.
-                </p>
-                <p>
-                  Se houver problema técnico que impeça o acesso, contacte o suporte. Reembolso e
-                  litígios seguem os{" "}
+                  É compra avulsa: o mapa permanece na conta após pagamento. Problemas técnicos —
+                  contacte suporte. Reembolsos conforme{" "}
                   <Link to="/terms" className="text-primary underline underline-offset-2">
                     Termos de Uso
                   </Link>{" "}
-                  e o indicado no checkout.
+                  e checkout.
                 </p>
               </AccordionContent>
             </AccordionItem>
           </Accordion>
         </div>
       </section>
+
+      <SectionRule />
 
       {/* Dobra 8 — CTA final */}
       <section className="relative overflow-hidden py-28 texture-grain">
@@ -478,14 +560,10 @@ function Landing() {
         <div className="pointer-events-none absolute inset-0 starfield opacity-[0.18]" />
         <div className="container relative z-[1] mx-auto px-4 text-center">
           <h2 className="font-display text-4xl font-bold md:text-5xl">
-            O mapa com o seu nome no céu.
+            Seu mapa natal completo. {mapaPriceFormatted}.
           </h2>
-          <p className="mx-auto mt-4 font-display text-2xl font-semibold text-gradient-mystical md:text-3xl">
-            {mapaPriceFormatted}
-          </p>
-          <p className="mx-auto mt-6 max-w-lg text-muted-foreground">
-            Crie a conta, pague uma vez e explore a roda e as leituras quando quiser — sem
-            mensalidade neste produto.
+          <p className="mx-auto mt-6 max-w-lg text-lg text-muted-foreground">
+            Pague uma vez, explore para sempre.
           </p>
           <Button
             asChild
@@ -493,13 +571,11 @@ function Landing() {
             className="mt-10 bg-mystical text-white shadow-mystical hover:opacity-90"
           >
             <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Comprar mapa
+              Comprar meu mapa
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
-          <div className="mt-6 text-xs text-muted-foreground">
-            <p>Pagamento único · {mapaPriceFormatted} · Pix ou cartão</p>
-          </div>
+          <p className="mt-6 text-xs text-muted-foreground">Pagamento único · Pix ou cartão</p>
         </div>
       </section>
 

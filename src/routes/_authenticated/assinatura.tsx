@@ -75,6 +75,33 @@ function onlyDigits(s: string): string {
   return s.replace(/\D/g, "");
 }
 
+/** Normaliza a resposta da server function (camelCase ou snake_case no JSON). */
+function pickMpCheckoutProFromPreferenceResponse(res: unknown): {
+  externalReference: string;
+  redirectUrl: string;
+} {
+  if (!res || typeof res !== "object") {
+    return { externalReference: "", redirectUrl: "" };
+  }
+  const o = res as Record<string, unknown>;
+  const refRaw = o.externalReference ?? o.external_reference;
+  const externalReference = typeof refRaw === "string" ? refRaw.trim() : "";
+  const urlCandidates = [
+    o.redirectUrl,
+    o.redirect_url,
+    o.mercadoPagoRedirectUrl,
+    o.mercado_pago_redirect_url,
+  ];
+  let redirectUrl = "";
+  for (const c of urlCandidates) {
+    if (typeof c === "string" && c.trim()) {
+      redirectUrl = c.trim();
+      break;
+    }
+  }
+  return { externalReference, redirectUrl };
+}
+
 function PaymentEnvGapBlock({ label, gaps }: { label: string; gaps: string[] | null }) {
   if (gaps === null) {
     return (
@@ -411,19 +438,27 @@ function PremiumPlansPage() {
       );
     },
     onSuccess: (res) => {
-      const ref = typeof res?.externalReference === "string" ? res.externalReference : "";
-      const raw =
-        typeof res?.redirectUrl === "string"
-          ? res.redirectUrl
-          : typeof (res as { mercadoPagoRedirectUrl?: string })?.mercadoPagoRedirectUrl === "string"
-            ? (res as { mercadoPagoRedirectUrl: string }).mercadoPagoRedirectUrl
-            : "";
-      const url = raw.trim();
+      const { externalReference: ref, redirectUrl: url } =
+        pickMpCheckoutProFromPreferenceResponse(res);
       if (!ref || !url || !/^https?:\/\//i.test(url)) {
-        console.error("[assinatura] Resposta MP sem redirectUrl válido:", res);
+        const keys = res && typeof res === "object" ? Object.keys(res as object) : [];
+        const mpAvailCache = qc.getQueryData<MercadoPagoAvailabilityData>([
+          "mercadopago-availability",
+          user?.id,
+        ]);
+        const checkoutProGaps =
+          mpAvailCache && "configurationGaps" in mpAvailCache
+            ? mpAvailCache.configurationGaps.checkoutPro
+            : undefined;
+        console.error("[assinatura] Resposta MP sem redirectUrl válido", {
+          keys,
+          checkoutProConfigurationGaps: checkoutProGaps,
+          payload: res,
+          hint: "Esperado externalReference (ou external_reference) e redirectUrl / mercadoPagoRedirectUrl (ou snake_case).",
+        });
         toast.error("Não foi possível abrir o checkout do Mercado Pago.", {
           description:
-            "Tente novamente ou use outro meio de pagamento. Se persistir, verifique as variáveis no servidor (APP_PUBLIC_URL e token MP).",
+            "Tente de novo daqui a instantes ou use Pix ou cartão nesta página (Checkout Transparente), se estiver disponível. Se o problema continuar, contacte o suporte.",
         });
         return;
       }

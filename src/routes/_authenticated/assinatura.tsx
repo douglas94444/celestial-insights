@@ -75,15 +75,11 @@ function onlyDigits(s: string): string {
   return s.replace(/\D/g, "");
 }
 
-/** Normaliza a resposta da server function (camelCase ou snake_case no JSON). */
-function pickMpCheckoutProFromPreferenceResponse(res: unknown): {
+/** Lê referência + URL de checkout a partir de um objecto plano (camelCase ou snake_case). */
+function extractMpCheckoutProFields(o: Record<string, unknown>): {
   externalReference: string;
   redirectUrl: string;
 } {
-  if (!res || typeof res !== "object") {
-    return { externalReference: "", redirectUrl: "" };
-  }
-  const o = res as Record<string, unknown>;
   const refRaw = o.externalReference ?? o.external_reference;
   const externalReference = typeof refRaw === "string" ? refRaw.trim() : "";
   const urlCandidates = [
@@ -100,6 +96,36 @@ function pickMpCheckoutProFromPreferenceResponse(res: unknown): {
     }
   }
   return { externalReference, redirectUrl };
+}
+
+/**
+ * Normaliza a resposta da server function: raiz, camelCase/snake_case, e embrulhadores comuns
+ * (`data`, `result`, `payload`, `response`) por si o transporte serializar noutro nível.
+ */
+function pickMpCheckoutProFromPreferenceResponse(res: unknown): {
+  externalReference: string;
+  redirectUrl: string;
+} {
+  if (!res || typeof res !== "object") {
+    return { externalReference: "", redirectUrl: "" };
+  }
+  const root = res as Record<string, unknown>;
+  let best = extractMpCheckoutProFields(root);
+  if (best.externalReference && best.redirectUrl) return best;
+
+  const nestedKeys = ["data", "result", "payload", "response"] as const;
+  for (const key of nestedKeys) {
+    const inner = root[key];
+    if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+      const innerFields = extractMpCheckoutProFields(inner as Record<string, unknown>);
+      if (innerFields.externalReference && innerFields.redirectUrl) return innerFields;
+      best = {
+        externalReference: best.externalReference || innerFields.externalReference,
+        redirectUrl: best.redirectUrl || innerFields.redirectUrl,
+      };
+    }
+  }
+  return best;
 }
 
 function PaymentEnvGapBlock({ label, gaps }: { label: string; gaps: string[] | null }) {

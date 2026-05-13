@@ -146,11 +146,10 @@ export function rolloutGatesForTier(tier: string, dayIndex: number): RolloutGate
 }
 
 /**
- * Quando as gates devem ser aplicadas com erro 403 (MAPA sempre; pagos só na rampa;
- * FREE nunca — UI e outras regras tratam o tier gratuito).
+ * Quando as gates devem ser aplicadas com erro 403 (FREE e MAPA sempre; pagos só na rampa).
  */
 export function rolloutGateEnforcementActive(tier: string, dayIndex: number): boolean {
-  if (isMapaTier(tier)) return true;
+  if (isFreeTier(tier) || isMapaTier(tier)) return true;
   return paidRolloutApplies(tier, dayIndex);
 }
 
@@ -184,7 +183,9 @@ export function assertRolloutGate(
   const msg =
     options?.tier && isMapaTier(options.tier)
       ? MAPA_ROLLOUT_LOCKED_MESSAGE
-      : rolloutLockedMessage(feature, dayIndex);
+      : options?.tier && isFreeTier(options.tier)
+        ? FREE_ROLLOUT_LOCKED_MESSAGE
+        : rolloutLockedMessage(feature, dayIndex);
   throw rolloutJsonError(403, "ROLLOUT_LOCKED", msg);
 }
 
@@ -213,6 +214,17 @@ export async function countInterpretationsUtcMonth(
 
 /** Limite de novas interpretações IA/mês na rampa (dias 0–5), só tipos natais permitidos. */
 export const ROLLOUT_EARLY_AI_MONTHLY_CAP = 3;
+
+/** Mensagem quando o utilizador FREE tenta feature fora do mapa natal (server-fn). */
+export const FREE_ROLLOUT_LOCKED_MESSAGE =
+  "Esta função está disponível no plano Mapa Natal ou no Premium. No plano grátis pode criar e consultar um mapa natal.";
+
+/** IA fora dos tipos natais permitidos no plano grátis. */
+export const FREE_AI_KIND_LOCKED_MESSAGE =
+  "No plano grátis só estão disponíveis interpretações de IA ligadas ao mapa natal (resumo, essência e planetas).";
+
+/** Teto mensal de interpretações IA no plano grátis. */
+export const FREE_AI_MONTHLY_LOCKED_MESSAGE = `No plano grátis são até ${ROLLOUT_EARLY_AI_MONTHLY_CAP} interpretações novas por IA por mês (tipos do mapa natal). Faça upgrade para o Premium ou compre o mapa natal para mais.`;
 
 export type ProfileRolloutState = {
   tier: Database["public"]["Enums"]["subscription_tier"];
@@ -281,6 +293,18 @@ export async function assertPaidRolloutAiAccess(
     const natalOk = (ROLLOUT_EARLY_NATAL_AI_KINDS as readonly string[]).includes(kind);
     if (!natalOk) {
       throw rolloutJsonError(403, "ROLLOUT_LOCKED", MAPA_ROLLOUT_LOCKED_MESSAGE);
+    }
+    return;
+  }
+
+  if (isFreeTier(tier)) {
+    const natalOk = (ROLLOUT_EARLY_NATAL_AI_KINDS as readonly string[]).includes(kind);
+    if (!natalOk) {
+      throw rolloutJsonError(403, "ROLLOUT_LOCKED", FREE_AI_KIND_LOCKED_MESSAGE);
+    }
+    const used = await countInterpretationsUtcMonth(supabase, userId, now);
+    if (used >= ROLLOUT_EARLY_AI_MONTHLY_CAP) {
+      throw rolloutJsonError(403, "ROLLOUT_AI_MONTHLY", FREE_AI_MONTHLY_LOCKED_MESSAGE);
     }
     return;
   }

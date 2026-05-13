@@ -17,6 +17,8 @@ import {
 function mockSupabaseForRollout(opts: {
   admin: boolean;
   tier?: Database["public"]["Enums"]["subscription_tier"];
+  /** Contagem simulada para `countInterpretationsUtcMonth` (interpretation_ai_cache). */
+  aiMonthCount?: number;
 }): SupabaseClient<Database> {
   const tier = opts.tier ?? "FREE";
   return {
@@ -42,6 +44,18 @@ function mockSupabaseForRollout(opts: {
                   data: opts.admin ? { user_id: "user-1" } : null,
                   error: null,
                 }),
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "interpretation_ai_cache") {
+        return {
+          select: () => ({
+            eq: () => ({
+              gte: async () => ({
+                count: opts.aiMonthCount ?? 0,
+                error: null,
               }),
             }),
           }),
@@ -114,6 +128,11 @@ describe("subscription-rollout", () => {
     expect(rolloutGatesForTier("MENSAL", 0)).toEqual(buildRolloutGatesForDay(0));
   });
 
+  it("rolloutGateEnforcementActive is true for FREE always", () => {
+    expect(rolloutGateEnforcementActive("FREE", 0)).toBe(true);
+    expect(rolloutGateEnforcementActive("FREE", 99)).toBe(true);
+  });
+
   it("rolloutGateEnforcementActive is true for MAPA always", () => {
     expect(rolloutGateEnforcementActive("MAPA", 0)).toBe(true);
     expect(rolloutGateEnforcementActive("MAPA", 100)).toBe(true);
@@ -132,11 +151,11 @@ describe("subscription-rollout", () => {
     expect(state.tier).toBe("FREE");
   });
 
-  it("fetchProfileRolloutState for non-admin FREE keeps FREE gates", async () => {
+  it("fetchProfileRolloutState for non-admin FREE keeps FREE gates and applies enforcement", async () => {
     const supabase = mockSupabaseForRollout({ admin: false, tier: "FREE" });
     const state = await fetchProfileRolloutState(supabase, "user-1");
     expect(state.gates).toEqual(rolloutGatesForTier("FREE", state.dayIndex));
-    expect(state.applies).toBe(false);
+    expect(state.applies).toBe(true);
   });
 
   it("assertPaidRolloutAiAccess allows any kind for admin on MAPA tier", async () => {
@@ -150,6 +169,39 @@ describe("subscription-rollout", () => {
     const supabase = mockSupabaseForRollout({ admin: false, tier: "MAPA" });
     await expect(
       assertPaidRolloutAiAccess(supabase, "user-1", "MAPA", "2026-01-01T12:00:00.000Z", "synastry"),
+    ).rejects.toSatisfy((r: unknown) => r instanceof Response && (r as Response).status === 403);
+  });
+
+  it("assertPaidRolloutAiAccess allows natal kind for FREE when under monthly cap", async () => {
+    const supabase = mockSupabaseForRollout({ admin: false, tier: "FREE", aiMonthCount: 0 });
+    await expect(
+      assertPaidRolloutAiAccess(
+        supabase,
+        "user-1",
+        "FREE",
+        "2026-01-01T12:00:00.000Z",
+        "natal_summary",
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it("assertPaidRolloutAiAccess blocks non-natal kinds for FREE", async () => {
+    const supabase = mockSupabaseForRollout({ admin: false, tier: "FREE", aiMonthCount: 0 });
+    await expect(
+      assertPaidRolloutAiAccess(supabase, "user-1", "FREE", "2026-01-01T12:00:00.000Z", "synastry"),
+    ).rejects.toSatisfy((r: unknown) => r instanceof Response && (r as Response).status === 403);
+  });
+
+  it("assertPaidRolloutAiAccess blocks FREE when monthly natal cap reached", async () => {
+    const supabase = mockSupabaseForRollout({ admin: false, tier: "FREE", aiMonthCount: 3 });
+    await expect(
+      assertPaidRolloutAiAccess(
+        supabase,
+        "user-1",
+        "FREE",
+        "2026-01-01T12:00:00.000Z",
+        "natal_planet",
+      ),
     ).rejects.toSatisfy((r: unknown) => r instanceof Response && (r as Response).status === 403);
   });
 });

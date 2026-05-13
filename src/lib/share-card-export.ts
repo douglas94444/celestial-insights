@@ -38,29 +38,61 @@ async function toPngBlob(
   return res.blob();
 }
 
+/** Blob SVG precisa de xmlns; sem isto alguns browsers falham ao decodificar o <img>. */
+function ensureSvgXmlns(serialized: string): string {
+  const head = serialized.slice(0, 600);
+  if (/xmlns\s*=\s*["']http:\/\/www\.w3\.org\/2000\/svg["']/i.test(head)) return serialized;
+  return serialized.replace(/<svg\b/, '<svg xmlns="http://www.w3.org/2000/svg" ');
+}
+
+/** Tamanho estável para rasterizar o wheel (evita 0×0 ou rect reduzido por transform no pai). */
+function svgExportPixelSize(svg: SVGSVGElement): { w: number; h: number } {
+  const vb = svg.viewBox?.baseVal;
+  if (vb && vb.width >= 1 && vb.height >= 1) {
+    return { w: Math.round(vb.width), h: Math.round(vb.height) };
+  }
+  const rect = svg.getBoundingClientRect();
+  const w = Math.max(1, Math.round(svg.clientWidth || rect.width || 420));
+  const h = Math.max(1, Math.round(svg.clientHeight || rect.height || 420));
+  return { w, h };
+}
+
 async function serializeSvgsToImages(el: HTMLElement): Promise<() => void> {
-  const svgEls = Array.from(el.querySelectorAll("svg"));
+  const svgEls = Array.from(el.querySelectorAll("svg")).filter(
+    (n): n is SVGSVGElement => n instanceof SVGSVGElement,
+  );
   const restoreFns: Array<() => void> = [];
   for (const svg of svgEls) {
     const parent = svg.parentElement;
     if (!parent) continue;
-    const w = svg.clientWidth || 420;
-    const h = svg.clientHeight || 420;
-    const svgStr = new XMLSerializer().serializeToString(svg);
+    const { w, h } = svgExportPixelSize(svg);
+    const svgStr = ensureSvgXmlns(new XMLSerializer().serializeToString(svg));
     const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const img = document.createElement("img");
     img.width = w;
     img.height = h;
     img.style.display = "block";
-    await new Promise<void>((res, rej) => {
-      img.onload = () => res();
-      img.onerror = rej;
-      img.src = url;
-    });
-    URL.revokeObjectURL(url);
-    parent.replaceChild(img, svg);
-    restoreFns.push(() => parent.replaceChild(svg, img));
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const t = window.setTimeout(() => reject(new Error("svg raster timeout")), 15_000);
+        img.onload = () => {
+          window.clearTimeout(t);
+          resolve();
+        };
+        img.onerror = () => {
+          window.clearTimeout(t);
+          reject(new Error("svg raster onerror"));
+        };
+        img.src = url;
+      });
+      URL.revokeObjectURL(url);
+      parent.replaceChild(img, svg);
+      restoreFns.push(() => parent.replaceChild(svg, img));
+    } catch {
+      URL.revokeObjectURL(url);
+      /* Mantém o SVG inline para o html-to-image tentar capturar. */
+    }
   }
   return () => restoreFns.forEach((fn) => fn());
 }
@@ -73,11 +105,25 @@ export async function captureMomentShareCardPng(
   await waitFonts();
   await waitTwoFrames();
   await delay(60);
-  const restoreSvgs = await serializeSvgsToImages(el);
+  let restoreSvgs: () => void = () => {};
+  try {
+    restoreSvgs = await serializeSvgsToImages(el);
+  } catch {
+    restoreSvgs = () => {};
+  }
   try {
     return await toPngBlob(el, { pixelRatio, backgroundColor });
   } catch {
-    return await toPngBlob(el, { pixelRatio, backgroundColor, skipFonts: true });
+    try {
+      return await toPngBlob(el, { pixelRatio, backgroundColor, skipFonts: true });
+    } catch {
+      return await toPngBlob(el, {
+        pixelRatio,
+        backgroundColor,
+        skipFonts: true,
+        skipAutoScale: true,
+      });
+    }
   } finally {
     restoreSvgs();
   }
@@ -88,8 +134,12 @@ export async function downloadBlob(blob: Blob, filename: string): Promise<void> 
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
+  a.rel = "noopener";
+  a.style.display = "none";
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  window.setTimeout(() => URL.revokeObjectURL(url), 400);
 }
 
 export async function sharePngIfPossible(

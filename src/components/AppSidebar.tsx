@@ -31,7 +31,12 @@ import { useUserIsAdmin } from "@/hooks/use-user-is-admin";
 import { useProfile } from "@/hooks/use-profile";
 import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
 import type { RolloutGates } from "@/lib/subscription-rollout";
-import { rolloutLockedMessage } from "@/lib/subscription-rollout";
+import {
+  FREE_ROLLOUT_LOCKED_MESSAGE,
+  isMapaTier,
+  MAPA_ROLLOUT_LOCKED_MESSAGE,
+  rolloutLockedMessage,
+} from "@/lib/subscription-rollout";
 import { Lock } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -103,10 +108,14 @@ export function AppSidebar() {
                   const freeBlocked = isFreeRestricted && !!gate;
                   const isBlocked = rolloutBlocked || freeBlocked;
                   const rolloutTooltip = freeBlocked
-                    ? "Adquira o Mapa Natal (R$ 37) para desbloquear esta área."
-                    : rolloutBlocked
-                      ? rolloutLockedMessage(gate, rollout.dayIndex)
-                      : null;
+                    ? FREE_ROLLOUT_LOCKED_MESSAGE
+                    : rolloutBlocked &&
+                        profile?.subscription_tier &&
+                        isMapaTier(profile.subscription_tier)
+                      ? MAPA_ROLLOUT_LOCKED_MESSAGE
+                      : rolloutBlocked
+                        ? rolloutLockedMessage(gate, rollout.dayIndex)
+                        : null;
                   const expandedLink = (
                     <Link to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4 shrink-0" />

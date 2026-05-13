@@ -13,7 +13,7 @@ import {
 export type SubscriptionRollout = {
   dayIndex: number;
   gates: RolloutGates;
-  /** Rampa activa: plano pago e ainda dentro dos primeiros 7 dias civis (SP). */
+  /** Rampa paga (7 dias SP) ou enforcement FREE/MAPA nas gates da UI. */
   active: boolean;
   /** Tier FREE: features avançadas bloqueadas permanentemente até comprar o mapa. */
   freeRestricted: boolean;

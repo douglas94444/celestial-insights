@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AppAuthenticatedHeader } from "@/components/AppAuthenticatedHeader";
+import { MapaPremiumUpsell } from "@/components/MapaPremiumUpsell";
 import { AuthenticatedSessionSkeleton } from "@/components/AuthenticatedSessionSkeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,6 +76,7 @@ function AuthenticatedLayout() {
         <AppSidebar />
         <div className="flex flex-1 flex-col">
           <AppAuthenticatedHeader />
+          <MapaPremiumUpsell />
           <main className="relative flex-1 overflow-auto bg-shell-glow texture-grain">
             <Outlet />
           </main>

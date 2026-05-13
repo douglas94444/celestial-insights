@@ -50,3 +50,19 @@ export function hasCheckoutMapaIntent(): boolean {
   if (typeof sessionStorage === "undefined") return false;
   return sessionStorage.getItem(SESSION_CHECKOUT_MAPA_INTENT) === "1";
 }
+
+/** Uma vez por sessão de browser: diálogo de upsell Premium para tier MAPA. Limpar no logout. */
+export const SESSION_MAPA_PREMIUM_PROMPT_SHOWN = "astromap_mapa_premium_prompt_shown";
+
+export function clearMapaPremiumPromptShown(): void {
+  if (typeof sessionStorage === "undefined") return;
+  sessionStorage.removeItem(SESSION_MAPA_PREMIUM_PROMPT_SHOWN);
+}
+
+export const MAPA_PREMIUM_BANNER_TEXT =
+  "O plano Mapa Natal inclui só o mapa de nascimento. Desbloqueie sinastria, trânsitos, PDF e IA ilimitada com o Premium.";
+
+export const MAPA_PREMIUM_DIALOG_TITLE = "Quer ir mais longe?";
+
+export const MAPA_PREMIUM_DIALOG_BODY =
+  "O Premium desbloqueia mapas ilimitados, compatibilidade, trânsitos, previsão anual, exportações e muito mais.";

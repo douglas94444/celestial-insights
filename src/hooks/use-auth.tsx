@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { clearMapaPremiumPromptShown } from "@/lib/mapa-product-copy";
 
 interface AuthContextValue {
   user: User | null;
@@ -43,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       loading,
       signOut: async () => {
+        clearMapaPremiumPromptShown();
         await supabase.auth.signOut();
       },
     }),

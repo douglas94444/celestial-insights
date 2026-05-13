@@ -48,6 +48,9 @@ export function AdminInstagramSignCards() {
       return;
     }
     setExporting(true);
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
     try {
       const { captureMomentShareCardPng, downloadBlob } = await import("@/lib/share-card-export");
       const blob = await captureMomentShareCardPng(el, {
@@ -136,7 +139,7 @@ export function AdminInstagramSignCards() {
           <div
             className="relative"
             style={{
-              transform: `scale(${previewScale})`,
+              transform: exporting ? "none" : `scale(${previewScale})`,
               transformOrigin: "top center",
             }}
           >

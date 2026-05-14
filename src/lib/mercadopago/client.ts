@@ -185,6 +185,9 @@ export async function mercadoPagoCreatePreference(
     },
     auto_return: "approved",
     notification_url: notificationUrl,
+    payment_methods: {
+      excluded_payment_types: [{ id: "ticket" }, { id: "atm" }, { id: "prepaid_card" }],
+    },
   };
 
   const res = await fetch(`${MP_API}/checkout/preferences`, {

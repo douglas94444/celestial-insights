@@ -31,6 +31,9 @@ const planSchema = z.enum(["mensal", "anual", "mapa"]);
 
 const createPreferenceSchema = z.object({
   plan: planSchema,
+  /** Opcional: se enviado, actualiza `profiles` antes de criar a preferência. */
+  billing_cpf: z.string().min(11).max(18).optional(),
+  billing_phone: z.string().min(10).max(20).optional(),
 });
 
 const orderStatusSchema = z.object({
@@ -150,6 +153,20 @@ export const createMercadoPagoPreferenceFn = createServerFn({ method: "POST" })
         .single();
 
       if (profileErr) throw jsonError(500, "PROFILE", profileErr.message);
+
+      const patch: { billing_cpf?: string; billing_phone?: string } = {};
+      if (data.billing_cpf !== undefined) {
+        const d = onlyDigits(data.billing_cpf);
+        if (d.length === 11) patch.billing_cpf = d;
+      }
+      if (data.billing_phone !== undefined) {
+        const p = onlyDigits(data.billing_phone);
+        if (p.length >= 10 && p.length <= 11) patch.billing_phone = p;
+      }
+      if (Object.keys(patch).length > 0) {
+        const { error: upErr } = await supabase.from("profiles").update(patch).eq("id", userId);
+        if (upErr) throw jsonError(500, "PROFILE_UPDATE", upErr.message);
+      }
 
       const { data: profileAfter } = await supabase
         .from("profiles")

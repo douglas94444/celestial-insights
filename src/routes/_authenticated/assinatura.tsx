@@ -498,8 +498,14 @@ function PremiumPlansPage() {
   const createMpPreference = useMutation({
     mutationFn: async (plan: "mensal" | "anual" | "mapa") => {
       if (!session) throw new Error("Sessão necessária.");
+      const cpf = onlyDigits(billingCpf);
+      const phone = onlyDigits(billingPhone);
       return createMercadoPagoPreferenceFn({
-        data: { plan },
+        data: {
+          plan,
+          billing_cpf: cpf.length === 11 ? billingCpf : undefined,
+          billing_phone: phone.length >= 10 && phone.length <= 11 ? billingPhone : undefined,
+        },
         ...withSupabaseAuth(session),
       });
     },
@@ -535,7 +541,7 @@ function PremiumPlansPage() {
         });
         toast.error("Não foi possível abrir o checkout do Mercado Pago.", {
           description:
-            "A preferência foi criada mas sem URL de redirect válido. Verifique se MERCADOPAGO_ACCESS_TOKEN e APP_PUBLIC_URL estão correctos no Worker.",
+            "A resposta do servidor não trouxe o link de redirecionamento. Tente novamente em instantes.",
         });
         return;
       }

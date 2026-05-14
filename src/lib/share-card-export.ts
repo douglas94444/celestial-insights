@@ -66,8 +66,7 @@ async function serializeSvgsToImages(el: HTMLElement): Promise<() => void> {
     if (!parent) continue;
     const { w, h } = svgExportPixelSize(svg);
     const svgStr = ensureSvgXmlns(new XMLSerializer().serializeToString(svg));
-    const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+    const url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgStr);
     const img = document.createElement("img");
     img.width = w;
     img.height = h;
@@ -85,11 +84,9 @@ async function serializeSvgsToImages(el: HTMLElement): Promise<() => void> {
         };
         img.src = url;
       });
-      URL.revokeObjectURL(url);
       parent.replaceChild(img, svg);
       restoreFns.push(() => parent.replaceChild(svg, img));
     } catch {
-      URL.revokeObjectURL(url);
       /* Mantém o SVG inline para o html-to-image tentar capturar. */
     }
   }

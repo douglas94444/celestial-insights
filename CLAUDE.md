@@ -13,16 +13,21 @@ npm run test:watch   # Vitest in watch mode
 npm run test:e2e     # Playwright end-to-end (requires dev server on :5173)
 npm run format       # Prettier write
 npm run format:check # Prettier check
+npm run check:payment-env # Verifica .env local: SyncPay, MP Checkout Pro, MP transparente (alinhado às server functions)
 
 # Run a single test file
 npx vitest run src/lib/astrology/transits.test.ts
 
 # Supabase (project ref: fxcoxnqqjgvqfukasfjb)
 # A equipa Supabase não suporta `npm install -g supabase`; usar sempre `npx supabase` (os scripts npm abaixo já fazem isso).
-npm run supabase:link              # Link CLI to remote project
-npm run supabase:push              # Push migrations to remote (use -- --include-all if prompted)
+npm run supabase:link              # Link CLI to remote project (necessário para `supabase:push` / `supabase:types` com --linked)
+npm run supabase:push              # Push migrations to remote (use -- --include-all if prompted; exige link ou --db-url)
 npm run supabase:types             # Regenerate src/integrations/supabase/types.ts; then `npm run format` if needed
-npm run supabase:functions:deploy # Deploy transit-digest-cron edge function
+npm run supabase:functions:deploy # transit-digest-cron (--project-ref no script; não exige `supabase link`)
+npm run supabase:functions:deploy:syncpay-webhook
+npm run supabase:functions:deploy:mercadopago-webhook
+npm run supabase:functions:deploy:all   # As três funções acima (deploy Edge completo)
+npm run supabase:deploy:functions       # Alias de deploy:all
 ```
 
 Notas sobre `npm audit`, GHSA em `@tanstack/history` e alinhamento de versões: `docs/npm-security-audit-notes.md`.

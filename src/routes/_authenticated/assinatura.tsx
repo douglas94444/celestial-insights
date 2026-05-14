@@ -296,7 +296,10 @@ function PremiumPlansPage() {
     setPixSecondsLeft(600);
     const iv = setInterval(() => {
       setPixSecondsLeft((s) => {
-        if (s === null || s <= 1) { clearInterval(iv); return 0; }
+        if (s === null || s <= 1) {
+          clearInterval(iv);
+          return 0;
+        }
         return s - 1;
       });
     }, 1000);
@@ -391,9 +394,10 @@ function PremiumPlansPage() {
         void navigate({ to: "/onboarding", replace: true });
       } else {
         clearCheckoutMapaIntent();
-        const planLabelMpPro = selectedPremiumPlan === "anual"
-          ? `Anual — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual)}`
-          : `Mensal — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mensal)}`;
+        const planLabelMpPro =
+          selectedPremiumPlan === "anual"
+            ? `Anual — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual)}`
+            : `Mensal — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mensal)}`;
         setPaymentSuccess({ label: planLabelMpPro });
         void navigate({ to: "/assinatura", search: {}, replace: true });
       }
@@ -451,9 +455,10 @@ function PremiumPlansPage() {
         void navigate({ to: "/onboarding", replace: true });
       } else {
         clearCheckoutMapaIntent();
-        const planLabel = selectedPremiumPlan === "anual"
-          ? `Anual — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual)}`
-          : `Mensal — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mensal)}`;
+        const planLabel =
+          selectedPremiumPlan === "anual"
+            ? `Anual — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual)}`
+            : `Mensal — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mensal)}`;
         setPaymentSuccess({ label: planLabel });
       }
     }
@@ -624,6 +629,54 @@ function PremiumPlansPage() {
     return parts.join(" · ");
   })();
 
+  /** Segunda frase da carta «Dados de cobrança»: só menciona Pix quando SyncPay está activo. */
+  const billingRequiredByOperatorsText = useMemo(() => {
+    const hasPix = checkoutReady;
+    const hasMp = mpTransparent || mpCheckoutPro;
+    if (hasPix && hasMp) {
+      return "São exigidos pelo Pix (SyncPay) e pelo Mercado Pago no Brasil.";
+    }
+    if (hasPix) return "São exigidos pelo Pix (SyncPay) no Brasil.";
+    if (hasMp) return "São exigidos pelo Mercado Pago no Brasil.";
+    return "São exigidos pelos meios de pagamento activos nesta página.";
+  }, [checkoutReady, mpTransparent, mpCheckoutPro]);
+
+  /** Texto de apoio dos planos Premium conforme meios realmente activos (evita prometer Pix inexistente). */
+  const premiumPlansPaymentBlurb = useMemo(() => {
+    const base =
+      "Mensal e anual incluem os mesmos recursos quando a rampa de 7 dias termina (desbloqueio gradual por dia civil, fuso São Paulo). ";
+    const hasPix = checkoutReady;
+    const cardHere = mpTransparent;
+    const cardRedirect = mpCheckoutPro && !mpTransparent;
+
+    if (hasPix && cardHere) {
+      return `${base}Pode pagar com Pix (SyncPay) ou com cartão nesta página (Mercado Pago).`;
+    }
+    if (hasPix && cardRedirect) {
+      return `${base}Pode pagar com Pix (SyncPay) ou com cartão no site do Mercado Pago (nova página).`;
+    }
+    if (hasPix) {
+      return `${base}Pode pagar com Pix (SyncPay).`;
+    }
+    if (cardHere) {
+      return `${base}Pode pagar com cartão nesta página (Mercado Pago).`;
+    }
+    if (cardRedirect) {
+      return `${base}Pode pagar com cartão no site do Mercado Pago (nova página).`;
+    }
+    return `${base}Os meios de pagamento activos dependem da configuração do servidor.`;
+  }, [checkoutReady, mpTransparent, mpCheckoutPro]);
+
+  /** Frase completa para o alerta «Transparência» (Premium), com concordância correcta. */
+  const premiumTransparencyBillingPhrase = useMemo(() => {
+    const hasPix = checkoutReady;
+    const hasMp = mpTransparent || mpCheckoutPro;
+    if (hasPix && hasMp) return "das operadoras de pagamento (Pix (SyncPay) e Mercado Pago)";
+    if (hasPix) return "da operadora de pagamento (Pix (SyncPay))";
+    if (hasMp) return "da operadora de pagamento (Mercado Pago)";
+    return "dos meios de pagamento activos nesta página";
+  }, [checkoutReady, mpTransparent, mpCheckoutPro]);
+
   const cpfDigits = onlyDigits(billingCpf);
   const phoneDigits = onlyDigits(billingPhone);
   const cpfFormatHint = billingCpf.length > 0 && cpfDigits.length !== 11;
@@ -725,7 +778,7 @@ function PremiumPlansPage() {
           <p className="mt-2 max-w-2xl text-muted-foreground">
             {isMapa
               ? "Pagamento único e permanente. Roda natal interactiva, planetas, aspectos e interpretações com IA. Sem mensalidade."
-              : "Mensal e anual incluem os mesmos recursos quando a rampa de 7 dias termina (desbloqueio gradual por dia civil, fuso São Paulo). Pode pagar com Pix (SyncPay) ou com cartão via Mercado Pago (nesta página ou no site do MP, conforme as opções ativas)."}
+              : premiumPlansPaymentBlurb}
           </p>
           {isMapa && (
             <p className="mt-2 text-sm text-muted-foreground">
@@ -744,7 +797,7 @@ function PremiumPlansPage() {
             <AlertDescription>
               Pode usar a conta desde o primeiro dia; na primeira semana algumas áreas abrem dia a
               dia (trânsitos, sinastria, mapa composto, etc.). O CPF e o telefone são usados para
-              cumprir requisitos das operadoras de pagamento (Pix e Mercado Pago).
+              cumprir requisitos {premiumTransparencyBillingPhrase}.
             </AlertDescription>
           </Alert>
         )}
@@ -816,7 +869,11 @@ function PremiumPlansPage() {
                 <Button
                   className="mt-auto w-full bg-mystical text-white hover:opacity-90"
                   disabled={!showBillingForm}
-                  title={!showBillingForm ? "Aguarde enquanto carregamos os meios de pagamento" : undefined}
+                  title={
+                    !showBillingForm
+                      ? "Aguarde enquanto carregamos os meios de pagamento"
+                      : undefined
+                  }
                   onClick={() => setSelectedPremiumPlan("anual")}
                 >
                   {selectedPremiumPlan === "anual"
@@ -859,7 +916,11 @@ function PremiumPlansPage() {
                 <Button
                   className="mt-auto w-full bg-mystical text-white hover:opacity-90"
                   disabled={!showBillingForm}
-                  title={!showBillingForm ? "Aguarde enquanto carregamos os meios de pagamento" : undefined}
+                  title={
+                    !showBillingForm
+                      ? "Aguarde enquanto carregamos os meios de pagamento"
+                      : undefined
+                  }
                   onClick={() => setSelectedPremiumPlan("mensal")}
                 >
                   {selectedPremiumPlan === "mensal"
@@ -989,8 +1050,8 @@ function PremiumPlansPage() {
             <CardHeader>
               <CardTitle className="font-display text-lg">Dados de cobrança</CardTitle>
               <CardDescription>
-                CPF (11 dígitos) e telefone com DDD (10 ou 11 dígitos). São exigidos pelo Pix e pelo
-                Mercado Pago no Brasil. Pode guardá-los também em{" "}
+                CPF (11 dígitos) e telefone com DDD (10 ou 11 dígitos).{" "}
+                {billingRequiredByOperatorsText} Pode guardá-los também em{" "}
                 <Link to="/configuracoes" className="text-primary underline">
                   Configurações
                 </Link>

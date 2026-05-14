@@ -16,12 +16,15 @@
     "test:e2e": "playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "check:payment-env": "node scripts/check-payment-env.mjs",
     "supabase:login": "npx --yes supabase login",
     "supabase:link": "npx --yes supabase link --project-ref fxcoxnqqjgvqfukasfjb",
     "supabase:push": "npx --yes supabase db push",
-    "supabase:functions:deploy": "npx --yes supabase functions deploy transit-digest-cron --no-verify-jwt",
-    "supabase:functions:deploy:syncpay-webhook": "npx --yes supabase functions deploy syncpay-webhook --no-verify-jwt",
-    "supabase:functions:deploy:mercadopago-webhook": "npx --yes supabase functions deploy mercadopago-webhook --no-verify-jwt",
+    "supabase:functions:deploy": "npx --yes supabase functions deploy transit-digest-cron --no-verify-jwt --project-ref fxcoxnqqjgvqfukasfjb",
+    "supabase:functions:deploy:syncpay-webhook": "npx --yes supabase functions deploy syncpay-webhook --no-verify-jwt --project-ref fxcoxnqqjgvqfukasfjb",
+    "supabase:functions:deploy:mercadopago-webhook": "npx --yes supabase functions deploy mercadopago-webhook --no-verify-jwt --project-ref fxcoxnqqjgvqfukasfjb",
+    "supabase:functions:deploy:all": "npm run supabase:functions:deploy && npm run supabase:functions:deploy:syncpay-webhook && npm run supabase:functions:deploy:mercadopago-webhook",
+    "supabase:deploy:functions": "npm run supabase:functions:deploy:all",
     "supabase:types": "npx --yes supabase gen types typescript --linked --schema public > src/integrations/supabase/types.ts"
   },
   "dependencies": {

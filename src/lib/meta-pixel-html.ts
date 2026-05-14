@@ -15,8 +15,9 @@ export function readMetaPixelIdFromWorkerEnv(env: unknown): string | undefined {
 }
 
 /**
- * Injeta `<meta name="meta-pixel-id" content="...">` no `<head>` para o bundle do cliente
- * poder carregar o Pixel sem `VITE_*` na build (basta `META_PIXEL_ID` / `VITE_META_PIXEL_ID` no Worker).
+ * Injeta o snippet padrão do Meta Pixel + `<meta name="meta-pixel-id">` no `<head>`.
+ * O snippet inline permite que o Pixel Helper detete o pixel antes da hydration React.
+ * A `<meta>` mantém-se para o `MetaPixel.tsx` ler o ID em dev (sem HTMLRewriter).
  */
 export function injectMetaPixelIdMeta(response: Response, env: unknown): Response {
   const pixelId = readMetaPixelIdFromWorkerEnv(env);
@@ -25,11 +26,24 @@ export function injectMetaPixelIdMeta(response: Response, env: unknown): Respons
   if (!ct.includes("text/html")) return response;
   if (typeof HTMLRewriter === "undefined") return response;
 
+  const id = escapeHtmlAttr(pixelId);
+  // window.__metaPixelId sinaliza ao MetaPixel.tsx que já foi inicializado — evita PageView duplo.
+  const snippet =
+    `<script>` +
+    `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?` +
+    `n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;` +
+    `n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;` +
+    `t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}` +
+    `(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');` +
+    `fbq('init','${id}');fbq('track','PageView');window.__metaPixelId='${id}';` +
+    `</script>` +
+    `<noscript><img height="1" width="1" style="display:none"` +
+    ` src="https://www.facebook.com/tr?id=${id}&amp;ev=PageView&amp;noscript=1"/></noscript>` +
+    `<meta name="${META_PIXEL_ID_META_NAME}" content="${id}">`;
+
   const rewriter = new HTMLRewriter().on("head", {
     element(el) {
-      el.append(`<meta name="${META_PIXEL_ID_META_NAME}" content="${escapeHtmlAttr(pixelId)}">`, {
-        html: true,
-      });
+      el.append(snippet, { html: true });
     },
   });
   return rewriter.transform(response);

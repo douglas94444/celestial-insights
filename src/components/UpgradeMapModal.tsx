@@ -18,7 +18,7 @@ interface Props {
 const PREMIUM_BENEFITS = [
   "Mapas ilimitados — família, amigos, parceiros",
   "Sinastria e mapa composto entre quaisquer dois mapas",
-  "Interpretações IA ilimitadas após a primeira semana guiada",
+  "Interpretações ilimitadas após a primeira semana guiada",
   "Previsão anual completa com picos e retrogradações",
   "Exportação PDF e cartão Instagram personalizados",
 ];
@@ -26,7 +26,7 @@ const PREMIUM_BENEFITS = [
 const MAPA_BENEFITS = [
   "Compre o mapa natal por R$ 37 (pagamento único, permanente)",
   "Roda natal interactiva completa",
-  "Interpretações com IA para todos os planetas",
+  "Interpretações textuais para todos os planetas",
   "Sem mensalidade — pague uma vez e tenha para sempre",
 ];
 

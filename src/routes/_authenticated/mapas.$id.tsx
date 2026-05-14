@@ -224,7 +224,7 @@ const PlanetasTab = memo(function PlanetasTab({
                 <AiButton
                   isPending={aiPlanetLoading === p.key}
                   onClick={() => onAiPlanet(p.key)}
-                  label="Aprofundar com IA"
+                  label="Aprofundar"
                   size="sm"
                   className="shrink-0 text-xs h-8"
                 />
@@ -252,24 +252,11 @@ const PlanetasTab = memo(function PlanetasTab({
 interface CasasTabProps {
   houses: HousePosition[];
   planetsByHouse: Map<number, PlanetPosition[]>;
-  storedHouseSystem: HouseSystemId;
 }
 
-const CasasTab = memo(function CasasTab({
-  houses,
-  planetsByHouse,
-  storedHouseSystem,
-}: CasasTabProps) {
+const CasasTab = memo(function CasasTab({ houses, planetsByHouse }: CasasTabProps) {
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-      <p className="text-sm text-muted-foreground">
-        Sistema usado neste mapa: <strong>{HOUSE_SYSTEM_LABELS[storedHouseSystem]}</strong>. Altere
-        o padrão em{" "}
-        <Link to="/configuracoes" className="text-primary underline underline-offset-2">
-          Configurações
-        </Link>{" "}
-        e use &quot;Recalcular mapa&quot; para aplicar outro sistema sem criar um mapa novo.
-      </p>
       {houses.map((house) => {
         const inHouse = planetsByHouse.get(house.number) ?? [];
         return (
@@ -679,7 +666,7 @@ function ChartView() {
                 onClick={() => setAiExecOpen(true)}
               >
                 <Sparkles className="mr-1 h-4 w-4 text-primary" />
-                Interpretar mapa com IA
+                Interpretar mapa
               </Button>
             </div>
           </CardContent>
@@ -770,7 +757,7 @@ function ChartView() {
               >
                 <span className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  Interpretação integrada (IA)
+                  Interpretação integrada
                 </span>
                 <ChevronDown
                   className={`h-5 w-5 shrink-0 transition-transform ${aiExecOpen ? "rotate-180" : ""}`}
@@ -779,8 +766,8 @@ function ChartView() {
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4 space-y-3">
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Camada opcional que complementa os textos fixos desta página. Se o serviço de IA
-                falhar, continue a usar as interpretações estáticas.
+                Camada opcional que complementa os textos fixos desta página. Se o serviço de
+                interpretação automática falhar, continue a usar as interpretações estáticas.
               </p>
               {aiQuota && !aiQuota.isPremium ? (
                 <p
@@ -851,11 +838,7 @@ function ChartView() {
             </TabsContent>
 
             <TabsContent value="casas" className="mt-4">
-              <CasasTab
-                houses={chartEssence!.houses}
-                planetsByHouse={planetsByHouse}
-                storedHouseSystem={storedHouseSystem}
-              />
+              <CasasTab houses={chartEssence!.houses} planetsByHouse={planetsByHouse} />
             </TabsContent>
 
             <TabsContent value="aspectos" className="mt-4">

@@ -60,7 +60,7 @@ export function clearMapaPremiumPromptShown(): void {
 }
 
 export const MAPA_PREMIUM_BANNER_TEXT =
-  "O plano Mapa Natal inclui só o mapa de nascimento. Desbloqueie sinastria, trânsitos, PDF e IA ilimitada com o Premium.";
+  "O plano Mapa Natal inclui só o mapa de nascimento. Desbloqueie sinastria, trânsitos, PDF e interpretações ilimitadas com o Premium.";
 
 export const MAPA_PREMIUM_DIALOG_TITLE = "Quer ir mais longe?";
 

@@ -81,7 +81,9 @@ function TermsPage() {
           </section>
 
           <section>
-            <h2 className="font-display text-xl font-semibold">6. Conteúdo gerado por IA</h2>
+            <h2 className="font-display text-xl font-semibold">
+              6. Conteúdo gerado por inteligência artificial
+            </h2>
             <p className="mt-2 text-muted-foreground leading-relaxed">
               As interpretações e textos gerados por inteligência artificial são produzidos
               automaticamente com base em dados astrológicos e não representam a opinião do
@@ -105,9 +107,10 @@ function TermsPage() {
           <section>
             <h2 className="font-display text-xl font-semibold">8. Propriedade intelectual</h2>
             <p className="mt-2 text-muted-foreground leading-relaxed">
-              Todo o conteúdo do serviço (código, design, marca, textos não gerados por IA) é
-              propriedade do AstroMap e protegido por direitos autorais. As interpretações geradas
-              pela IA com base nos seus dados são de uso pessoal do usuário.
+              Todo o conteúdo do serviço (código, design, marca, textos não gerados por inteligência
+              artificial) é propriedade do AstroMap e protegido por direitos autorais. As
+              interpretações geradas pela inteligência artificial com base nos seus dados são de uso
+              pessoal do usuário.
             </p>
           </section>
 

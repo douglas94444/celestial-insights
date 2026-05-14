@@ -77,12 +77,12 @@ function PrivacyPage() {
               4. Uso de inteligência artificial
             </h2>
             <p className="mt-2 text-muted-foreground leading-relaxed">
-              As interpretações geradas por IA utilizam dados astrológicos (posições planetárias,
-              aspectos, casas) derivados das suas informações de nascimento. Esses dados são
-              processados por modelos de linguagem (Anthropic Claude ou OpenAI GPT) via chamadas de
-              servidor seguras. <strong>Nenhum dado pessoal identificável</strong> (nome, email,
-              endereço) é enviado ao modelo de IA. Interpretações são armazenadas em cache para
-              evitar chamadas repetidas e reduzir custos.
+              As interpretações geradas por inteligência artificial utilizam dados astrológicos
+              (posições planetárias, aspectos, casas) derivados das suas informações de nascimento.
+              Esses dados são processados por modelos de linguagem (Anthropic Claude ou OpenAI GPT)
+              via chamadas de servidor seguras. <strong>Nenhum dado pessoal identificável</strong>{" "}
+              (nome, email, endereço) é enviado ao modelo de inteligência artificial. Interpretações
+              são armazenadas em cache para evitar chamadas repetidas e reduzir custos.
             </p>
           </section>
 
@@ -98,8 +98,8 @@ function PrivacyPage() {
                 (infraestrutura na AWS).
               </li>
               <li>
-                <strong>Anthropic / OpenAI</strong> — processamento de interpretações por IA (apenas
-                dados astrológicos numéricos).
+                <strong>Anthropic / OpenAI</strong> — processamento de interpretações por
+                inteligência artificial (apenas dados astrológicos numéricos).
               </li>
               <li>
                 <strong>Resend</strong> — envio de emails transacionais e digest de trânsitos.

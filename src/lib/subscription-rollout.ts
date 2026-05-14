@@ -221,10 +221,10 @@ export const FREE_ROLLOUT_LOCKED_MESSAGE =
 
 /** IA fora dos tipos natais permitidos no plano grátis. */
 export const FREE_AI_KIND_LOCKED_MESSAGE =
-  "No plano grátis só estão disponíveis interpretações de IA ligadas ao mapa natal (resumo, essência e planetas).";
+  "No plano grátis só estão disponíveis interpretações dinâmicas ligadas ao mapa natal (resumo, essência e planetas).";
 
 /** Teto mensal de interpretações IA no plano grátis. */
-export const FREE_AI_MONTHLY_LOCKED_MESSAGE = `No plano grátis são até ${ROLLOUT_EARLY_AI_MONTHLY_CAP} interpretações novas por IA por mês (tipos do mapa natal). Faça upgrade para o Premium ou compre o mapa natal para mais.`;
+export const FREE_AI_MONTHLY_LOCKED_MESSAGE = `No plano grátis são até ${ROLLOUT_EARLY_AI_MONTHLY_CAP} interpretações novas dinâmicas por mês (tipos do mapa natal). Faça upgrade para o Premium ou compre o mapa natal para mais.`;
 
 export type ProfileRolloutState = {
   tier: Database["public"]["Enums"]["subscription_tier"];
@@ -322,7 +322,7 @@ export async function assertPaidRolloutAiAccess(
     throw rolloutJsonError(
       403,
       "ROLLOUT_AI_MONTHLY",
-      `Na primeira semana são até ${ROLLOUT_EARLY_AI_MONTHLY_CAP} interpretações novas por IA por mês (tipos do mapa natal). Dia 7 libera todos os tipos.`,
+      `Na primeira semana são até ${ROLLOUT_EARLY_AI_MONTHLY_CAP} interpretações novas dinâmicas por mês (tipos do mapa natal). Dia 7 libera todos os tipos.`,
     );
   }
 }

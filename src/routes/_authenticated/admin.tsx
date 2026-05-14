@@ -133,7 +133,7 @@ function AdminPage() {
               subtitle="total acumulado"
             />
             <MetricCard
-              title="Entradas cache IA"
+              title="Entradas em cache de interpretação"
               value={metrics.ai_cache_count}
               subtitle="total acumulado"
             />

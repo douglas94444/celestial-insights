@@ -262,9 +262,7 @@ function SignUpForm() {
         {password.length > 0 && password.length < 6 && (
           <p className="text-xs text-destructive">Mínimo 6 caracteres.</p>
         )}
-        {password.length >= 6 && (
-          <p className="text-xs text-green-500">Senha válida.</p>
-        )}
+        {password.length >= 6 && <p className="text-xs text-green-500">Senha válida.</p>}
       </div>
       <Button
         type="submit"

@@ -33,13 +33,13 @@ const MAPA_FEATURES = [
   },
   {
     icon: Brain,
-    title: "Interpretações com IA",
+    title: "Interpretações personalizadas",
     description: "Análises personalizadas para cada planeta e posição do seu mapa.",
   },
   {
     icon: Moon,
     title: "Essência natal",
-    description: "Resumo executivo gerado por IA que integra todas as energias do mapa.",
+    description: "Resumo executivo que integra automaticamente todas as energias do mapa.",
   },
 ];
 

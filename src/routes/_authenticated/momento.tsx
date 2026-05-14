@@ -592,7 +592,7 @@ function MomentoPage() {
               <AiButton
                 isPending={dashTransitAiMutation.isPending}
                 onClick={() => dashTransitAiMutation.mutate()}
-                label="Iluminar com IA"
+                label="Iluminar"
                 aria-label="Gerar texto do dia com inteligência artificial"
                 className="w-full border-primary/25"
               />

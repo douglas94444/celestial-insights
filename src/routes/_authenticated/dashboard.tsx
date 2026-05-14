@@ -334,7 +334,7 @@ function Dashboard() {
                   <AiButton
                     isPending={dashTransitAiMutation.isPending}
                     onClick={() => dashTransitAiMutation.mutate()}
-                    label="Explicar hoje com IA"
+                    label="Explicar o dia de hoje"
                     aria-label="Gerar explicação do trânsito de hoje com inteligência artificial"
                     className="w-full border-primary/25 text-xs"
                   />

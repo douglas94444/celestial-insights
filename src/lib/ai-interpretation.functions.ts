@@ -157,7 +157,7 @@ async function assertAiGenerationAllowed(
     throw jsonError(
       403,
       "PREMIUM_REQUIRED",
-      "As interpretações geradas por IA estão disponíveis para assinantes.",
+      "As interpretações personalizadas geradas automaticamente estão disponíveis para assinantes.",
     );
   }
 
@@ -329,7 +329,7 @@ export const generateNatalExecutiveSummaryFn = createServerFn({ method: "POST" }
         throw jsonError(
           503,
           "LLM_NOT_CONFIGURED",
-          "Serviço de IA não configurado no servidor (chaves em falta).",
+          "Serviço de interpretação automática não configurado no servidor (chaves em falta).",
         );
       }
 
@@ -436,7 +436,7 @@ export const generateNatalPlanetInsightFn = createServerFn({ method: "POST" })
         throw jsonError(
           503,
           "LLM_NOT_CONFIGURED",
-          "Serviço de IA não configurado no servidor (chaves em falta).",
+          "Serviço de interpretação automática não configurado no servidor (chaves em falta).",
         );
       }
 
@@ -554,7 +554,7 @@ export const generateSynastryNarrativeFn = createServerFn({ method: "POST" })
         throw jsonError(
           503,
           "LLM_NOT_CONFIGURED",
-          "Serviço de IA não configurado no servidor (chaves em falta).",
+          "Serviço de interpretação automática não configurado no servidor (chaves em falta).",
         );
       }
 
@@ -670,7 +670,7 @@ export const generateTransitDayNarrativeFn = createServerFn({ method: "POST" })
         throw jsonError(
           503,
           "LLM_NOT_CONFIGURED",
-          "Serviço de IA não configurado no servidor (chaves em falta).",
+          "Serviço de interpretação automática não configurado no servidor (chaves em falta).",
         );
       }
 
@@ -821,7 +821,7 @@ export const generateMorningDeepMessageFn = createServerFn({ method: "POST" })
         throw jsonError(
           503,
           "LLM_NOT_CONFIGURED",
-          "Serviço de IA não configurado no servidor (chaves em falta).",
+          "Serviço de interpretação automática não configurado no servidor (chaves em falta).",
         );
       }
 
@@ -955,7 +955,7 @@ export const generateNatalEssenceFn = createServerFn({ method: "POST" })
         throw jsonError(
           503,
           "LLM_NOT_CONFIGURED",
-          "Serviço de IA não configurado no servidor (chaves em falta).",
+          "Serviço de interpretação automática não configurado no servidor (chaves em falta).",
         );
       }
 
@@ -1088,12 +1088,12 @@ export const generateSynastryDeepNarrativeFn = createServerFn({ method: "POST" }
         throw jsonError(
           503,
           "LLM_NOT_CONFIGURED",
-          "Serviço de IA não configurado no servidor (chaves em falta).",
+          "Serviço de interpretação automática não configurado no servidor (chaves em falta).",
         );
       }
 
       const ctx = formatSynastryPromptContext(row, parsedPayload);
-      const userPrompt = `${ctx}\n\nPontuações por área (ecoar sem contradizer): amor ${parsedPayload.areas.love}, amizade ${parsedPayload.areas.friendship}, trabalho ${parsedPayload.areas.work}, convivência ${parsedPayload.areas.convivencia}.\n\n${SYNASTRY_COMPOSITE_MVP_PT}\n\nTarefa: responde só com JSON com chaves exactas: composite_disclaimer (repete ou parafraseia a limitação do mapa composto acima), overview, emotional_dynamics, communication_styles, intimacy_attraction, conflict_repair, daily_rhythm, long_term_growth, integration_summary (inclui o aviso legal do system). Tom IA preferido: ${toneRaw}. Áreas de foco do utilizador: ${focusAreas.length ? focusAreas.join(", ") : "equilíbrio geral"}.`;
+      const userPrompt = `${ctx}\n\nPontuações por área (ecoar sem contradizer): amor ${parsedPayload.areas.love}, amizade ${parsedPayload.areas.friendship}, trabalho ${parsedPayload.areas.work}, convivência ${parsedPayload.areas.convivencia}.\n\n${SYNASTRY_COMPOSITE_MVP_PT}\n\nTarefa: responde só com JSON com chaves exactas: composite_disclaimer (repete ou parafraseia a limitação do mapa composto acima), overview, emotional_dynamics, communication_styles, intimacy_attraction, conflict_repair, daily_rhythm, long_term_growth, integration_summary (inclui o aviso legal do system). Tom de texto preferido: ${toneRaw}. Áreas de foco do utilizador: ${focusAreas.length ? focusAreas.join(", ") : "equilíbrio geral"}.`;
 
       const t0 = Date.now();
       let completion;
@@ -1231,7 +1231,7 @@ export const generateCompositeNarrativeFn = createServerFn({ method: "POST" })
         throw jsonError(
           503,
           "LLM_NOT_CONFIGURED",
-          "Serviço de IA não configurado no servidor (chaves em falta).",
+          "Serviço de interpretação automática não configurado no servidor (chaves em falta).",
         );
       }
 

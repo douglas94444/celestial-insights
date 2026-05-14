@@ -534,7 +534,9 @@ function Settings() {
                   />
 
                   <div className="rounded-lg border border-primary/15 bg-muted/10 p-4 space-y-4">
-                    <p className="text-sm font-medium">Personalização para IA astrológica</p>
+                    <p className="text-sm font-medium">
+                      Personalização para interpretações astrológicas
+                    </p>
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       Estas preferências entram nos prompts das mensagens profundas, da linha de
                       essência e da sinastria — não alteram os cálculos do mapa.
@@ -595,7 +597,7 @@ function Settings() {
                           <FormItem>
                             <FormLabel>Áreas de foco (até 6)</FormLabel>
                             <p className="text-xs text-muted-foreground mb-2">
-                              Ajuda a orientar exemplos nas mensagens geradas por IA.
+                              Ajuda a orientar exemplos nas mensagens geradas automaticamente.
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {(Object.keys(FOCUS_AREA_LABELS) as FocusAreaKey[]).map((key) => {

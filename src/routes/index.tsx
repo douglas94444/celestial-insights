@@ -48,7 +48,8 @@ const TESTIMONIALS: Testimonial[] = [
     sign: "Capricórnio",
   },
   {
-    quote: "Em menos de 2 minutos já estava explorando meu mapa. A interpretação do meu Nodo Norte me fez parar tudo.",
+    quote:
+      "Em menos de 2 minutos já estava explorando meu mapa. A interpretação do meu Nodo Norte me fez parar tudo.",
     name: "Rafael T.",
     sign: "Peixes",
   },
@@ -146,7 +147,7 @@ const DETAIL_BLOCKS: DetailBlock[] = [
       "Na app, padrões como Grand Trine ou Yod surgem no separador Essência quando o mapa os tiver.",
   },
   {
-    title: "Essência natal personalizada por IA",
+    title: "Essência natal personalizada",
     body: "Síntese gerada para o seu mapa especificamente — conecta Sol, Lua, Ascendente e os padrões do seu céu natal em um texto só.",
     imageSrc: `${LANDING_PUBLIC}/hero-essencia.png`,
     imageAlt:
@@ -163,9 +164,13 @@ function TrustBadges() {
   return (
     <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
       <span>Pagamento seguro</span>
-      <span aria-hidden className="text-border">·</span>
+      <span aria-hidden className="text-border">
+        ·
+      </span>
       <span>Acesso imediato após confirmação</span>
-      <span aria-hidden className="text-border">·</span>
+      <span aria-hidden className="text-border">
+        ·
+      </span>
       <span>Mapa permanente na sua conta</span>
     </div>
   );
@@ -297,10 +302,7 @@ function Landing() {
         <div className="container mx-auto max-w-4xl px-4">
           <div className="grid gap-4 md:grid-cols-3">
             {TESTIMONIALS.map((t) => (
-              <blockquote
-                key={t.name}
-                className="rounded-xl border bg-card p-5 text-left"
-              >
+              <blockquote key={t.name} className="rounded-xl border bg-card p-5 text-left">
                 <p className="text-sm text-muted-foreground">&ldquo;{t.quote}&rdquo;</p>
                 <footer className="mt-4">
                   <p className="text-sm font-medium text-foreground">{t.name}</p>
@@ -571,9 +573,9 @@ function Landing() {
               <AccordionTrigger>O mapa muda ao longo do tempo?</AccordionTrigger>
               <AccordionContent className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  Não — o mapa natal é fixo no momento do seu nascimento e não muda. O que muda é
-                  o céu atual em relação ao seu mapa (trânsitos). Essa comparação faz parte dos{" "}
-                  planos Premium, opcionais e separados.
+                  Não — o mapa natal é fixo no momento do seu nascimento e não muda. O que muda é o
+                  céu atual em relação ao seu mapa (trânsitos). Essa comparação faz parte dos planos
+                  Premium, opcionais e separados.
                 </p>
               </AccordionContent>
             </AccordionItem>

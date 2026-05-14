@@ -66,7 +66,7 @@ export const Route = createFileRoute("/_authenticated/assinatura")({
 const PLAN_FEATURES = [
   "Mapas ilimitados (família, amigos, parceiros)",
   "Sinastria e mapa composto",
-  "Interpretações com IA ilimitadas",
+  "Interpretações dinâmicas ilimitadas",
   "Trânsitos e previsão anual",
   "Exportação PDF e cartão Instagram personalizados",
   "Diário de humor com correlações",
@@ -786,7 +786,7 @@ function PremiumPlansPage() {
           </h1>
           <p className="mt-2 max-w-2xl text-muted-foreground">
             {isMapa
-              ? "Pagamento único e permanente. Roda natal interactiva, planetas, aspectos e interpretações com IA. Sem mensalidade."
+              ? "Pagamento único e permanente. Roda natal interactiva, planetas, aspectos e interpretações personalizadas. Sem mensalidade."
               : premiumPlansPaymentBlurb}
           </p>
           {isMapa && (

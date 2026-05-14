@@ -515,7 +515,7 @@ function TransitosPage() {
 
                         <div className="rounded-lg border border-muted bg-muted/20 p-4 space-y-3">
                           <p className="text-xs font-medium uppercase text-muted-foreground">
-                            Linguagem simples (IA)
+                            Leitura em linguagem simples
                           </p>
                           <p className="text-xs text-muted-foreground leading-relaxed">
                             Complementa a leitura rápida acima; em caso de erro, continue a usar as

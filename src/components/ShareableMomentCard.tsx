@@ -28,7 +28,7 @@ export const CARD_THEMES: Record<CardTheme, { label: string; bg: string; gradien
 export type ShareableMomentCardProps = {
   displayName: string;
   identityLine: string;
-  /** Frase curta gerada por IA (opcional). */
+  /** Frase curta opcional da essência do mapa. */
   essenceLine?: string;
   quoteLines: string[];
   dominantElement: string;
@@ -110,7 +110,7 @@ const ShareableMomentCardInner = forwardRef<HTMLDivElement, ShareableMomentCardP
           ) : null}
           {essenceLine ? (
             <p className="mt-4 max-w-[920px] text-center font-display text-[18px] leading-snug text-white/42">
-              Essência gerada por IA · reflexão simbólica
+              Essência personalizada · reflexão simbólica
             </p>
           ) : null}
 

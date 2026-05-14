@@ -401,7 +401,8 @@ describe("mercadoPagoPostCardPayment", () => {
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
-        text: async () => JSON.stringify({ id: 777, status: "in_process", status_detail: "pending_review" }),
+        text: async () =>
+          JSON.stringify({ id: 777, status: "in_process", status_detail: "pending_review" }),
       }),
     );
 
@@ -436,7 +437,9 @@ describe("mercadoPagoPostCardPayment", () => {
       }),
     );
 
-    await expect(mercadoPagoPostCardPayment(cardBody, "idem-6")).rejects.toThrow(MercadoPagoApiError);
+    await expect(mercadoPagoPostCardPayment(cardBody, "idem-6")).rejects.toThrow(
+      MercadoPagoApiError,
+    );
   });
 
   it("lança MercadoPagoConfigError quando ACCESS_TOKEN ausente", async () => {

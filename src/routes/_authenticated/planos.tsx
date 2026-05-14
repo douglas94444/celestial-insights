@@ -16,9 +16,9 @@ const FREE_HIGHLIGHTS = ["Criação da conta gratuita", "Página de boas-vindas 
 const MAPA_HIGHLIGHTS = [
   "Roda natal interactiva completa",
   "Todos os planetas, casas e aspectos",
-  "Interpretações com IA: Sol, Lua, Asc e todos os planetas",
+  "Interpretações textuais: Sol, Lua, Asc e todos os planetas",
   "Configurações especiais (Grand Trine, T-Square, Yod…)",
-  "Essência natal gerada por IA",
+  "Essência natal personalizada",
   "Acesso permanente — sem mensalidade",
 ];
 
@@ -29,7 +29,7 @@ const PREMIUM_HIGHLIGHTS = [
   "Trânsitos e previsão anual",
   "PDFs e cartões prontos para redes sociais",
   "Diário de humor com leitura ao longo do tempo",
-  "IA avançada sem limite diário",
+  "Interpretações avançadas sem limite diário",
 ];
 
 function PlanosPage() {

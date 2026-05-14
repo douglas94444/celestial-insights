@@ -663,7 +663,7 @@ function CompatibilidadePage() {
                     <Card className="border-primary/15">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-semibold">
-                          Análise narrativa (IA)
+                          Análise narrativa dinâmica
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3">
@@ -843,7 +843,7 @@ function CompatibilidadePage() {
                 <Card className="border-primary/15">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-semibold">
-                      Interpretação do composto (IA)
+                      Interpretação do composto
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">

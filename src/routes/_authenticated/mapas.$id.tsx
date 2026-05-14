@@ -37,7 +37,14 @@ import { NatalAspectsVirtualList } from "@/components/NatalAspectsVirtualList";
 import { computeAngles, type HouseSystemId } from "@/lib/astrology/calculate";
 import { HOUSE_SYSTEM_LABELS } from "@/lib/astrology/houses";
 import type { ChartData, PlanetPosition, HousePosition, Aspect } from "@/lib/astrology/calculate";
-import { signFromLongitude, formatDegree, PLANETS, type PlanetKey } from "@/lib/astrology/zodiac";
+import {
+  signFromLongitude,
+  formatDegree,
+  PLANETS,
+  getPlanetName,
+  type PlanetKey,
+} from "@/lib/astrology/zodiac";
+import { cn } from "@/lib/utils";
 import { SUN_IN_SIGN, MOON_IN_SIGN, ASC_IN_SIGN } from "@/data/interpretations";
 import {
   aspectMood,
@@ -80,6 +87,49 @@ type ChartEssence = {
   houses: HousePosition[];
   aspects: Aspect[];
 };
+
+/** Glifos dos corpos envolvidos em cada padrão (a roda já desenha a geometria). */
+function PatternPlanetBadges({
+  planetKeys,
+  apexKey,
+  triune,
+}: {
+  planetKeys: PlanetKey[];
+  apexKey?: PlanetKey;
+  /** Grande trígono: realçar os três vértices por igual. */
+  triune?: boolean;
+}) {
+  const label = planetKeysLabelPt(planetKeys);
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2 pt-0.5"
+      role="img"
+      aria-label={`Planetas no padrão: ${label}`}
+    >
+      {planetKeys.map((pk) => {
+        const sym = PLANETS.find((p) => p.key === pk)?.symbol ?? "·";
+        const isApex = apexKey === pk;
+        return (
+          <span
+            key={pk}
+            title={getPlanetName(pk)}
+            className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-base leading-none shadow-sm",
+              triune
+                ? "border-primary/45 bg-primary/15 text-foreground"
+                : isApex
+                  ? "border-amber-500/55 bg-amber-500/15 text-amber-50"
+                  : "border-border/70 bg-muted/50 text-foreground",
+            )}
+            aria-hidden
+          >
+            {sym}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─── Tab: Essência ────────────────────────────────────────────────────────────
 
@@ -146,15 +196,26 @@ const EssenciaTab = memo(function EssenciaTab({ chartEssence, chartPatterns }: E
               </p>
               <ul className="space-y-4 text-sm">
                 {chartPatterns.grand_trines.map((g, idx) => (
-                  <li key={`gt-${idx}-${g.planets.join("-")}`}>
+                  <li
+                    key={`gt-${idx}-${g.planets.join("-")}`}
+                    className="rounded-lg border border-primary/15 bg-background/40 p-4 space-y-2"
+                  >
                     <p className="font-medium">Grande trígono ({g.element})</p>
+                    <PatternPlanetBadges planetKeys={g.planets} triune />
                     <p className="text-muted-foreground">{planetKeysLabelPt(g.planets)}</p>
                     <p className="mt-1 text-foreground/85">{SPECIAL_GEOMETRY_BLURBS.grand_trine}</p>
                   </li>
                 ))}
                 {chartPatterns.t_squares.map((t, idx) => (
-                  <li key={`ts-${idx}-${t.apex}-${t.opposition.join("-")}`}>
+                  <li
+                    key={`ts-${idx}-${t.apex}-${t.opposition.join("-")}`}
+                    className="rounded-lg border border-primary/15 bg-background/40 p-4 space-y-2"
+                  >
                     <p className="font-medium">T-quadrado</p>
+                    <PatternPlanetBadges
+                      planetKeys={[t.apex, t.opposition[0], t.opposition[1]]}
+                      apexKey={t.apex}
+                    />
                     <p className="text-muted-foreground">
                       Vértice {planetKeysLabelPt([t.apex])} · oposição{" "}
                       {planetKeysLabelPt([t.opposition[0], t.opposition[1]])}
@@ -163,15 +224,26 @@ const EssenciaTab = memo(function EssenciaTab({ chartEssence, chartPatterns }: E
                   </li>
                 ))}
                 {chartPatterns.grand_crosses.map((gc, idx) => (
-                  <li key={`gc-${idx}-${gc.planets.join("-")}`}>
+                  <li
+                    key={`gc-${idx}-${gc.planets.join("-")}`}
+                    className="rounded-lg border border-primary/15 bg-background/40 p-4 space-y-2"
+                  >
                     <p className="font-medium">Grande cruz</p>
+                    <PatternPlanetBadges planetKeys={gc.planets} />
                     <p className="text-muted-foreground">{planetKeysLabelPt(gc.planets)}</p>
                     <p className="mt-1 text-foreground/85">{SPECIAL_GEOMETRY_BLURBS.grand_cross}</p>
                   </li>
                 ))}
                 {chartPatterns.yods.map((y, idx) => (
-                  <li key={`yod-${idx}-${y.apex}-${y.sextile.join("-")}`}>
+                  <li
+                    key={`yod-${idx}-${y.apex}-${y.sextile.join("-")}`}
+                    className="rounded-lg border border-primary/15 bg-background/40 p-4 space-y-2"
+                  >
                     <p className="font-medium">Yod (Dedo de Deus)</p>
+                    <PatternPlanetBadges
+                      planetKeys={[y.apex, y.sextile[0], y.sextile[1]]}
+                      apexKey={y.apex}
+                    />
                     <p className="text-muted-foreground">
                       Vértice {planetKeysLabelPt([y.apex])} · base em sextil{" "}
                       {planetKeysLabelPt([y.sextile[0], y.sextile[1]])}

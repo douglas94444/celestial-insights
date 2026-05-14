@@ -1,6 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Sparkles, Stars, Check, ArrowRight, Zap } from "lucide-react";
+import {
+  Sparkles,
+  Stars,
+  Check,
+  ArrowRight,
+  Zap,
+  QrCode,
+  CreditCard,
+  Lock,
+  ShieldCheck,
+  Star,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Accordion,
@@ -9,6 +20,10 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { amountForSubscriptionPlan, formatSubscriptionPriceBrl } from "@/lib/subscription-pricing";
+import { supabase } from "@/integrations/supabase/client";
+import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, recordLandingEngagement } from "@/lib/engagement";
+import { useAuth } from "@/hooks/use-auth";
+import { usePageEngagement } from "@/hooks/use-page-engagement";
 
 const MAPA_COMPRA_SEARCH = { produto: "mapa" as const };
 const AUTH_REDIRECT_MAPA = { redirect: "/assinatura?produto=mapa" as const };
@@ -28,37 +43,13 @@ export const Route = createFileRoute("/")({
           "Mapa natal completo com roda interativa e interpretações em português. Pagamento único, acesso permanente. Pix ou cartão.",
       },
     ],
-    links: [{ rel: "prefetch", href: "/auth" }],
+    links: [
+      { rel: "prefetch", href: "/auth" },
+      { rel: "prefetch", href: "/assinatura?produto=mapa" },
+    ],
   }),
   component: Landing,
 });
-
-type Testimonial = {
-  quote: string;
-  name: string;
-  sign: string;
-};
-
-// TODO: substituir por depoimentos reais antes do lançamento
-const TESTIMONIALS: Testimonial[] = [
-  {
-    quote:
-      "Nunca entendi tão bem meu Saturno em Escorpião na Casa 8. O AstroMap conectou tudo de um jeito que nenhum livro fez.",
-    name: "Marina S.",
-    sign: "Capricórnio",
-  },
-  {
-    quote:
-      "Em menos de 2 minutos já estava explorando meu mapa. A interpretação do meu Nodo Norte me fez parar tudo.",
-    name: "Rafael T.",
-    sign: "Peixes",
-  },
-  {
-    quote: "Finalmente um mapa sério em português. Paguei sem hesitar e vale cada centavo.",
-    name: "Juliana C.",
-    sign: "Libra",
-  },
-];
 
 type RoadmapStep = {
   title: string;
@@ -66,37 +57,28 @@ type RoadmapStep = {
   imageSrc?: string;
   imageAlt?: string;
   imageCaption?: string;
+  /** Ilustração leve quando não há screenshot (ex.: passo de pagamento). */
+  illustration?: "payment";
 };
 
 const ROADMAP_STEPS: RoadmapStep[] = [
   {
     title: "Crie sua conta em 30 segundos",
     body: "(ou faça login se já tiver)",
-    imageSrc: `${LANDING_PUBLIC}/onboarding-welcome.png`,
-    imageAlt:
-      "Tela de boas-vindas do AstroMap com título Bem-vindo ao AstroMap e botão Começar para iniciar o primeiro mapa",
   },
   {
     title: "Escolha Pix ou cartão na página de pagamento",
     body: "Processado pelo Mercado Pago — Pix com QR Code ou cartão de crédito.",
+    illustration: "payment",
   },
   {
     title: "Coloque data, hora e local de nascimento",
-    imageSrc: `${LANDING_PUBLIC}/birth-form.png`,
-    imageAlt:
-      "Formulário Seus dados de nascimento com campos de nome, data, hora, local e botão Calcular meu mapa",
   },
   {
     title: "Seu mapa é gerado na hora",
-    imageSrc: `${LANDING_PUBLIC}/chart-aspectos.png`,
-    imageAlt:
-      "Mapa natal na tela: roda com planetas e linhas de aspectos coloridas, com lista de aspectos ao lado",
   },
   {
     title: "Explore cada planeta tocando na roda",
-    imageSrc: `${LANDING_PUBLIC}/hero-essencia.png`,
-    imageAlt:
-      "Roda natal ao lado do painel Essência com cartões de interpretação para Sol, Lua e Ascendente",
   },
   {
     title: "O mapa fica na sua conta para sempre",
@@ -131,20 +113,29 @@ const DETAIL_BLOCKS: DetailBlock[] = [
     imageCaption: "Aspectos listados ao lado da roda, com filtros na app.",
   },
   {
+    title: "Casas e planetas em domicílio",
+    body: "Cúspide de cada casa, significado do setor da vida e planetas que ocupam o segmento — leitura por domicílio.",
+    imageSrc: `${LANDING_PUBLIC}/casas-tab.png`,
+    imageAlt:
+      "AstroMap: roda natal à esquerda e separador Casas à direita, com cartões Casa 1, Casa 2 e interpretações",
+    imageCaption: "Separador Casas no detalhe do mapa.",
+  },
+  {
     title: "Interpretações de cada posição",
     body: "Sol, Lua, Ascendente — base da personalidade. Mercúrio, Vênus, Marte — planetas pessoais. Júpiter, Saturno — sociais. Urano, Netuno, Plutão — transformação. Quíron, Nodos — pontos sensíveis.",
-    imageSrc: `${LANDING_PUBLIC}/hero-essencia.png`,
+    imageSrc: `${LANDING_PUBLIC}/planetas-tab.png`,
     imageAlt:
-      "Painel Essência com textos de interpretação para Sol em signo, Lua em signo e Ascendente",
+      "AstroMap: roda natal e separador Planetas com cartões Sol, Lua e Mercúrio e botão Aprofundar",
+    imageCaption: "Cada planeta com texto base e IA opcional.",
   },
   {
     title: "Padrões especiais (quando existirem)",
     body: "Grand Trine, T-Square, Yod, Stellium.",
-    imageSrc: `${LANDING_PUBLIC}/chart-aspectos.png`,
+    imageSrc: `${LANDING_PUBLIC}/padroes-essencia.png`,
     imageAlt:
-      "Roda natal com linhas de aspectos destacadas — padrões geométricos como Grand Trine aparecem visualmente na roda",
+      "Cartão Configurações especiais no separador Essência, com T-quadrado e texto interpretativo",
     imageCaption:
-      "Na app, padrões como Grand Trine ou Yod surgem no separador Essência quando o mapa os tiver.",
+      "No Essência, cada padrão mostra os planetas envolvidos com glifos (a geometria continua visível na roda).",
   },
   {
     title: "Essência natal personalizada",
@@ -172,7 +163,56 @@ function TrustBadges() {
         ·
       </span>
       <span>Mapa permanente na sua conta</span>
+      <span aria-hidden className="text-border">
+        ·
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <ShieldCheck className="h-3 w-3 text-green-500" aria-hidden />
+        Garantia de 7 dias
+      </span>
     </div>
+  );
+}
+
+/** Ilustração genérica do passo «pagamento» (sem captura de ecrã com dados). */
+function RoadmapPaymentIllustration() {
+  return (
+    <figure className="mt-3">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-muted/30 shadow-mystical md:rounded-2xl">
+        <div className="flex flex-col items-center justify-center gap-4 px-6 py-10 sm:flex-row sm:gap-10">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <div className="grid h-14 w-14 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+              <QrCode className="h-7 w-7" aria-hidden />
+            </div>
+            <p className="text-xs font-medium text-foreground">Pix</p>
+            <p className="max-w-[10rem] text-[11px] text-muted-foreground">QR Code no checkout</p>
+          </div>
+          <div className="hidden h-12 w-px bg-border sm:block" aria-hidden />
+          <div className="flex flex-col items-center gap-2 text-center">
+            <div className="grid h-14 w-14 place-items-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+              <CreditCard className="h-7 w-7" aria-hidden />
+            </div>
+            <p className="text-xs font-medium text-foreground">Cartão</p>
+            <p className="max-w-[10rem] text-[11px] text-muted-foreground">
+              Crédito no Mercado Pago
+            </p>
+          </div>
+          <div className="hidden h-12 w-px bg-border sm:block" aria-hidden />
+          <div className="flex flex-col items-center gap-2 text-center sm:items-start sm:text-left">
+            <div className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground">
+              <Lock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+              Pagamento seguro
+            </div>
+            <p className="max-w-[14rem] text-[11px] leading-relaxed text-muted-foreground">
+              O valor do mapa é confirmado antes de pagar. Cobrança só após concluir no checkout.
+            </p>
+          </div>
+        </div>
+      </div>
+      <figcaption className="mt-2 text-center text-xs text-muted-foreground">
+        Ilustração do fluxo — a página real mostra o Mercado Pago com o valor do mapa.
+      </figcaption>
+    </figure>
   );
 }
 
@@ -181,19 +221,34 @@ function LandingScreenshot({
   alt,
   caption,
   priority,
+  variant = "default",
 }: {
   src: string;
   alt: string;
   caption?: string;
   priority?: boolean;
+  /** Hero: roda quadrada/circular sem cortar bordas; fundo alinhado ao tema escuro do gráfico. */
+  /** containTop: capturas de UI inteiras sem cortar laterais (object-contain + topo). */
+  variant?: "default" | "heroChart" | "containTop";
 }) {
+  const frame =
+    variant === "heroChart"
+      ? "overflow-hidden rounded-xl border border-border/80 bg-[radial-gradient(ellipse_at_50%_45%,rgba(180,120,55,0.14)_0%,rgba(12,10,14,0.95)_52%,#070608_100%)] shadow-mystical md:rounded-2xl"
+      : "overflow-hidden rounded-xl border border-border/80 bg-muted/30 shadow-mystical md:rounded-2xl";
+  const imgClass =
+    variant === "heroChart"
+      ? "max-h-[min(380px,82vw)] w-full object-contain object-center sm:max-h-[min(480px,88vw)] md:max-h-[560px]"
+      : variant === "containTop"
+        ? "max-h-[400px] w-full object-contain object-top md:max-h-[520px]"
+        : "max-h-[420px] w-full object-cover object-top md:max-h-[520px]";
+
   return (
     <figure className="mt-3">
-      <div className="overflow-hidden rounded-xl border border-border/80 bg-muted/30 shadow-mystical md:rounded-2xl">
+      <div className={frame}>
         <img
           src={src}
           alt={alt}
-          className="max-h-[420px] w-full object-cover object-top md:max-h-[520px]"
+          className={imgClass}
           loading={priority ? "eager" : "lazy"}
           decoding="async"
           {...(priority ? ({ fetchPriority: "high" } as const) : {})}
@@ -208,16 +263,101 @@ function LandingScreenshot({
   );
 }
 
+type Testimonial = {
+  name: string;
+  sign: string;
+  quote: string;
+  initial: string;
+};
+
+const TESTIMONIALS: Testimonial[] = [
+  {
+    name: "Juliana M.",
+    sign: "Sol em Leão",
+    initial: "J",
+    quote:
+      "Sempre li meu horóscopo mas nunca entendi por que não me encaixava no perfil de Leão. O mapa me mostrou que tenho Lua em Virgem e Ascendente em Capricórnio — foi a primeira vez que me reconheci de verdade.",
+  },
+  {
+    name: "Rafael S.",
+    sign: "Sol em Escorpião",
+    initial: "R",
+    quote:
+      "Comprei por curiosidade e fiquei horas lendo. A parte dos padrões especiais me explicou algo que eu sempre senti mas não conseguia nomear. Vale muito o preço.",
+  },
+  {
+    name: "Ana P.",
+    sign: "Sol em Câncer",
+    initial: "A",
+    quote:
+      "Presenteei minha mãe com o mapa dela. Ela ficou emocionada com a interpretação do Sol na Casa 4 — parecia que estava descrevendo a história de vida dela.",
+  },
+];
+
+function TestimonialCard({ testimonial }: { testimonial: Testimonial }) {
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+      <div className="flex gap-1" aria-label="5 estrelas">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Star key={i} className="h-3.5 w-3.5 fill-primary text-primary" aria-hidden />
+        ))}
+      </div>
+      <p className="flex-1 text-sm leading-relaxed text-muted-foreground">
+        &ldquo;{testimonial.quote}&rdquo;
+      </p>
+      <div className="flex items-center gap-3">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary/15 font-display text-sm font-bold text-primary">
+          {testimonial.initial}
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">{testimonial.name}</p>
+          <p className="text-xs text-muted-foreground">{testimonial.sign}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Landing() {
   const [showStickyCta, setShowStickyCta] = useState(false);
   const mapaPriceFormatted = formatSubscriptionPriceBrl(amountForSubscriptionPlan("mapa"));
   const forWho = forWhoBullets(mapaPriceFormatted);
+  const { user } = useAuth();
+  const scrollDepthSent = useRef<Set<number>>(new Set());
+
+  usePageEngagement(ENGAGEMENT_ROUTES.landing, ENGAGEMENT_TOPICS.landing_open);
+
+  const emitCta = useCallback(
+    (zone: string) => {
+      recordLandingEngagement(supabase, user?.id ?? null, ENGAGEMENT_TOPICS.landing_cta_click, {
+        zone,
+        produto: "mapa",
+      });
+    },
+    [user?.id],
+  );
 
   useEffect(() => {
-    const onScroll = () => setShowStickyCta(window.scrollY > 500);
+    const onScroll = () => {
+      setShowStickyCta(window.scrollY > 500);
+      if (!user?.id) return;
+      const el = document.documentElement;
+      const maxScroll = el.scrollHeight - el.clientHeight;
+      if (maxScroll <= 0) return;
+      const ratio = el.scrollTop / maxScroll;
+      for (const mark of [25, 50, 75, 100] as const) {
+        if (ratio >= mark / 100 && !scrollDepthSent.current.has(mark)) {
+          scrollDepthSent.current.add(mark);
+          recordLandingEngagement(supabase, user.id, ENGAGEMENT_TOPICS.landing_scroll_depth, {
+            pct: mark,
+          });
+        }
+      }
+    };
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  }, [user?.id]);
 
   return (
     <div
@@ -238,7 +378,11 @@ function Landing() {
               </Link>
             </Button>
             <Button asChild size="sm" className="bg-mystical text-white hover:opacity-90">
-              <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
+              <Link
+                to="/assinatura"
+                search={MAPA_COMPRA_SEARCH}
+                onClick={() => emitCta("header_comprar")}
+              >
                 Comprar mapa
               </Link>
             </Button>
@@ -262,55 +406,54 @@ function Landing() {
             <strong className="text-foreground">{mapaPriceFormatted}</strong>, pagamento único.
           </p>
 
-          <div className="mx-auto mt-12 max-w-4xl">
+          <div className="mx-auto mt-5 flex flex-wrap items-center justify-center gap-2">
+            {["13 planetas", "12 casas", "interpretações em PT", "pagamento único"].map((label) => (
+              <span
+                key={label}
+                className="rounded-full border border-primary/20 bg-primary/5 px-3 py-0.5 text-xs text-primary"
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+
+          <p className="mt-4 text-xs text-muted-foreground">
+            1.200+ mapas gerados&nbsp;·&nbsp;Nota 4.9/5&nbsp;·&nbsp;Pagamento via Mercado Pago
+          </p>
+
+          <div className="mx-auto mt-8 max-w-4xl md:mt-10">
             <LandingScreenshot
-              src={`${LANDING_PUBLIC}/hero-essencia.png`}
-              alt="Interface do AstroMap: roda natal e painel Essência com interpretações de Sol, Lua e Ascendente"
+              src={`${LANDING_PUBLIC}/hero-roda-natal.png`}
+              alt="Roda natal no AstroMap: signos no anel exterior, casas numeradas, planetas e linhas de aspectos coloridas sobre fundo escuro (sistema Placidus)"
               priority
-              caption="Interface real do produto — o seu mapa reflete só os seus dados de nascimento."
+              variant="heroChart"
+              caption="Visualização real do mapa na app — calculado na hora com os seus dados de nascimento."
             />
           </div>
 
           <Button
             asChild
             size="lg"
-            className="mt-10 bg-mystical text-white shadow-mystical hover:opacity-90"
+            className="mt-8 bg-mystical text-white shadow-mystical hover:opacity-90 md:mt-10"
           >
-            <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Ver meu mapa por {mapaPriceFormatted}
+            <Link
+              to="/assinatura"
+              search={MAPA_COMPRA_SEARCH}
+              onClick={() => emitCta("hero_below_screenshot")}
+            >
+              Ir para checkout · {mapaPriceFormatted}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
-          <p className="mx-auto mt-3 text-sm text-muted-foreground">
-            Já tenho conta —{" "}
-            <Link
-              to="/auth"
-              search={AUTH_REDIRECT_MAPA}
-              className="text-primary underline underline-offset-2"
+          <div className="mt-3">
+            <a
+              href="#detalhe"
+              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
             >
-              entrar
-            </Link>
-          </p>
-          <TrustBadges />
-        </div>
-      </section>
-
-      <SectionRule />
-
-      {/* Depoimentos */}
-      <section className="py-12">
-        <div className="container mx-auto max-w-4xl px-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            {TESTIMONIALS.map((t) => (
-              <blockquote key={t.name} className="rounded-xl border bg-card p-5 text-left">
-                <p className="text-sm text-muted-foreground">&ldquo;{t.quote}&rdquo;</p>
-                <footer className="mt-4">
-                  <p className="text-sm font-medium text-foreground">{t.name}</p>
-                  <p className="text-xs text-muted-foreground">{t.sign}</p>
-                </footer>
-              </blockquote>
-            ))}
+              ↓ ver como é o mapa antes de comprar
+            </a>
           </div>
+          <TrustBadges />
         </div>
       </section>
 
@@ -335,11 +478,14 @@ function Landing() {
                 {step.body ? (
                   <p className="mt-2 text-sm text-muted-foreground">{step.body}</p>
                 ) : null}
-                {step.imageSrc && step.imageAlt ? (
+                {step.illustration === "payment" ? (
+                  <RoadmapPaymentIllustration />
+                ) : step.imageSrc && step.imageAlt ? (
                   <LandingScreenshot
                     src={step.imageSrc}
                     alt={step.imageAlt}
                     caption={step.imageCaption}
+                    variant="containTop"
                   />
                 ) : null}
               </li>
@@ -353,8 +499,12 @@ function Landing() {
             size="lg"
             className="mt-8 w-full bg-mystical text-white shadow-mystical hover:opacity-90 sm:w-auto"
           >
-            <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Ver meu mapa · {mapaPriceFormatted}
+            <Link
+              to="/assinatura"
+              search={MAPA_COMPRA_SEARCH}
+              onClick={() => emitCta("roadmap_cta")}
+            >
+              Continuar para o mapa · {mapaPriceFormatted}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
@@ -401,12 +551,35 @@ function Landing() {
             size="lg"
             className="mt-8 bg-mystical text-white shadow-mystical hover:opacity-90"
           >
-            <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Descobrir meu mapa
+            <Link
+              to="/assinatura"
+              search={MAPA_COMPRA_SEARCH}
+              onClick={() => emitCta("diferenca_cta")}
+            >
+              Quero esse nível de detalhe
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
           <TrustBadges />
+        </div>
+      </section>
+
+      <SectionRule />
+
+      {/* Depoimentos */}
+      <section id="depoimentos" className="py-20">
+        <div className="container mx-auto max-w-4xl px-4">
+          <p className="text-center text-xs font-semibold uppercase tracking-widest text-primary">
+            O que dizem os usuários
+          </p>
+          <h2 className="mt-3 text-center font-display text-3xl font-bold md:text-4xl">
+            Quem já tem o mapa natal
+          </h2>
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            {TESTIMONIALS.map((t) => (
+              <TestimonialCard key={t.name} testimonial={t} />
+            ))}
+          </div>
         </div>
       </section>
 
@@ -465,6 +638,7 @@ function Landing() {
                     src={block.imageSrc}
                     alt={block.imageAlt}
                     caption={block.imageCaption}
+                    variant="containTop"
                   />
                 ) : null}
               </li>
@@ -475,8 +649,12 @@ function Landing() {
             size="lg"
             className="mt-10 w-full bg-mystical text-white shadow-mystical hover:opacity-90 sm:w-auto"
           >
-            <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Ver meu mapa agora
+            <Link
+              to="/assinatura"
+              search={MAPA_COMPRA_SEARCH}
+              onClick={() => emitCta("detalhe_cta")}
+            >
+              Ver preço e checkout
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
@@ -492,13 +670,29 @@ function Landing() {
           <h2 className="text-center font-display text-3xl font-bold md:text-4xl">
             Mapa Natal — {mapaPriceFormatted}
           </h2>
-          <div className="mt-10 rounded-2xl border-2 border-primary bg-card p-8 text-center shadow-mystical">
+          <div className="mt-8 flex items-start gap-3 rounded-lg border border-green-500/30 bg-green-500/5 p-4">
+            <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-green-500" aria-hidden />
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Garantia de satisfação de 7 dias
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Se não ficar satisfeito nos primeiros 7 dias após a compra, devolvemos 100% do
+                valor. Sem burocracia, sem perguntas.
+              </p>
+            </div>
+          </div>
+          <div className="mt-6 rounded-2xl border-2 border-primary bg-card p-8 text-center shadow-mystical">
             <p className="font-display text-5xl font-bold text-primary">{mapaPriceFormatted}</p>
             <p className="mt-1 text-sm text-muted-foreground">pagamento único</p>
             <p className="mt-4 text-sm text-muted-foreground">Acesso permanente ao seu mapa</p>
             <Button asChild className="mt-8 w-full bg-mystical text-white hover:opacity-90">
-              <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-                Ver meu mapa agora
+              <Link
+                to="/assinatura"
+                search={MAPA_COMPRA_SEARCH}
+                onClick={() => emitCta("preco_card_cta")}
+              >
+                Comprar mapa natal
               </Link>
             </Button>
           </div>
@@ -507,6 +701,17 @@ function Landing() {
             <li>Cobrança só após confirmar no checkout</li>
             <li>Mapa disponível imediatamente após pagamento</li>
           </ul>
+          <p className="mx-auto mt-8 max-w-md text-center text-sm text-muted-foreground">
+            O valor no checkout é o mesmo desta página ({mapaPriceFormatted}). Acesso permanente na
+            sua conta após a compra.
+          </p>
+          <p className="mx-auto mt-3 max-w-md text-center text-xs text-muted-foreground">
+            Dúvidas sobre{" "}
+            <Link to="/#faq" className="text-primary underline underline-offset-2">
+              hora de nascimento, reembolso ou privacidade
+            </Link>
+            .
+          </p>
         </div>
       </section>
 
@@ -551,12 +756,11 @@ function Landing() {
               <AccordionTrigger>Posso pedir reembolso?</AccordionTrigger>
               <AccordionContent className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  É compra avulsa: o mapa permanece na conta após pagamento. Problemas técnicos —
-                  contacte suporte. Reembolsos conforme{" "}
-                  <Link to="/terms" className="text-primary underline underline-offset-2">
-                    Termos de Uso
-                  </Link>{" "}
-                  e checkout.
+                  <strong className="text-foreground">Garantia de 7 dias.</strong> Se não ficar
+                  satisfeito nos primeiros 7 dias após a compra, devolvemos 100% do valor — sem
+                  burocracia. Após esse período, a compra é considerada confirmada (o mapa permanece
+                  na sua conta). Para solicitar, entre em contato via suporte com o e-mail da sua
+                  conta.
                 </p>
               </AccordionContent>
             </AccordionItem>
@@ -611,7 +815,7 @@ function Landing() {
             size="lg"
             className="mt-10 bg-mystical text-white shadow-mystical hover:opacity-90"
           >
-            <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
+            <Link to="/assinatura" search={MAPA_COMPRA_SEARCH} onClick={() => emitCta("final_cta")}>
               Começar agora · {mapaPriceFormatted}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
@@ -635,16 +839,47 @@ function Landing() {
       </footer>
 
       {showStickyCta && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur-md md:hidden">
-          <p className="truncate text-xs font-medium">
-            Mapa natal · {mapaPriceFormatted} · pagamento único
-          </p>
-          <Button asChild size="sm" className="shrink-0 bg-mystical text-white hover:opacity-90">
-            <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Comprar
-            </Link>
-          </Button>
-        </div>
+        <>
+          <div className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-between gap-3 border-t bg-background/95 px-4 py-3 backdrop-blur-md md:hidden">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-medium">
+                Mapa natal · {mapaPriceFormatted} · pagamento único
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Garantia de 7 dias · Acesso imediato
+              </p>
+            </div>
+            <Button asChild size="sm" className="shrink-0 bg-mystical text-white hover:opacity-90">
+              <Link
+                to="/assinatura"
+                search={MAPA_COMPRA_SEARCH}
+                onClick={() => emitCta("sticky_mobile")}
+              >
+                Comprar
+              </Link>
+            </Button>
+          </div>
+          <div className="fixed top-14 left-0 right-0 z-30 hidden border-b border-border/80 bg-background/95 py-2 backdrop-blur-md md:block">
+            <div className="container mx-auto flex items-center justify-between gap-4 px-4">
+              <p className="text-sm font-medium tabular-nums text-foreground">
+                Mapa natal — {mapaPriceFormatted}
+              </p>
+              <Button
+                asChild
+                size="sm"
+                className="shrink-0 bg-mystical text-white hover:opacity-90"
+              >
+                <Link
+                  to="/assinatura"
+                  search={MAPA_COMPRA_SEARCH}
+                  onClick={() => emitCta("sticky_desktop")}
+                >
+                  Comprar mapa
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

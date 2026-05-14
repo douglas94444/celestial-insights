@@ -10,6 +10,8 @@ export const ENGAGEMENT_ROUTES = {
   compatibilidade: "compatibilidade",
   configuracoes: "configuracoes",
   assinatura: "assinatura",
+  /** Página pública `/` (mapa natal). */
+  landing: "landing",
 } as const;
 
 /** Valores estáveis para `topic_key` + documentação do histórico agregado. */
@@ -39,6 +41,12 @@ export const ENGAGEMENT_TOPICS = {
   checkout_payment_confirmed_mp_transparent: "checkout_payment_confirmed_mp_transparent",
   /** Webhook / polling confirmou pagamento (Pix SyncPay ou MP Pro). */
   checkout_payment_confirmed: "checkout_payment_confirmed",
+  /** Clique num CTA da landing pública (`meta.zone` identifica a zona). */
+  landing_cta_click: "landing_cta_click",
+  /** Profundidade de scroll na landing (`meta.pct`: 25 | 50 | 75 | 100). */
+  landing_scroll_depth: "landing_scroll_depth",
+  /** Vista da homepage autenticado (~90s dedupe). */
+  landing_open: "landing_open",
 } as const;
 
 /*
@@ -96,6 +104,7 @@ const DEDUPE_TOPIC_KEYS = new Set<string>([
   ENGAGEMENT_TOPICS.prefs_saved,
   ENGAGEMENT_TOPICS.checkout_view,
   ENGAGEMENT_TOPICS.checkout_billing_ready,
+  ENGAGEMENT_TOPICS.landing_open,
 ]);
 
 const lastEmittedAt = new Map<string, number>();
@@ -177,6 +186,21 @@ export function recordCheckoutBillingReadyDeduped(
     route_key: ENGAGEMENT_ROUTES.assinatura,
     topic_key: ENGAGEMENT_TOPICS.checkout_billing_ready,
     meta: meta as Json,
+  });
+}
+
+/** Funil na homepage pública (requer sessão; visitantes anónimos não gravam). */
+export function recordLandingEngagement(
+  client: SupabaseClient<Database>,
+  userId: string | undefined | null,
+  topicKey: string,
+  meta?: Json,
+): void {
+  if (!userId) return;
+  insertEngagementEvent(client, userId, {
+    route_key: ENGAGEMENT_ROUTES.landing,
+    topic_key: topicKey,
+    meta: meta ?? {},
   });
 }
 

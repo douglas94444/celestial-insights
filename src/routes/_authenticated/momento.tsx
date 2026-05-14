@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Loader2, Sparkles, Share2, Download, Copy } from "lucide-react";
@@ -13,7 +13,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AiCacheAgeBadge, AiCacheAgeBadgeFromResult } from "@/components/AiCacheAgeBadge";
 import { BackToDashboardLink } from "@/components/BackToDashboardLink";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { ShareableMomentCard, CARD_THEMES, type CardTheme } from "@/components/ShareableMomentCard";
+import {
+  ShareableMomentCard,
+  CARD_THEMES,
+  SHARE_CARD_HEIGHT,
+  SHARE_CARD_WIDTH,
+  type CardTheme,
+} from "@/components/ShareableMomentCard";
 const MoodWidget = lazy(() =>
   import("@/components/MoodWidget").then((m) => ({ default: m.MoodWidget })),
 );
@@ -58,6 +64,8 @@ export const Route = createFileRoute("/_authenticated/momento")({
 function MomentoPage() {
   const navigate = useNavigate();
   const cardRef = useRef<HTMLDivElement>(null);
+  const cardPreviewWrapRef = useRef<HTMLDivElement>(null);
+  const [cardPreviewScale, setCardPreviewScale] = useState(1);
   const [exporting, setExporting] = useState(false);
   const [cardTheme, setCardTheme] = useState<CardTheme>("noturno");
   const [showWheel, setShowWheel] = useState(true);
@@ -96,6 +104,28 @@ function MomentoPage() {
     profile,
     user,
   } = useDailyMoment();
+
+  useLayoutEffect(() => {
+    const el = cardPreviewWrapRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w <= 0) return;
+      setCardPreviewScale(Math.min(1, Math.max(0.01, w / SHARE_CARD_WIDTH)));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [
+    wheelData,
+    personalizedInsights,
+    primary?.id,
+    rollout?.active,
+    rollout?.gates?.transits,
+    cardTheme,
+    showWheel,
+  ]);
 
   usePageEngagement(
     ENGAGEMENT_ROUTES.momento,
@@ -432,7 +462,6 @@ function MomentoPage() {
     );
   }
 
-  const previewScale = "min(1, calc((100vw - 32px) / 1080))";
   const dashAiShown = isTodayView ? dashTransitAi : histEntry?.aiText;
   const narrativeShown = isTodayView
     ? (transitToday?.narrative.slice(0, 4) ?? [])
@@ -707,12 +736,18 @@ function MomentoPage() {
           </div>
         </div>
 
-        <div className="flex justify-center overflow-x-auto pb-8 pt-2">
+        <div
+          ref={cardPreviewWrapRef}
+          className="relative w-full overflow-hidden pb-8 pt-2"
+          style={{ height: SHARE_CARD_HEIGHT * cardPreviewScale }}
+        >
           <div
-            className="relative"
+            className="absolute left-0 top-0"
             style={{
-              transform: `scale(${previewScale})`,
-              transformOrigin: "top center",
+              width: SHARE_CARD_WIDTH,
+              height: SHARE_CARD_HEIGHT,
+              transform: `scale(${cardPreviewScale})`,
+              transformOrigin: "top left",
             }}
           >
             <ShareableMomentCard

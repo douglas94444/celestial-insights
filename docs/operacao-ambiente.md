@@ -55,6 +55,16 @@ Depois de definir ou corrigir variáveis no painel do Worker, **volte a fazer de
 
 Quando pelo menos um canal estiver activo, a página mostra o bloco **«Dados de cobrança»**; para Pix é ainda necessário **CPF (11 dígitos) e telefone (10–11)** para os botões deixarem de estar desactivados.
 
+### Só aparece «Mercado Pago (nova página)» (sem Pix / sem cartão nesta página)
+
+Isto inclui **`/assinatura?produto=mapa`**: a página de checkout usa **os mesmos** sinais de disponibilidade que `/assinatura` sem query (`getSyncPayAvailabilityFn`, `getMercadoPagoAvailabilityFn`). Não há ramo separado que desactive SyncPay ou checkout transparente só no mapa.
+
+1. **Inspecção rápida no browser** — DevTools → **Rede** → localizar as chamadas às server functions que devolvem disponibilidade; no JSON, `available: false` indica SyncPay incompleto no Worker; `transparent: false` ou chave pública em falta indica cartão nesta página desligado.
+2. **Local** — Na raiz do repo: `npm run check:payment-env` (com `.env` espelhado das variáveis do Worker) lista o que falta para Pix, Checkout Pro e transparente.
+3. **Correcção** — Completar `SYNCPAY_*` e webhook, e para transparente `VITE_MERCADOPAGO_PUBLIC_KEY` no **build** ou `MERCADOPAGO_PUBLIC_KEY` no Worker; depois `npm run deploy:worker`.
+
+Na própria UI, quando só o redirect do MP está activo, pode aparecer um aviso informativo para o utilizador final (sem expor nomes de secrets).
+
 ### Interpretações com IA (`interpretation_ai_cache`)
 
 1. Aplicar a migração que cria `interpretation_ai_cache` e o enum `interpretation_ai_kind` (`npm run supabase:push`).

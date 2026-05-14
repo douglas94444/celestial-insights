@@ -260,6 +260,15 @@ function PremiumPlansPage() {
   const paymentsAvailabilityLoading = availabilityQuery.isLoading || mpAvailabilityQuery.isLoading;
   const paymentsAvailabilityError = availabilityQuery.isError || mpAvailabilityQuery.isError;
 
+  /** Só Checkout Pro activo: informar utilizador (mapa e Premium partilham os mesmos gates). */
+  const showPartialPaymentAvailabilityHint =
+    !paymentsAvailabilityLoading &&
+    !paymentsAvailabilityError &&
+    showBillingForm &&
+    mpCheckoutPro &&
+    !checkoutReady &&
+    !mpTransparent;
+
   useEffect(() => {
     setSelectedPremiumPlan(null);
     setPremiumPayMethod(null);
@@ -1099,6 +1108,36 @@ function PremiumPlansPage() {
               </div>
             </CardContent>
           </Card>
+        ) : null}
+
+        {showPartialPaymentAvailabilityHint ? (
+          <Alert className="mx-auto max-w-2xl border-primary/20 bg-primary/[0.04]">
+            <Info className="h-4 w-4 text-primary" />
+            <AlertTitle>Só está disponível o Mercado Pago (nova página)</AlertTitle>
+            <AlertDescription className="space-y-2 text-sm">
+              <p>
+                O Pix (SyncPay) e o cartão com checkout transparente nesta app não estão activos
+                neste servidor. O fluxo do mapa natal (
+                <code className="rounded bg-muted px-1">?produto=mapa</code>) usa as mesmas regras
+                que os planos Premium em <code className="rounded bg-muted px-1">/assinatura</code>{" "}
+                — não é um bug específico do produto mapa.
+              </p>
+              <p className="text-muted-foreground">
+                Quem gere o Worker deve alinhar variáveis e rebuild conforme{" "}
+                <code className="rounded bg-muted px-1">docs/operacao-ambiente.md</code> e pode
+                validar localmente com{" "}
+                <code className="rounded bg-muted px-1">npm run check:payment-env</code>.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Para inspeccionar o que o servidor devolve nesta sessão: ferramentas de
+                desenvolvimento do browser → separador Rede → respostas JSON das chamadas que
+                consultam disponibilidade (campos{" "}
+                <code className="rounded bg-muted px-0.5">available</code> do SyncPay e{" "}
+                <code className="rounded bg-muted px-0.5">transparent</code> / chave pública do
+                Mercado Pago).
+              </p>
+            </AlertDescription>
+          </Alert>
         ) : null}
 
         {!showBillingForm ? (

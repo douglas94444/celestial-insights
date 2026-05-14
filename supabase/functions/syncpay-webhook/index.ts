@@ -161,7 +161,13 @@ Deno.serve(async (req) => {
       .from("mapa_orders")
       .update({
         status:
-          newStatus === "completed" ? "completed" : newStatus === "failed" ? "failed" : "pending",
+          newStatus === "completed"
+            ? "completed"
+            : newStatus === "failed"
+              ? "failed"
+              : newStatus === "refunded"
+                ? "refunded"
+                : "pending",
         raw_last_payload: payloadJson,
         updated_at: new Date().toISOString(),
       })

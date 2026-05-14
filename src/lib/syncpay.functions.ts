@@ -233,15 +233,30 @@ export const getSyncPayTransactionFn = createServerFn({ method: "POST" })
         .maybeSingle();
 
       if (orderErr) throw jsonError(500, "ORDER", orderErr.message);
-      if (!order) {
-        throw jsonError(404, "NOT_FOUND", "Pedido não encontrado.");
+
+      let localStatus: string;
+
+      if (order) {
+        localStatus = order.status;
+      } else {
+        const { data: mapaOrder, error: mapaErr } = await supabase
+          .from("mapa_orders")
+          .select("id, status")
+          .eq("user_id", userId)
+          .eq("external_ref", data.identifier)
+          .maybeSingle();
+
+        if (mapaErr) throw jsonError(500, "ORDER", mapaErr.message);
+        if (!mapaOrder) throw jsonError(404, "NOT_FOUND", "Pedido não encontrado.");
+
+        localStatus = mapaOrder.status;
       }
 
       try {
         const tx = await syncPayGetTransaction(data.identifier);
         const st = tx.data?.status;
         return {
-          localStatus: order.status,
+          localStatus,
           remoteStatus: st,
           amount: tx.data?.amount,
           currency: tx.data?.currency,

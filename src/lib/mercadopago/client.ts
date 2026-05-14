@@ -142,8 +142,8 @@ export function buildMercadoPagoWebhookUrl(): string {
   return `${supabaseUrl}/functions/v1/mercadopago-webhook?token=${token}`;
 }
 
-function publicAppBaseUrl(): string {
-  const raw = process.env.APP_PUBLIC_URL?.trim();
+function publicAppBaseUrl(override?: string): string {
+  const raw = process.env.APP_PUBLIC_URL?.trim() || override?.trim();
   if (!raw) {
     throw new MercadoPagoConfigError("APP_PUBLIC_URL em falta para back_urls do checkout.");
   }
@@ -158,9 +158,10 @@ export function mercadoPagoUsesSandboxToken(): boolean {
 
 export async function mercadoPagoCreatePreference(
   input: MercadoPagoCreatePreferenceInput,
+  opts?: { appBaseOverride?: string },
 ): Promise<MercadoPagoPreferenceResponse> {
   const token = getAccessToken();
-  const base = publicAppBaseUrl();
+  const base = publicAppBaseUrl(opts?.appBaseOverride);
   const notificationUrl = buildMercadoPagoWebhookUrl();
 
   const body = {

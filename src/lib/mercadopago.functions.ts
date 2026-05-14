@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestUrl } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
@@ -179,15 +180,25 @@ export const createMercadoPagoPreferenceFn = createServerFn({ method: "POST" })
       const orderId = crypto.randomUUID();
       const externalReference = orderId;
 
+      let appBaseOverride: string | undefined;
       try {
-        const pref = await mercadoPagoCreatePreference({
-          externalReference,
-          payerEmail: email,
-          title,
-          unitPrice: amount,
-          plan,
-          userId,
-        });
+        appBaseOverride = getRequestUrl().origin;
+      } catch {
+        // fora de contexto de request (não deve acontecer em produção)
+      }
+
+      try {
+        const pref = await mercadoPagoCreatePreference(
+          {
+            externalReference,
+            payerEmail: email,
+            title,
+            unitPrice: amount,
+            plan,
+            userId,
+          },
+          { appBaseOverride },
+        );
 
         const preferenceId = pref.id?.trim();
         if (!preferenceId) {

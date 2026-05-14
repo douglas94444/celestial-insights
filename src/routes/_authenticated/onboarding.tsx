@@ -75,7 +75,11 @@ function Onboarding() {
             <Sparkles className="mx-auto h-16 w-16 text-primary" />
             <h1 className="mt-6 font-display text-3xl font-bold">Bem-vindo ao AstroMap ✨</h1>
             <p className="mt-3 text-muted-foreground">
-              Vamos criar seu primeiro mapa astral. Leva menos de um minuto.
+              Vamos criar seu primeiro mapa natal. Leva menos de um minuto.
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              A seguir você informa data, hora e local de nascimento — e a roda natal é gerada na
+              hora.
             </p>
             <Button onClick={() => setStep(1)} className="mt-8 bg-mystical text-white" size="lg">
               Começar
@@ -91,6 +95,9 @@ function Onboarding() {
             exit={{ opacity: 0, y: -20 }}
             className="space-y-5"
           >
+            <p className="text-xs font-medium uppercase tracking-widest text-primary">
+              Passo 2 de 2
+            </p>
             <h1 className="font-display text-2xl font-bold">Seus dados de nascimento</h1>
             <BirthChartForm
               session={session}

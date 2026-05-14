@@ -54,30 +54,15 @@ function AuthPage() {
           <span className="font-display text-2xl font-semibold">AstroMap</span>
         </Link>
         <div className="rounded-2xl border border-white/20 bg-card p-6 text-card-foreground shadow-2xl shadow-black/25 ring-1 ring-white/10">
-          <Tabs defaultValue="signin">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Entrar</TabsTrigger>
-              <TabsTrigger value="signup">Criar conta</TabsTrigger>
-            </TabsList>
-            <TabsContent value="signin">
-              <SignInForm />
-            </TabsContent>
-            <TabsContent value="signup">
-              <SignUpForm />
-            </TabsContent>
-          </Tabs>
-          <div className="relative mt-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border/80" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase tracking-wide">
-              <span className="bg-card px-2 text-muted-foreground">ou</span>
-            </div>
-          </div>
+          {redirect && (
+            <p className="mb-4 text-center text-xs text-muted-foreground">
+              Passo 1 de 3 — Criar sua conta
+            </p>
+          )}
           <Button
             type="button"
             variant="outline"
-            className="mt-4 w-full border-white/20 bg-background/80"
+            className="w-full border-white/20 bg-background/80"
             onClick={() => void signInWithGoogle(redirect)}
           >
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
@@ -100,6 +85,26 @@ function AuthPage() {
             </svg>
             Continuar com Google
           </Button>
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border/80" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase tracking-wide">
+              <span className="bg-card px-2 text-muted-foreground">ou continue com email</span>
+            </div>
+          </div>
+          <Tabs defaultValue="signin">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="signin">Entrar</TabsTrigger>
+              <TabsTrigger value="signup">Criar conta</TabsTrigger>
+            </TabsList>
+            <TabsContent value="signin">
+              <SignInForm />
+            </TabsContent>
+            <TabsContent value="signup">
+              <SignUpForm />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
@@ -254,6 +259,12 @@ function SignUpForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+        {password.length > 0 && password.length < 6 && (
+          <p className="text-xs text-destructive">Mínimo 6 caracteres.</p>
+        )}
+        {password.length >= 6 && (
+          <p className="text-xs text-green-500">Senha válida.</p>
+        )}
       </div>
       <Button
         type="submit"

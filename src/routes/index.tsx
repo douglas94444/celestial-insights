@@ -33,26 +33,35 @@ export const Route = createFileRoute("/")({
   component: Landing,
 });
 
-const HERO_MOCKUP_INSIGHTS: { label: string; hint: string; accent?: "red" }[] = [
+type Testimonial = {
+  quote: string;
+  name: string;
+  sign: string;
+};
+
+// TODO: substituir por depoimentos reais antes do lançamento
+const TESTIMONIALS: Testimonial[] = [
   {
-    label: "Sol em Áries · Casa 10",
-    hint: "Identidade ligada à carreira",
+    quote:
+      "Nunca entendi tão bem meu Saturno em Escorpião na Casa 8. O AstroMap conectou tudo de um jeito que nenhum livro fez.",
+    name: "Marina S.",
+    sign: "Capricórnio",
   },
   {
-    label: "Lua em Câncer · Casa 4",
-    hint: "Emoções conectadas ao lar",
+    quote: "Em menos de 2 minutos já estava explorando meu mapa. A interpretação do meu Nodo Norte me fez parar tudo.",
+    name: "Rafael T.",
+    sign: "Peixes",
   },
   {
-    label: "Saturno em quadratura ao Sol",
-    hint: "Tensão entre impulso e estrutura",
-    accent: "red",
+    quote: "Finalmente um mapa sério em português. Paguei sem hesitar e vale cada centavo.",
+    name: "Juliana C.",
+    sign: "Libra",
   },
 ];
 
 type RoadmapStep = {
   title: string;
   body?: string;
-  mockup?: string;
   imageSrc?: string;
   imageAlt?: string;
   imageCaption?: string;
@@ -68,7 +77,7 @@ const ROADMAP_STEPS: RoadmapStep[] = [
   },
   {
     title: "Escolha Pix ou cartão na página de pagamento",
-    mockup: "Tela de checkout com botões Pix/Cartão",
+    body: "Processado pelo Mercado Pago — Pix com QR Code ou cartão de crédito.",
   },
   {
     title: "Coloque data, hora e local de nascimento",
@@ -130,18 +139,18 @@ const DETAIL_BLOCKS: DetailBlock[] = [
   {
     title: "Padrões especiais (quando existirem)",
     body: "Grand Trine, T-Square, Yod, Stellium.",
-    imageSrc: `${LANDING_PUBLIC}/hero-essencia.png`,
+    imageSrc: `${LANDING_PUBLIC}/chart-aspectos.png`,
     imageAlt:
-      "Vista do mapa no AstroMap com roda e painel de conteúdo; na app, padrões geométricos aparecem destacados quando existem",
+      "Roda natal com linhas de aspectos destacadas — padrões geométricos como Grand Trine aparecem visualmente na roda",
     imageCaption:
       "Na app, padrões como Grand Trine ou Yod surgem no separador Essência quando o mapa os tiver.",
   },
   {
-    title: "Essência natal personalizada",
-    body: "Síntese conectando todos os elementos.",
+    title: "Essência natal personalizada por IA",
+    body: "Síntese gerada para o seu mapa especificamente — conecta Sol, Lua, Ascendente e os padrões do seu céu natal em um texto só.",
     imageSrc: `${LANDING_PUBLIC}/hero-essencia.png`,
     imageAlt:
-      "Mesma área de trabalho do mapa com separador Essência e cartões de leitura para pontos principais do mapa",
+      "Painel Essência com interpretações textuais de Sol, Lua e Ascendente no contexto do mapa natal",
     imageCaption: "Resumo e síntese no fluxo real do detalhe do mapa.",
   },
 ];
@@ -150,10 +159,14 @@ function SectionRule() {
   return <div className="my-16 border-t border-border/60" aria-hidden />;
 }
 
-function MockupPlaceholder({ label }: { label: string }) {
+function TrustBadges() {
   return (
-    <div className="mt-3 rounded-lg border border-dashed border-primary/30 bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground">
-      [Screenshot: {label}]
+    <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
+      <span>Pagamento seguro</span>
+      <span aria-hidden className="text-border">·</span>
+      <span>Acesso imediato após confirmação</span>
+      <span aria-hidden className="text-border">·</span>
+      <span>Mapa permanente na sua conta</span>
     </div>
   );
 }
@@ -228,78 +241,74 @@ function Landing() {
         </div>
       </header>
 
-      {/* Dobra 1 — TL;DR (sem botão no corpo) */}
+      {/* Dobra 1 — Hero */}
       <section className="relative overflow-hidden pt-32 pb-20 texture-grain">
         <div className="pointer-events-none absolute inset-0 bg-cosmic opacity-[0.07]" />
         <div className="pointer-events-none absolute inset-0 bg-shell-glow" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-glow opacity-[0.85]" />
         <div className="pointer-events-none absolute inset-0 starfield opacity-[0.22]" />
         <div className="container relative z-[1] mx-auto px-4 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Resumo</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Mapa natal</p>
           <h1 className="mt-4 font-display text-4xl font-bold md:text-5xl md:leading-[1.15] text-gradient-mystical">
-            Seu mapa natal completo por {mapaPriceFormatted}
+            Descubra o que o céu diz sobre você
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            Roda interativa + interpretações de cada planeta em signo e casa
+            Roda natal interativa com interpretações de cada planeta em signo e casa — por{" "}
+            <strong className="text-foreground">{mapaPriceFormatted}</strong>, pagamento único.
           </p>
 
-          <div className="mx-auto mt-12 grid max-w-5xl gap-8 md:grid-cols-2 md:items-start md:text-left">
-            <div>
-              <LandingScreenshot
-                src={`${LANDING_PUBLIC}/hero-essencia.png`}
-                alt="Interface do AstroMap: roda natal e painel Essência com interpretações de Sol, Lua e Ascendente"
-                priority
-                caption="Interface real do produto — o seu mapa reflete só os seus dados de nascimento."
-              />
-              <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-                A imagem mostra <strong className="text-foreground">outro mapa de exemplo</strong>{" "}
-                na interface. Os textos à direita são{" "}
-                <strong className="text-foreground">exemplos do tipo de leitura</strong> (Sol em
-                Áries na Casa 10, etc.) — não coincidem com os signos e casas dessa captura.
-              </p>
-            </div>
-            <div className="rounded-2xl border bg-card/90 p-6 text-left shadow-mystical backdrop-blur-sm">
-              <p className="text-xs font-semibold uppercase tracking-widest text-primary">
-                Pré-visualização (exemplo)
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Ilustração do tipo de leitura — o seu mapa usa os seus dados de nascimento.
-              </p>
-              <ul className="mt-5 space-y-4">
-                {HERO_MOCKUP_INSIGHTS.map((row) => (
-                  <li
-                    key={row.label}
-                    className={
-                      row.accent === "red"
-                        ? "border-l-4 border-destructive/80 pl-3"
-                        : "border-l-4 border-primary/40 pl-3"
-                    }
-                  >
-                    <p className="text-sm font-medium text-foreground">{row.label}</p>
-                    <p
-                      className={
-                        row.accent === "red"
-                          ? "mt-1 text-sm text-destructive/90"
-                          : "mt-1 text-sm text-muted-foreground"
-                      }
-                    >
-                      {row.hint}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          <div className="mx-auto mt-12 max-w-4xl">
+            <LandingScreenshot
+              src={`${LANDING_PUBLIC}/hero-essencia.png`}
+              alt="Interface do AstroMap: roda natal e painel Essência com interpretações de Sol, Lua e Ascendente"
+              priority
+              caption="Interface real do produto — o seu mapa reflete só os seus dados de nascimento."
+            />
           </div>
 
-          <p className="mx-auto mt-10 max-w-xl text-base font-medium text-foreground">
-            {mapaPriceFormatted} pagamento único
+          <Button
+            asChild
+            size="lg"
+            className="mt-10 bg-mystical text-white shadow-mystical hover:opacity-90"
+          >
+            <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
+              Ver meu mapa por {mapaPriceFormatted}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+          <p className="mx-auto mt-3 text-sm text-muted-foreground">
+            Já tenho conta —{" "}
+            <Link
+              to="/auth"
+              search={AUTH_REDIRECT_MAPA}
+              className="text-primary underline underline-offset-2"
+            >
+              entrar
+            </Link>
           </p>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
-            Acesso permanente · sem mensalidade
-          </p>
-          <p className="mx-auto mt-2 text-xs text-muted-foreground">
-            Pix ou cartão · dados criptografados (HTTPS/TLS)
-          </p>
+          <TrustBadges />
+        </div>
+      </section>
+
+      <SectionRule />
+
+      {/* Depoimentos */}
+      <section className="py-12">
+        <div className="container mx-auto max-w-4xl px-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            {TESTIMONIALS.map((t) => (
+              <blockquote
+                key={t.name}
+                className="rounded-xl border bg-card p-5 text-left"
+              >
+                <p className="text-sm text-muted-foreground">&ldquo;{t.quote}&rdquo;</p>
+                <footer className="mt-4">
+                  <p className="text-sm font-medium text-foreground">{t.name}</p>
+                  <p className="text-xs text-muted-foreground">{t.sign}</p>
+                </footer>
+              </blockquote>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -331,7 +340,6 @@ function Landing() {
                     caption={step.imageCaption}
                   />
                 ) : null}
-                {step.mockup ? <MockupPlaceholder label={step.mockup} /> : null}
               </li>
             ))}
           </ol>
@@ -344,10 +352,11 @@ function Landing() {
             className="mt-8 w-full bg-mystical text-white shadow-mystical hover:opacity-90 sm:w-auto"
           >
             <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Comprar por {mapaPriceFormatted}
+              Ver meu mapa · {mapaPriceFormatted}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
+          <TrustBadges />
         </div>
       </section>
 
@@ -391,10 +400,11 @@ function Landing() {
             className="mt-8 bg-mystical text-white shadow-mystical hover:opacity-90"
           >
             <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Quero meu mapa
+              Descobrir meu mapa
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
+          <TrustBadges />
         </div>
       </section>
 
@@ -464,10 +474,11 @@ function Landing() {
             className="mt-10 w-full bg-mystical text-white shadow-mystical hover:opacity-90 sm:w-auto"
           >
             <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Comprar agora
+              Ver meu mapa agora
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
+          <TrustBadges />
         </div>
       </section>
 
@@ -485,7 +496,7 @@ function Landing() {
             <p className="mt-4 text-sm text-muted-foreground">Acesso permanente ao seu mapa</p>
             <Button asChild className="mt-8 w-full bg-mystical text-white hover:opacity-90">
               <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-                Comprar agora
+                Ver meu mapa agora
               </Link>
             </Button>
           </div>
@@ -547,6 +558,34 @@ function Landing() {
                 </p>
               </AccordionContent>
             </AccordionItem>
+            <AccordionItem value="5">
+              <AccordionTrigger>Quanto tempo leva para ver meu mapa?</AccordionTrigger>
+              <AccordionContent className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  Menos de 2 minutos do pagamento à primeira visualização. O mapa é calculado e
+                  exibido imediatamente após a confirmação do pagamento.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="6">
+              <AccordionTrigger>O mapa muda ao longo do tempo?</AccordionTrigger>
+              <AccordionContent className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  Não — o mapa natal é fixo no momento do seu nascimento e não muda. O que muda é
+                  o céu atual em relação ao seu mapa (trânsitos). Essa comparação faz parte dos{" "}
+                  planos Premium, opcionais e separados.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
+            <AccordionItem value="7">
+              <AccordionTrigger>Funciona no celular?</AccordionTrigger>
+              <AccordionContent className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  Sim. O AstroMap funciona em qualquer navegador moderno — celular, tablet ou
+                  computador. Não é necessário instalar nenhum aplicativo.
+                </p>
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         </div>
       </section>
@@ -560,10 +599,10 @@ function Landing() {
         <div className="pointer-events-none absolute inset-0 starfield opacity-[0.18]" />
         <div className="container relative z-[1] mx-auto px-4 text-center">
           <h2 className="font-display text-4xl font-bold md:text-5xl">
-            Seu mapa natal completo. {mapaPriceFormatted}.
+            O seu céu de nascimento, explicado.
           </h2>
           <p className="mx-auto mt-6 max-w-lg text-lg text-muted-foreground">
-            Pague uma vez, explore para sempre.
+            {mapaPriceFormatted} pagamento único. Acesso permanente, sem mensalidade.
           </p>
           <Button
             asChild
@@ -571,11 +610,11 @@ function Landing() {
             className="mt-10 bg-mystical text-white shadow-mystical hover:opacity-90"
           >
             <Link to="/assinatura" search={MAPA_COMPRA_SEARCH}>
-              Comprar meu mapa
+              Começar agora · {mapaPriceFormatted}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
-          <p className="mt-6 text-xs text-muted-foreground">Pagamento único · Pix ou cartão</p>
+          <TrustBadges />
         </div>
       </section>
 

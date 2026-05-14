@@ -25,6 +25,7 @@ import {
   getSyncPayTransactionFn,
 } from "@/lib/syncpay.functions";
 import { withSupabaseAuth } from "@/lib/server-fn-client";
+import { getServerFnErrorDetails } from "@/lib/server-fn-errors";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { formatSubscriptionPriceBrl, SUBSCRIPTION_PLAN_AMOUNTS } from "@/lib/subscription-pricing";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,6 +74,28 @@ const PLAN_FEATURES = [
 
 function onlyDigits(s: string): string {
   return s.replace(/\D/g, "");
+}
+
+function formatCpf(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
+
+function formatPhone(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : "";
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
+function formatCountdown(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
 /** Lê referência + URL de checkout a partir de um objecto plano (camelCase ou snake_case). */
@@ -180,6 +203,9 @@ function PremiumPlansPage() {
   const [billingPhone, setBillingPhone] = useState("");
   const [pixCode, setPixCode] = useState<string | null>(null);
   const [txIdentifier, setTxIdentifier] = useState<string | null>(null);
+  const [pixCopied, setPixCopied] = useState(false);
+  const [pixSecondsLeft, setPixSecondsLeft] = useState<number | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState<{ label: string } | null>(null);
   const [mpResumeExternalRef, setMpResumeExternalRef] = useState<string | null>(null);
   const mpFailureToastDone = useRef(false);
   const [selectedPremiumPlan, setSelectedPremiumPlan] = useState<PremiumSubscriptionPlan | null>(
@@ -192,8 +218,8 @@ function PremiumPlansPage() {
   const mapaTransparentSuccessRecorded = useRef(false);
 
   useEffect(() => {
-    if (profile?.billing_cpf) setBillingCpf(profile.billing_cpf);
-    if (profile?.billing_phone) setBillingPhone(profile.billing_phone);
+    if (profile?.billing_cpf) setBillingCpf(formatCpf(profile.billing_cpf));
+    if (profile?.billing_phone) setBillingPhone(formatPhone(profile.billing_phone));
   }, [profile?.billing_cpf, profile?.billing_phone]);
 
   const availabilityQuery = useQuery({
@@ -256,6 +282,25 @@ function PremiumPlansPage() {
 
   useEffect(() => {
     if (!txIdentifier) pixSuccessRecorded.current = false;
+  }, [txIdentifier]);
+
+  useEffect(() => {
+    setPixCopied(false);
+  }, [pixCode]);
+
+  useEffect(() => {
+    if (!txIdentifier) {
+      setPixSecondsLeft(null);
+      return;
+    }
+    setPixSecondsLeft(600);
+    const iv = setInterval(() => {
+      setPixSecondsLeft((s) => {
+        if (s === null || s <= 1) { clearInterval(iv); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(iv);
   }, [txIdentifier]);
 
   useEffect(() => {
@@ -346,7 +391,10 @@ function PremiumPlansPage() {
         void navigate({ to: "/onboarding", replace: true });
       } else {
         clearCheckoutMapaIntent();
-        toast.success("Pagamento confirmado. O seu plano foi atualizado.");
+        const planLabelMpPro = selectedPremiumPlan === "anual"
+          ? `Anual — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual)}`
+          : `Mensal — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mensal)}`;
+        setPaymentSuccess({ label: planLabelMpPro });
         void navigate({ to: "/assinatura", search: {}, replace: true });
       }
     }
@@ -403,10 +451,13 @@ function PremiumPlansPage() {
         void navigate({ to: "/onboarding", replace: true });
       } else {
         clearCheckoutMapaIntent();
-        toast.success("Pagamento confirmado. O seu plano foi atualizado.");
+        const planLabel = selectedPremiumPlan === "anual"
+          ? `Anual — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual)}`
+          : `Mensal — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mensal)}`;
+        setPaymentSuccess({ label: planLabel });
       }
     }
-  }, [pollQuery.data?.remoteStatus, qc, user?.id, isMapa, navigate]);
+  }, [pollQuery.data?.remoteStatus, qc, user?.id, isMapa, navigate, selectedPremiumPlan]);
 
   const createOrder = useMutation({
     mutationFn: async (plan: "mensal" | "anual" | "mapa") => {
@@ -484,14 +535,29 @@ function PremiumPlansPage() {
         });
         toast.error("Não foi possível abrir o checkout do Mercado Pago.", {
           description:
-            "Tente de novo daqui a instantes ou use Pix ou cartão nesta página (Checkout Transparente), se estiver disponível. Se o problema continuar, contacte o suporte.",
+            "A preferência foi criada mas sem URL de redirect válido. Verifique se MERCADOPAGO_ACCESS_TOKEN e APP_PUBLIC_URL estão correctos no Worker.",
         });
         return;
       }
       sessionStorage.setItem(SESSION_MP_ORDER_REF, ref);
       window.location.href = url;
     },
-    onError: (e) => void toastServerFnError(e),
+    onError: async (e) => {
+      const { code, message } = await getServerFnErrorDetails(e);
+      if (code === "MERCADOPAGO_DISABLED") {
+        toast.error("Mercado Pago não está activo neste servidor.", {
+          description: "Contacte o suporte ou use Pix se estiver disponível.",
+        });
+      } else if (code === "MERCADOPAGO" || code === "MERCADOPAGO_RESPONSE") {
+        toast.error("Não foi possível abrir o checkout do Mercado Pago.", {
+          description: message,
+        });
+      } else if (code === "BILLING_CPF" || code === "BILLING_PHONE") {
+        toast.error("Dados de cobrança inválidos.", { description: message });
+      } else {
+        void toastServerFnError(e);
+      }
+    },
   });
 
   const hasBillingForPayment =
@@ -522,19 +588,13 @@ function PremiumPlansPage() {
   }, [user?.id, hasBillingForPayment, isMapa]);
 
   const pollStatus = pollQuery.data?.remoteStatus;
-  const pollLabel = useMemo(() => {
-    if (!txIdentifier) return null;
-    if (pollStatus === "completed") return "Pagamento confirmado.";
-    if (pollStatus === "failed" || pollStatus === "refunded") return "Pagamento não concluído.";
-    if (pollStatus === "pending") return "Aguardando confirmação do Pix…";
-    return "A verificar estado do pagamento…";
-  }, [pollStatus, txIdentifier]);
 
   async function copyPix() {
     if (!pixCode) return;
     try {
       await navigator.clipboard.writeText(pixCode);
-      toast.success("Código Pix copiado.");
+      setPixCopied(true);
+      setTimeout(() => setPixCopied(false), 2000);
     } catch {
       toast.error("Não foi possível copiar. Selecione e copie manualmente.");
     }
@@ -635,6 +695,20 @@ function PremiumPlansPage() {
       <div className="pointer-events-none absolute inset-0 starfield opacity-[0.22]" />
 
       <div className="container relative z-[1] mx-auto max-w-4xl space-y-8 p-4 pb-12 sm:p-6 texture-grain">
+        {paymentSuccess && (
+          <Card className="border-2 border-green-500/50 bg-green-500/5">
+            <CardContent className="py-10 text-center space-y-4">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10">
+                <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
+              </div>
+              <h2 className="font-display text-2xl font-bold">Pagamento confirmado!</h2>
+              <p className="text-muted-foreground">Plano {paymentSuccess.label} · ativo agora</p>
+              <Button asChild className="bg-mystical text-white hover:opacity-90">
+                <Link to="/dashboard">Ir para o dashboard</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
         <div className="text-center sm:text-left">
           <Badge variant="outline" className="mb-3 border-primary/40 bg-primary/5">
             {isMapa ? "Mapa Natal" : paymentBadgeLabel}
@@ -736,6 +810,7 @@ function PremiumPlansPage() {
                 <Button
                   className="mt-auto w-full bg-mystical text-white hover:opacity-90"
                   disabled={!showBillingForm}
+                  title={!showBillingForm ? "Aguarde enquanto carregamos os meios de pagamento" : undefined}
                   onClick={() => setSelectedPremiumPlan("anual")}
                 >
                   {selectedPremiumPlan === "anual"
@@ -778,6 +853,7 @@ function PremiumPlansPage() {
                 <Button
                   className="mt-auto w-full bg-mystical text-white hover:opacity-90"
                   disabled={!showBillingForm}
+                  title={!showBillingForm ? "Aguarde enquanto carregamos os meios de pagamento" : undefined}
                   onClick={() => setSelectedPremiumPlan("mensal")}
                 >
                   {selectedPremiumPlan === "mensal"
@@ -787,6 +863,13 @@ function PremiumPlansPage() {
               </CardContent>
             </Card>
 
+            <p className="col-span-full text-center text-xs text-muted-foreground">
+              Cancele quando quiser em{" "}
+              <Link to="/configuracoes" className="text-primary underline underline-offset-2">
+                Configurações
+              </Link>{" "}
+              — sem fidelidade.
+            </p>
             {selectedPremiumPlan ? (
               <div className="relative z-10 col-span-full flex justify-center border-t border-border/40 pt-4 sm:justify-start">
                 <Button
@@ -915,9 +998,9 @@ function PremiumPlansPage() {
                   id="billing-cpf"
                   inputMode="numeric"
                   autoComplete="off"
-                  placeholder="Somente números"
+                  placeholder="000.000.000-00"
                   value={billingCpf}
-                  onChange={(e) => setBillingCpf(e.target.value)}
+                  onChange={(e) => setBillingCpf(formatCpf(e.target.value))}
                   aria-invalid={cpfFormatHint}
                   className={cn(
                     cpfFormatHint && "border-destructive focus-visible:ring-destructive",
@@ -933,9 +1016,9 @@ function PremiumPlansPage() {
                   id="billing-phone"
                   inputMode="tel"
                   autoComplete="tel"
-                  placeholder="Somente números com DDD"
+                  placeholder="(00) 00000-0000"
                   value={billingPhone}
-                  onChange={(e) => setBillingPhone(e.target.value)}
+                  onChange={(e) => setBillingPhone(formatPhone(e.target.value))}
                   aria-invalid={phoneFormatHint}
                   className={cn(
                     phoneFormatHint && "border-destructive focus-visible:ring-destructive",
@@ -1158,6 +1241,21 @@ function PremiumPlansPage() {
                       ENGAGEMENT_TOPICS.checkout_payment_confirmed_mp_transparent,
                       { status, plan: selectedPremiumPlan },
                     );
+                    if (status === "approved") {
+                      recordCheckoutEngagement(
+                        supabase,
+                        user.id,
+                        ENGAGEMENT_TOPICS.checkout_payment_confirmed,
+                        { channel: "mp_transparent", produto: "premium" },
+                      );
+                      void qc.invalidateQueries({ queryKey: ["profile", user.id] });
+                      void qc.invalidateQueries({ queryKey: ["charts", user.id] });
+                      const planLabel =
+                        selectedPremiumPlan === "anual"
+                          ? `Anual — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.anual)}`
+                          : `Mensal — ${formatSubscriptionPriceBrl(SUBSCRIPTION_PLAN_AMOUNTS.mensal)}`;
+                      setPaymentSuccess({ label: planLabel });
+                    }
                   }}
                   onSubscriptionActivated={() => {
                     if (user?.id) {
@@ -1386,8 +1484,16 @@ function PremiumPlansPage() {
             <CardHeader>
               <CardTitle className="font-display text-lg">Pague com Pix</CardTitle>
               <CardDescription>
-                {pollLabel}
-                {pollQuery.isFetching ? (
+                {pollStatus === "completed"
+                  ? "Pagamento confirmado."
+                  : pollStatus === "failed" || pollStatus === "refunded"
+                    ? "Pagamento não concluído."
+                    : pixSecondsLeft === 0
+                      ? "O Pix pode ter expirado — gere um novo ou tente outro método."
+                      : pixSecondsLeft !== null
+                        ? `Aguardando confirmação · expira em ${formatCountdown(pixSecondsLeft)}`
+                        : "A verificar estado do pagamento…"}
+                {pollQuery.isFetching && pollStatus !== "completed" ? (
                   <span className="ml-2 inline-flex items-center gap-1 text-xs">
                     <Loader2 className="h-3 w-3 animate-spin" /> A atualizar…
                   </span>
@@ -1403,8 +1509,17 @@ function PremiumPlansPage() {
               ) : null}
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="secondary" onClick={() => void copyPix()}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copiar código Pix
+                  {pixCopied ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4 text-green-500" />
+                      Copiado!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copiar código Pix
+                    </>
+                  )}
                 </Button>
                 <Button
                   type="button"
@@ -1417,11 +1532,9 @@ function PremiumPlansPage() {
                   Fechar
                 </Button>
               </div>
-              <textarea
-                readOnly
-                className="min-h-[120px] w-full rounded-md border border-input bg-muted/30 p-3 font-mono text-xs"
-                value={pixCode}
-              />
+              <p className="rounded-md border border-input bg-muted/30 p-3 font-mono text-xs break-all select-all">
+                {pixCode}
+              </p>
               <p className="text-xs text-muted-foreground">
                 Identificador: <code className="rounded bg-muted px-1">{txIdentifier}</code>
               </p>

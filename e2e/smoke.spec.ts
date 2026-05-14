@@ -4,7 +4,7 @@ test.describe("smoke público", () => {
   test("landing mostra herói", async ({ page }) => {
     await page.goto("/");
     await expect(
-      page.getByRole("heading", { level: 1, name: /Seu mapa natal completo por/i }),
+      page.getByRole("heading", { level: 1, name: /Descubra o que o céu diz sobre você/i }),
     ).toBeVisible();
     await expect(page.locator("#comprar-mapa")).toContainText("37");
   });

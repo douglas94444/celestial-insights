@@ -143,7 +143,9 @@ export function buildMercadoPagoWebhookUrl(): string {
 }
 
 function publicAppBaseUrl(override?: string): string {
-  const raw = process.env.APP_PUBLIC_URL?.trim() || override?.trim();
+  // Preferir a origem da requisição (domínio onde o utilizador está) sobre APP_PUBLIC_URL,
+  // para que back_urls/auto_return funcionem mesmo quando APP_PUBLIC_URL aponta para outro deploy.
+  const raw = override?.trim() || process.env.APP_PUBLIC_URL?.trim();
   if (!raw) {
     throw new MercadoPagoConfigError("APP_PUBLIC_URL em falta para back_urls do checkout.");
   }

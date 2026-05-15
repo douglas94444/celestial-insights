@@ -1,43 +1,39 @@
 ## Diagnóstico
 
-A página `/premium` mostra o aviso quando **ambos** os gates falham no servidor:
+O código do `/assinatura` já implementa os três fluxos (Pix SyncPay, MP Checkout Pro «nova página», MP Transparente «cartão na própria app»). A UI esconde Pix e Cartão Transparente porque, em produção (`astrologiia.app` / Worker da Lovable), `getSyncPayAvailabilityFn` devolve `available: false` e `getMercadoPagoAvailabilityFn` devolve `transparent: false`.
 
-- **SyncPay** (`isSyncPayServerConfigured`) exige: `SYNCPAY_API_BASE_URL`, `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET`, **`SYNCPAY_WEBHOOK_TOKEN`**, `SUPABASE_URL`.
-- **Mercado Pago Checkout Pro** (`isMercadoPagoServerConfigured`) exige: `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN`, `SUPABASE_URL`, **`APP_PUBLIC_URL`**.
-- **Mercado Pago Transparente / cartão** (`isMercadoPagoTransparentConfigured`) exige: `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN`, `SUPABASE_URL`, `VITE_MERCADOPAGO_PUBLIC_KEY` (ou `MERCADOPAGO_PUBLIC_KEY`).
+A causa não é lógica de UI — são variáveis de ambiente que não estão a ser lidas pelo runtime do Worker:
 
-Comparando com os secrets já configurados no projeto:
+1. **MP Transparente:** `mercadoPagoPublicKeyForTransparent()` em `src/lib/mercadopago/client.ts` lê primeiro `import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY` (substituído em build) e depois faz fallback para `process.env.VITE_MERCADOPAGO_PUBLIC_KEY` / `process.env.MERCADOPAGO_PUBLIC_KEY` (runtime). O secret existente chama-se `VITE_MERCADOPAGO_PUBLIC_KEY`, mas chaves com prefixo `VITE_` só são injetadas no bundle do cliente em build — não chegam ao Worker como `process.env`. Resultado: `transparent` fica `false`.
+2. **SyncPay Pix:** `isSyncPayServerConfigured()` exige `SYNCPAY_API_BASE_URL`, `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET`, `SYNCPAY_WEBHOOK_TOKEN` em `process.env` no Worker. Estão registados nos secrets da Lovable Cloud, mas no Worker da Lovable apenas as keys explicitamente expostas ao runtime ficam disponíveis. Sem isso, `available` fica `false`.
 
-| Secret                                                                                 | Estado          |
-| -------------------------------------------------------------------------------------- | --------------- |
-| `SYNCPAY_API_BASE_URL`, `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET`                   | ✅ presentes    |
-| `SYNCPAY_WEBHOOK_TOKEN`                                                                | ❌ **em falta** |
-| `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN`, `VITE_MERCADOPAGO_PUBLIC_KEY` | ✅ presentes    |
-| `APP_PUBLIC_URL`                                                                       | ❌ **em falta** |
-| `SUPABASE_URL`                                                                         | ✅ presente     |
+## Mudanças propostas
 
-Em teoria o gate **MP transparente** já deveria estar verde (todos os quatro presentes). Como o aviso ainda aparece, o Worker publicado provavelmente foi gerado **antes** dos secrets actuais terem sido adicionados — os secrets só ficam disponíveis para o Worker após **novo deploy / Publish → Update**.
+### 1. Código (src/lib/mercadopago/client.ts)
+Tornar a leitura da chave pública mais robusta para não depender do prefixo `VITE_` em runtime:
 
-## Plano
+- Acrescentar suporte a um nome canónico `MERCADOPAGO_PUBLIC_KEY` (server-side, sem `VITE_`).
+- Manter `VITE_MERCADOPAGO_PUBLIC_KEY` como build-time / fallback (para o SDK no cliente continuar a funcionar a partir do bundle).
+- Atualizar `mercadoPagoTransparentGaps()` para reportar `MERCADOPAGO_PUBLIC_KEY` como o nome recomendado nos diagnósticos do painel admin.
 
-1. **Adicionar os dois secrets em falta** (via tool de secrets, formulário seguro):
-   - `SYNCPAY_WEBHOOK_TOKEN` — string aleatória forte que vais também colar no painel SyncPay como token do webhook (`/functions/v1/syncpay-webhook?token=…`).
-   - `APP_PUBLIC_URL` — URL pública absoluta da app, ex.: `https://astrologiia.app` (sem `/` final). Usado nas `back_urls` do Checkout Pro do Mercado Pago.
+Nenhuma outra mudança de fluxo é necessária — `MercadoPagoTransparentCardBrick` e `createMercadoPagoTransparentPaymentFn` já estão completos.
 
-2. **Republicar o Worker** (Publish → Update no editor) para que os secrets fiquem disponíveis em `process.env` no SSR/Worker. Sem este passo, mesmo os secrets já existentes podem não estar a ser lidos pelo build em produção.
+### 2. Secrets a adicionar / renomear na Lovable Cloud
+Para o Worker que serve `astrologiia.app`, garantir que existem como **runtime** env vars (não apenas no bundle Vite):
 
-3. **Verificar no `/premium`**:
-   - O alerta "Pagamentos em configuração" deve desaparecer.
-   - Botão Pix (SyncPay) activo se `SYNCPAY_*` completos.
-   - Botão Mercado Pago Checkout Pro activo (precisa `APP_PUBLIC_URL`).
-   - Brick de cartão (transparente) activo (precisa `VITE_MERCADOPAGO_PUBLIC_KEY` no build do cliente — se não aparecer, é preciso garantir que esse `VITE_*` foi injectado no build e republicar).
+- `MERCADOPAGO_PUBLIC_KEY` — mesma chave pública do MP que está em `VITE_MERCADOPAGO_PUBLIC_KEY` (copiar valor).
+- Confirmar que `MERCADOPAGO_ACCESS_TOKEN`, `MERCADOPAGO_WEBHOOK_TOKEN`, `APP_PUBLIC_URL` já estão como secrets de runtime — aparecem na lista, mas precisamos confirmar que o Worker os vê.
+- Confirmar SyncPay: `SYNCPAY_API_BASE_URL`, `SYNCPAY_CLIENT_ID`, `SYNCPAY_CLIENT_SECRET`, `SYNCPAY_WEBHOOK_TOKEN` (todos já listados).
 
-4. **Configurar webhooks nos providers** (passo operacional, fora do código):
-   - **SyncPay** → URL: `https://fxcoxnqqjgvqfukasfjb.supabase.co/functions/v1/syncpay-webhook?token=<SYNCPAY_WEBHOOK_TOKEN>`
-   - **Mercado Pago** → URL: `https://fxcoxnqqjgvqfukasfjb.supabase.co/functions/v1/mercadopago-webhook?token=<MERCADOPAGO_WEBHOOK_TOKEN>`
+### 3. Verificação
+Após o deploy:
+- Em `/assinatura?produto=mapa` (logado como admin), o painel de diagnóstico deve mostrar 0 gaps em Checkout Pro **e** Transparente, e «SyncPay disponível».
+- A UI deve passar a oferecer 3 botões de pagamento: «Pix», «Cartão (nesta página)», «Mercado Pago (nova página)».
 
-## Notas técnicas
+## Pergunta antes de executar
 
-- Nenhuma alteração de código é necessária — só configuração de ambiente + redeploy.
-- Se quiseres só uma das passarelas (ex.: só Pix SyncPay), basta completar esse conjunto e o gate respectivo abre; a outra continua oculta sem partir nada.
-- Para `APP_PUBLIC_URL` em ambiente preview vs produção: usa o domínio final (`https://astrologiia.app`) — afecta apenas os `back_urls` do Checkout Pro (sucesso/falha/pendente).
+Quer que eu:
+- **(A)** Aplique a alteração de código no `mercadopago/client.ts` e abra um pedido para adicionar o secret `MERCADOPAGO_PUBLIC_KEY` (você cola o valor da chave pública MP no formulário seguro)?
+- **(B)** Ou prefere também rever / readicionar os secrets SyncPay para garantir que ficam visíveis ao runtime do Worker?
+
+A escolha mais comum é A + verificação de B só se Pix continuar oculto após publish.

@@ -79,12 +79,16 @@ export class MercadoPagoApiError extends Error {
 }
 
 function mercadoPagoPublicKeyForTransparent(): string {
+  // Preferir runtime env do Worker (MERCADOPAGO_PUBLIC_KEY sem prefixo VITE_),
+  // que é o nome canónico para secrets de runtime na Lovable Cloud.
+  const runtimeKey = process.env.MERCADOPAGO_PUBLIC_KEY?.trim();
+  if (runtimeKey) return runtimeKey;
+  // Fallback 1: VITE_MERCADOPAGO_PUBLIC_KEY substituída no bundle em build (cliente).
   const viteKey = import.meta.env.VITE_MERCADOPAGO_PUBLIC_KEY as string | undefined;
   const a = typeof viteKey === "string" ? viteKey.trim() : "";
   if (a) return a;
-  const runtimeViteKey = process.env.VITE_MERCADOPAGO_PUBLIC_KEY?.trim();
-  if (runtimeViteKey) return runtimeViteKey;
-  return process.env.MERCADOPAGO_PUBLIC_KEY?.trim() ?? "";
+  // Fallback 2: VITE_MERCADOPAGO_PUBLIC_KEY exposta também em runtime (compat).
+  return process.env.VITE_MERCADOPAGO_PUBLIC_KEY?.trim() ?? "";
 }
 
 /** Checkout Pro: access token, webhook, Supabase URL e APP_PUBLIC_URL (back_urls). */
@@ -121,7 +125,7 @@ export function mercadoPagoTransparentGaps(): string[] {
   if (!process.env.MERCADOPAGO_WEBHOOK_TOKEN?.trim()) missing.push("MERCADOPAGO_WEBHOOK_TOKEN");
   if (!getSupabaseUrl().trim()) missing.push("SUPABASE_URL");
   if (!mercadoPagoPublicKeyForTransparent())
-    missing.push("VITE_MERCADOPAGO_PUBLIC_KEY ou MERCADOPAGO_PUBLIC_KEY");
+    missing.push("MERCADOPAGO_PUBLIC_KEY (preferido) ou VITE_MERCADOPAGO_PUBLIC_KEY");
   return missing;
 }
 

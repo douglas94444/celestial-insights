@@ -95,6 +95,121 @@ export type Database = {
         }
         Relationships: []
       }
+      diagnoses: {
+        Row: {
+          amount_cents: number
+          completed_at: string | null
+          created_at: string
+          cta_clicked_at: string | null
+          currency: string
+          failed_reason: string | null
+          id: string
+          meta_ad_account_id: string | null
+          meta_user_id: string | null
+          mp_payment_id: string | null
+          mp_preference_id: string | null
+          report_version: number
+          secret_slug: string
+          status: string
+          viewed_at: string | null
+        }
+        Insert: {
+          amount_cents?: number
+          completed_at?: string | null
+          created_at?: string
+          cta_clicked_at?: string | null
+          currency?: string
+          failed_reason?: string | null
+          id?: string
+          meta_ad_account_id?: string | null
+          meta_user_id?: string | null
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          report_version?: number
+          secret_slug?: string
+          status: string
+          viewed_at?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          completed_at?: string | null
+          created_at?: string
+          cta_clicked_at?: string | null
+          currency?: string
+          failed_reason?: string | null
+          id?: string
+          meta_ad_account_id?: string | null
+          meta_user_id?: string | null
+          mp_payment_id?: string | null
+          mp_preference_id?: string | null
+          report_version?: number
+          secret_slug?: string
+          status?: string
+          viewed_at?: string | null
+        }
+        Relationships: []
+      }
+      diagnosis_reports: {
+        Row: {
+          analysis_json: Json | null
+          diagnosis_id: string
+          facts_json: Json | null
+          prompt_version: string | null
+          updated_at: string
+        }
+        Insert: {
+          analysis_json?: Json | null
+          diagnosis_id: string
+          facts_json?: Json | null
+          prompt_version?: string | null
+          updated_at?: string
+        }
+        Update: {
+          analysis_json?: Json | null
+          diagnosis_id?: string
+          facts_json?: Json | null
+          prompt_version?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnosis_reports_diagnosis_id_fkey"
+            columns: ["diagnosis_id"]
+            isOneToOne: true
+            referencedRelation: "diagnoses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      diagnosis_secrets: {
+        Row: {
+          access_token: string | null
+          diagnosis_id: string
+          token_expires_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token?: string | null
+          diagnosis_id: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token?: string | null
+          diagnosis_id?: string
+          token_expires_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "diagnosis_secrets_diagnosis_id_fkey"
+            columns: ["diagnosis_id"]
+            isOneToOne: true
+            referencedRelation: "diagnoses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interpretation_ai_cache: {
         Row: {
           chart_id: string | null

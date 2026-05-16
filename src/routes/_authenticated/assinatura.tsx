@@ -27,7 +27,11 @@ import {
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { getServerFnErrorDetails } from "@/lib/server-fn-errors";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
-import { formatSubscriptionPriceBrl, SUBSCRIPTION_PLAN_AMOUNTS } from "@/lib/subscription-pricing";
+import {
+  formatSubscriptionPriceBrl,
+  SUBSCRIPTION_PLAN_AMOUNTS,
+  type SubscriptionProductId,
+} from "@/lib/subscription-pricing";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ENGAGEMENT_TOPICS,

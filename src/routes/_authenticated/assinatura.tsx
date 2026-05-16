@@ -593,6 +593,14 @@ function PremiumPlansPage() {
       mpTransparent,
       mpCheckoutPro,
     });
+    const produto: SubscriptionProductId = isMapa ? "mapa" : "mensal";
+    trackMetaEvent("ViewContent", {
+      content_type: "product",
+      content_ids: [isMapa ? "mapa" : "premium"],
+      content_name: isMapa ? "Mapa natal" : "AstroMap Premium",
+      value: SUBSCRIPTION_PLAN_AMOUNTS[produto],
+      currency: "BRL",
+    });
   }, [
     user?.id,
     isMapa,

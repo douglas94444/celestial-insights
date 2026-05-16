@@ -42,6 +42,7 @@ import {
   markCheckoutMapaIntent,
 } from "@/lib/mapa-product-copy";
 import { cn } from "@/lib/utils";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 const SESSION_MP_ORDER_REF = "astromap_mp_order_ref";
 

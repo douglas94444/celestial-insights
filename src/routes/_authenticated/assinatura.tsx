@@ -1394,6 +1394,13 @@ function PremiumPlansPage() {
                       ENGAGEMENT_TOPICS.checkout_payment_confirmed_mp_transparent,
                       { status, plan: selectedPremiumPlan },
                     );
+                    trackMetaEvent("AddPaymentInfo", {
+                      content_ids: [selectedPremiumPlan],
+                      value: SUBSCRIPTION_PLAN_AMOUNTS[selectedPremiumPlan],
+                      currency: "BRL",
+                      payment_method: "card_mp_transparent",
+                      status,
+                    });
                     if (status === "approved") {
                       recordCheckoutEngagement(
                         supabase,
@@ -1401,6 +1408,14 @@ function PremiumPlansPage() {
                         ENGAGEMENT_TOPICS.checkout_payment_confirmed,
                         { channel: "mp_transparent", produto: "premium" },
                       );
+                      trackMetaEvent("Purchase", {
+                        content_ids: [selectedPremiumPlan],
+                        content_name: `AstroMap ${selectedPremiumPlan}`,
+                        value: SUBSCRIPTION_PLAN_AMOUNTS[selectedPremiumPlan],
+                        currency: "BRL",
+                        num_items: 1,
+                        channel: "mp_transparent",
+                      });
                       void qc.invalidateQueries({ queryKey: ["profile", user.id] });
                       void qc.invalidateQueries({ queryKey: ["charts", user.id] });
                       const planLabel =

@@ -334,6 +334,7 @@ function Landing() {
         zone,
         produto: "mapa",
       });
+      trackMetaEvent("Lead", { content_name: zone, content_category: "landing_cta" });
     },
     [user?.id],
   );

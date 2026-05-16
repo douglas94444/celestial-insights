@@ -1544,6 +1544,13 @@ function PremiumPlansPage() {
                       ENGAGEMENT_TOPICS.checkout_payment_confirmed_mp_transparent,
                       { status, plan: "mapa" },
                     );
+                    trackMetaEvent("AddPaymentInfo", {
+                      content_ids: ["mapa"],
+                      value: SUBSCRIPTION_PLAN_AMOUNTS.mapa,
+                      currency: "BRL",
+                      payment_method: "card_mp_transparent",
+                      status,
+                    });
                     if (status === "approved") {
                       if (!mapaTransparentSuccessRecorded.current) {
                         mapaTransparentSuccessRecorded.current = true;
@@ -1553,6 +1560,14 @@ function PremiumPlansPage() {
                           ENGAGEMENT_TOPICS.checkout_payment_confirmed,
                           { channel: "mp_transparent", produto: "mapa" },
                         );
+                        trackMetaEvent("Purchase", {
+                          content_ids: ["mapa"],
+                          content_name: "Mapa natal",
+                          value: SUBSCRIPTION_PLAN_AMOUNTS.mapa,
+                          currency: "BRL",
+                          num_items: 1,
+                          channel: "mp_transparent",
+                        });
                       }
                       clearCheckoutMapaIntent();
                       if (user?.id) {

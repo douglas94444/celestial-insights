@@ -546,6 +546,14 @@ function PremiumPlansPage() {
           plan,
         },
       );
+      trackMetaEvent("InitiateCheckout", {
+        content_ids: [plan],
+        content_name: plan === "mapa" ? "Mapa natal" : `AstroMap ${plan}`,
+        value: SUBSCRIPTION_PLAN_AMOUNTS[plan],
+        currency: "BRL",
+        num_items: 1,
+        payment_method: "card_mp_pro",
+      });
     },
     onSuccess: (res) => {
       const { externalReference: ref, redirectUrl: url } =

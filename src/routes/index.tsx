@@ -24,6 +24,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, recordLandingEngagement } from "@/lib/engagement";
 import { useAuth } from "@/hooks/use-auth";
 import { usePageEngagement } from "@/hooks/use-page-engagement";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 const MAPA_COMPRA_SEARCH = { produto: "mapa" as const };
 const AUTH_REDIRECT_MAPA = { redirect: "/assinatura?produto=mapa" as const };

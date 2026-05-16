@@ -497,6 +497,14 @@ function PremiumPlansPage() {
       recordCheckoutEngagement(supabase, user?.id, ENGAGEMENT_TOPICS.checkout_initiate_pix, {
         plan,
       });
+      trackMetaEvent("InitiateCheckout", {
+        content_ids: [plan],
+        content_name: plan === "mapa" ? "Mapa natal" : `AstroMap ${plan}`,
+        value: SUBSCRIPTION_PLAN_AMOUNTS[plan],
+        currency: "BRL",
+        num_items: 1,
+        payment_method: "pix",
+      });
     },
     onSuccess: async (res, plan) => {
       setPixCode(res.pix_code);

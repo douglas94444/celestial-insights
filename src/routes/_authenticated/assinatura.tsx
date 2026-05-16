@@ -464,6 +464,15 @@ function PremiumPlansPage() {
           channel: "syncpay_pix",
           produto: mapaFlow ? "mapa" : "premium",
         });
+        const productPix: SubscriptionProductId = mapaFlow ? "mapa" : selectedPremiumPlan ?? "mensal";
+        trackMetaEvent("Purchase", {
+          content_ids: [productPix],
+          content_name: mapaFlow ? "Mapa natal" : `AstroMap ${productPix}`,
+          value: SUBSCRIPTION_PLAN_AMOUNTS[productPix],
+          currency: "BRL",
+          num_items: 1,
+          channel: "syncpay_pix",
+        });
       }
       void qc.invalidateQueries({ queryKey: ["profile", user.id] });
       void qc.invalidateQueries({ queryKey: ["charts", user.id] });

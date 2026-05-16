@@ -44,6 +44,15 @@ function PlanosPage() {
   const priceMensal = formatSubscriptionPriceBrl(amountForSubscriptionPlan("mensal"));
   const priceAnual = formatSubscriptionPriceBrl(amountForSubscriptionPlan("anual"));
 
+  useEffect(() => {
+    trackMetaEvent("ViewContent", {
+      content_type: "product_group",
+      content_ids: ["mapa", "mensal", "anual"],
+      content_name: "planos",
+      currency: "BRL",
+    });
+  }, []);
+
   return (
     <div className="container mx-auto max-w-5xl space-y-8 p-4 pb-12 md:p-6">
       <div className="space-y-2 text-center md:text-left">

@@ -55,8 +55,10 @@ import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
 import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS, recordAiEngagement } from "@/lib/engagement";
 import { usePageEngagement } from "@/hooks/use-page-engagement";
+import { useProfile } from "@/hooks/use-profile";
 import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
-import { rolloutLockedMessage } from "@/lib/subscription-rollout";
+import { RolloutLockedAlert } from "@/components/RolloutLockedAlert";
+import { rolloutLockedMessageForTier } from "@/lib/subscription-rollout";
 import { AiButton } from "@/components/AiButton";
 import { AiTextCard } from "@/components/AiTextCard";
 import { TransitScoreBadges } from "@/components/TransitScoreBadges";
@@ -105,6 +107,8 @@ function TransitosPage() {
 
   const { data: charts = [] } = useChartsListQuery();
   const rollout = useSubscriptionRollout();
+  const { data: profile } = useProfile();
+  const tier = profile?.subscription_tier ?? "FREE";
 
   useEffect(() => {
     if (!chartId && charts.length) {
@@ -203,7 +207,7 @@ function TransitosPage() {
 
   async function exportPdf() {
     if (rollout?.active && !rollout.gates.pdfExport) {
-      toast.error(rolloutLockedMessage("pdfExport", rollout.dayIndex));
+      toast.error(rolloutLockedMessageForTier(tier, "pdfExport", rollout.dayIndex));
       return;
     }
     if (!transitsQuery.data || days.length === 0) {
@@ -302,12 +306,12 @@ function TransitosPage() {
 
           <TabsContent value="periodo" className="mt-0">
             {rollout?.active && !rollout.gates.transits ? (
-              <Alert className="border-primary/25 bg-primary/5">
-                <AlertTitle>Trânsitos em breve</AlertTitle>
-                <AlertDescription>
-                  {rolloutLockedMessage("transits", rollout.dayIndex)}
-                </AlertDescription>
-              </Alert>
+              <RolloutLockedAlert
+                tier={tier}
+                feature="transits"
+                dayIndex={rollout.dayIndex}
+                rampTitle="Trânsitos em breve"
+              />
             ) : (
               <div className="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
                 <div className="space-y-4">
@@ -567,12 +571,12 @@ function TransitosPage() {
 
           <TabsContent value="ano" className="mt-0 space-y-6">
             {rollout?.active && !rollout.gates.annualForecast ? (
-              <Alert className="border-primary/25 bg-primary/5">
-                <AlertTitle>Previsão anual em breve</AlertTitle>
-                <AlertDescription>
-                  {rolloutLockedMessage("annualForecast", rollout.dayIndex)}
-                </AlertDescription>
-              </Alert>
+              <RolloutLockedAlert
+                tier={tier}
+                feature="annualForecast"
+                dayIndex={rollout.dayIndex}
+                rampTitle="Previsão anual em breve"
+              />
             ) : null}
             <Card>
               <CardHeader className="pb-2">

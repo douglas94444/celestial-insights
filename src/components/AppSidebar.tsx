@@ -33,9 +33,7 @@ import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
 import type { RolloutGates } from "@/lib/subscription-rollout";
 import {
   FREE_ROLLOUT_LOCKED_MESSAGE,
-  isMapaTier,
-  MAPA_ROLLOUT_LOCKED_MESSAGE,
-  rolloutLockedMessage,
+  rolloutLockedMessageForTier,
 } from "@/lib/subscription-rollout";
 import { Lock } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -109,13 +107,13 @@ export function AppSidebar() {
                   const isBlocked = rolloutBlocked || freeBlocked;
                   const rolloutTooltip = freeBlocked
                     ? FREE_ROLLOUT_LOCKED_MESSAGE
-                    : rolloutBlocked &&
-                        profile?.subscription_tier &&
-                        isMapaTier(profile.subscription_tier)
-                      ? MAPA_ROLLOUT_LOCKED_MESSAGE
-                      : rolloutBlocked
-                        ? rolloutLockedMessage(gate, rollout.dayIndex)
-                        : null;
+                    : rolloutBlocked && profile?.subscription_tier && gate
+                      ? rolloutLockedMessageForTier(
+                          profile.subscription_tier,
+                          gate,
+                          rollout.dayIndex,
+                        )
+                      : null;
                   const expandedLink = (
                     <Link to={item.url} className="flex items-center gap-2">
                       <item.icon className="h-4 w-4 shrink-0" />

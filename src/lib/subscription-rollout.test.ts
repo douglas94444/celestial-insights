@@ -6,11 +6,15 @@ import {
   buildRolloutGatesForDay,
   calendarDaysBetweenYmd,
   fetchProfileRolloutState,
+  FREE_ROLLOUT_LOCKED_MESSAGE,
   FULL_ROLLOUT_GATES,
   getRolloutDayIndexSp,
+  MAPA_ROLLOUT_LOCKED_MESSAGE,
   paidRolloutApplies,
   rolloutGateEnforcementActive,
   rolloutGatesForTier,
+  rolloutLockedMessage,
+  rolloutLockedMessageForTier,
   ymdSaoPaulo,
 } from "@/lib/subscription-rollout";
 
@@ -141,6 +145,20 @@ describe("subscription-rollout", () => {
   it("rolloutGateEnforcementActive for MENSAL matches paid ramp only", () => {
     expect(rolloutGateEnforcementActive("MENSAL", 0)).toBe(true);
     expect(rolloutGateEnforcementActive("MENSAL", 7)).toBe(false);
+  });
+
+  it("rolloutLockedMessageForTier MAPA returns Premium upsell message", () => {
+    expect(rolloutLockedMessageForTier("MAPA", "transits", 99)).toBe(MAPA_ROLLOUT_LOCKED_MESSAGE);
+  });
+
+  it("rolloutLockedMessageForTier FREE returns free tier message", () => {
+    expect(rolloutLockedMessageForTier("FREE", "synastry", 0)).toBe(FREE_ROLLOUT_LOCKED_MESSAGE);
+  });
+
+  it("rolloutLockedMessageForTier MENSAL uses day ramp message", () => {
+    expect(rolloutLockedMessageForTier("MENSAL", "transits", 0)).toBe(
+      rolloutLockedMessage("transits", 0),
+    );
   });
 
   it("fetchProfileRolloutState for admin returns full gates and applies false", async () => {

@@ -77,7 +77,8 @@ import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { useAuth } from "@/hooks/use-auth";
 import { useChartsListQuery } from "@/hooks/use-charts-list";
 import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
-import { rolloutLockedMessage } from "@/lib/subscription-rollout";
+import { useProfile } from "@/hooks/use-profile";
+import { RolloutLockedAlert } from "@/components/RolloutLockedAlert";
 
 export const Route = createFileRoute("/_authenticated/compatibilidade")({
   component: CompatibilidadePage,
@@ -161,6 +162,8 @@ function CompatibilidadePage() {
     refetch: refetchCharts,
   } = useChartsListQuery();
   const rollout = useSubscriptionRollout();
+  const { data: profile } = useProfile();
+  const tier = profile?.subscription_tier ?? "FREE";
 
   const {
     data: history = [],
@@ -402,10 +405,13 @@ function CompatibilidadePage() {
       <BackToDashboardLink buttonClassName="mb-4" />
 
       {rollout?.active && !rollout.gates.synastry ? (
-        <Alert className="mb-6 border-primary/25 bg-primary/5">
-          <AlertTitle>Sinastria em breve</AlertTitle>
-          <AlertDescription>{rolloutLockedMessage("synastry", rollout.dayIndex)}</AlertDescription>
-        </Alert>
+        <RolloutLockedAlert
+          className="mb-6"
+          tier={tier}
+          feature="synastry"
+          dayIndex={rollout.dayIndex}
+          rampTitle="Sinastria em breve"
+        />
       ) : null}
 
       <div className="mb-8 flex flex-wrap items-start gap-4 justify-between">
@@ -806,12 +812,12 @@ function CompatibilidadePage() {
 
           <TabsContent value="composto" className="mt-0 space-y-6">
             {rollout?.active && !rollout.gates.composite ? (
-              <Alert className="border-primary/25 bg-primary/5">
-                <AlertTitle>Mapa composto em breve</AlertTitle>
-                <AlertDescription>
-                  {rolloutLockedMessage("composite", rollout.dayIndex)}
-                </AlertDescription>
-              </Alert>
+              <RolloutLockedAlert
+                tier={tier}
+                feature="composite"
+                dayIndex={rollout.dayIndex}
+                rampTitle="Mapa composto em breve"
+              />
             ) : null}
             {compositeQuery.isLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground">

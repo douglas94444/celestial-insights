@@ -229,34 +229,57 @@ function LandingScreenshot({
   caption?: string;
   priority?: boolean;
   /** Hero: roda quadrada/circular sem cortar bordas; fundo alinhado ao tema escuro do gráfico. */
+  /** heroDashboard: captura ampla do painel (mapa + horóscopo), moldura premium e maior escala. */
   /** containTop: capturas de UI inteiras sem cortar laterais (object-contain + topo). */
-  variant?: "default" | "heroChart" | "containTop";
+  variant?: "default" | "heroChart" | "heroDashboard" | "containTop";
 }) {
   const frame =
     variant === "heroChart"
       ? "overflow-hidden rounded-xl border border-border/80 bg-[radial-gradient(ellipse_at_50%_45%,rgba(180,120,55,0.14)_0%,rgba(12,10,14,0.95)_52%,#070608_100%)] shadow-mystical md:rounded-2xl"
-      : "overflow-hidden rounded-xl border border-border/80 bg-muted/30 shadow-mystical md:rounded-2xl";
+      : variant === "heroDashboard"
+        ? "group relative overflow-hidden rounded-2xl border border-primary/35 bg-[radial-gradient(ellipse_90%_70%_at_50%_20%,rgba(200,155,75,0.18)_0%,rgba(14,10,12,0.97)_48%,#080506_100%)] shadow-[0_28px_80px_-24px_rgba(0,0,0,0.75),0_0_0_1px_rgba(200,165,95,0.12),0_0_48px_-12px_rgba(180,130,55,0.25)] ring-1 ring-primary/20 before:pointer-events-none before:absolute before:inset-0 before:rounded-[inherit] before:bg-[linear-gradient(145deg,rgba(255,255,255,0.06)_0%,transparent_42%,transparent_100%)] before:opacity-70 md:rounded-[1.35rem]"
+        : "overflow-hidden rounded-xl border border-border/80 bg-muted/30 shadow-mystical md:rounded-2xl";
   const imgClass =
     variant === "heroChart"
       ? "max-h-[min(380px,82vw)] w-full object-contain object-center sm:max-h-[min(480px,88vw)] md:max-h-[560px]"
-      : variant === "containTop"
-        ? "max-h-[400px] w-full object-contain object-top md:max-h-[520px]"
-        : "max-h-[420px] w-full object-cover object-top md:max-h-[520px]";
+      : variant === "heroDashboard"
+        ? "max-h-[min(340px,92vw)] w-full object-contain object-center sm:max-h-[min(420px,88vw)] lg:max-h-[min(520px,72vh)] xl:max-h-[580px]"
+        : variant === "containTop"
+          ? "max-h-[400px] w-full object-contain object-top md:max-h-[520px]"
+          : "max-h-[420px] w-full object-cover object-top md:max-h-[520px]";
 
   return (
-    <figure className="mt-3">
-      <div className={frame}>
+    <figure className={variant === "heroDashboard" ? "mt-0" : "mt-3"}>
+      <div
+        className={
+          variant === "heroDashboard"
+            ? `${frame} lg:motion-safe:[transform:perspective(1200px)_rotateY(-4deg)_rotateX(2deg)] lg:transition-transform lg:duration-500 lg:ease-out lg:motion-safe:hover:[transform:perspective(1200px)_rotateY(-2deg)_rotateX(1deg)]`
+            : frame
+        }
+      >
+        {variant === "heroDashboard" ? (
+          <div className="pointer-events-none absolute left-4 top-4 z-[2] flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-primary/35 bg-background/55 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary backdrop-blur-sm">
+              Dentro da app
+            </span>
+            <span className="rounded-full border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] text-muted-foreground backdrop-blur-sm">
+              Mapa + horóscopo do dia
+            </span>
+          </div>
+        ) : null}
         <img
           src={src}
           alt={alt}
-          className={imgClass}
+          className={`relative z-[1] ${imgClass}`}
           loading={priority ? "eager" : "lazy"}
           decoding="async"
           {...(priority ? ({ fetchPriority: "high" } as const) : {})}
         />
       </div>
       {caption ? (
-        <figcaption className="mt-2 text-center text-xs text-muted-foreground">
+        <figcaption
+          className={`mt-2 text-xs text-muted-foreground ${variant === "heroDashboard" ? "mx-auto max-w-2xl text-center" : "text-center"}`}
+        >
           {caption}
         </figcaption>
       ) : null}
@@ -393,69 +416,84 @@ function Landing() {
       </header>
 
       {/* Dobra 1 — Hero */}
-      <section className="relative overflow-hidden pt-32 pb-20 texture-grain">
+      <section className="relative overflow-hidden pt-32 pb-16 md:pb-24 texture-grain">
         <div className="pointer-events-none absolute inset-0 bg-cosmic opacity-[0.07]" />
         <div className="pointer-events-none absolute inset-0 bg-shell-glow" />
         <div className="pointer-events-none absolute inset-0 bg-gradient-glow opacity-[0.85]" />
         <div className="pointer-events-none absolute inset-0 starfield opacity-[0.22]" />
-        <div className="container relative z-[1] mx-auto px-4 text-center">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary">Mapa natal</p>
-          <h1 className="mt-4 font-display text-4xl font-bold md:text-5xl md:leading-[1.15] text-gradient-mystical">
-            Descubra o que o céu diz sobre você
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            Roda natal interativa com interpretações de cada planeta em signo e casa — por{" "}
-            <strong className="text-foreground">{mapaPriceFormatted}</strong>, pagamento único.
-          </p>
+        <div
+          className="pointer-events-none absolute -left-32 top-1/4 h-72 w-72 rounded-full bg-primary/10 blur-[100px] md:h-96 md:w-96"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -right-24 bottom-0 h-64 w-64 rounded-full bg-violet-500/10 blur-[90px] md:h-80 md:w-80"
+          aria-hidden
+        />
+        <div className="container relative z-[1] mx-auto px-4">
+          <div className="mx-auto max-w-6xl text-center">
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+              Mapa natal
+            </p>
+            <h1 className="mt-4 font-display text-4xl font-bold md:text-5xl md:leading-[1.12] xl:text-[3.25rem] text-gradient-mystical">
+              Descubra o que o céu diz sobre você
+            </h1>
+            <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
+              Painel completo com roda natal, essência (Sol, Lua, Asc) e leituras do dia — por{" "}
+              <strong className="text-foreground">{mapaPriceFormatted}</strong>, pagamento único.
+            </p>
 
-          <div className="mx-auto mt-5 flex flex-wrap items-center justify-center gap-2">
-            {["13 planetas", "12 casas", "interpretações em PT", "pagamento único"].map((label) => (
-              <span
-                key={label}
-                className="rounded-full border border-primary/20 bg-primary/5 px-3 py-0.5 text-xs text-primary"
+            <div className="mx-auto mt-5 flex flex-wrap items-center justify-center gap-2">
+              {["13 planetas", "12 casas", "interpretações em PT", "pagamento único"].map(
+                (label) => (
+                  <span
+                    key={label}
+                    className="rounded-full border border-primary/20 bg-primary/5 px-3 py-0.5 text-xs text-primary"
+                  >
+                    {label}
+                  </span>
+                ),
+              )}
+            </div>
+
+            <p className="mt-4 text-xs text-muted-foreground">
+              1.200+ mapas gerados&nbsp;·&nbsp;Nota 4.9/5
+            </p>
+
+            <div className="relative mx-auto mt-8 w-full max-w-5xl">
+              <LandingScreenshot
+                src={`${LANDING_PUBLIC}/hero-dashboard-app.png`}
+                alt="AstroMap: painel Meu Mapa Principal com roda natal, Sol em Sagitário, Lua em Escorpião, Ascendente em Sagitário, e painel Horóscopo hoje com leituras personalizadas"
+                priority
+                variant="heroDashboard"
+                caption="Visualização real do seu painel — mapa principal e horóscopo contextual ao mesmo tempo."
+              />
+            </div>
+
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
+              <Button
+                asChild
+                size="lg"
+                className="w-full bg-mystical text-white shadow-mystical hover:opacity-90 sm:w-auto"
               >
-                {label}
-              </span>
-            ))}
-          </div>
+                <Link
+                  to="/assinatura"
+                  search={MAPA_COMPRA_SEARCH}
+                  onClick={() => emitCta("hero_below_screenshot")}
+                >
+                  Ir para checkout · {mapaPriceFormatted}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+              <a
+                href="#detalhe"
+                className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              >
+                Ver como é o mapa antes de comprar ↓
+              </a>
+            </div>
 
-          <p className="mt-4 text-xs text-muted-foreground">
-            1.200+ mapas gerados&nbsp;·&nbsp;Nota 4.9/5&nbsp;·&nbsp;Pagamento via Mercado Pago
-          </p>
-
-          <div className="mx-auto mt-8 max-w-4xl md:mt-10">
-            <LandingScreenshot
-              src={`${LANDING_PUBLIC}/hero-roda-natal.png`}
-              alt="Roda natal no AstroMap: signos no anel exterior, casas numeradas, planetas e linhas de aspectos coloridas sobre fundo escuro (sistema Placidus)"
-              priority
-              variant="heroChart"
-              caption="Visualização real do mapa na app — calculado na hora com os seus dados de nascimento."
-            />
+            <TrustBadges />
           </div>
-
-          <Button
-            asChild
-            size="lg"
-            className="mt-8 bg-mystical text-white shadow-mystical hover:opacity-90 md:mt-10"
-          >
-            <Link
-              to="/assinatura"
-              search={MAPA_COMPRA_SEARCH}
-              onClick={() => emitCta("hero_below_screenshot")}
-            >
-              Ir para checkout · {mapaPriceFormatted}
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-          <div className="mt-3">
-            <a
-              href="#detalhe"
-              className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-            >
-              ↓ ver como é o mapa antes de comprar
-            </a>
-          </div>
-          <TrustBadges />
         </div>
       </section>
 

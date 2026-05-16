@@ -25,6 +25,7 @@
     "supabase:functions:deploy:mercadopago-webhook": "npx --yes supabase functions deploy mercadopago-webhook --no-verify-jwt --project-ref fxcoxnqqjgvqfukasfjb",
     "supabase:functions:deploy:all": "npm run supabase:functions:deploy && npm run supabase:functions:deploy:syncpay-webhook && npm run supabase:functions:deploy:mercadopago-webhook",
     "supabase:deploy:functions": "npm run supabase:functions:deploy:all",
+    "supabase:deploy:mcp-bundles": "node scripts/build-mcp-edge-payload.mjs syncpay-webhook && node scripts/build-mcp-edge-payload.mjs mercadopago-webhook && node scripts/build-mcp-edge-payload.mjs transit-digest-cron",
     "supabase:types": "npx --yes supabase gen types typescript --linked --schema public > src/integrations/supabase/types.ts"
   },
   "dependencies": {

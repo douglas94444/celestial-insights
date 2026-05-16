@@ -219,6 +219,17 @@ export const ROLLOUT_EARLY_AI_MONTHLY_CAP = 3;
 export const FREE_ROLLOUT_LOCKED_MESSAGE =
   "Esta função está disponível no plano Mapa Natal ou no Premium. No plano grátis pode criar e consultar um mapa natal.";
 
+/** Mensagem de bloqueio na UI conforme tier (MAPA/FREE fixos; pagos na rampa de 7 dias). */
+export function rolloutLockedMessageForTier(
+  tier: string,
+  feature: keyof RolloutGates,
+  dayIndex: number,
+): string {
+  if (isMapaTier(tier)) return MAPA_ROLLOUT_LOCKED_MESSAGE;
+  if (isFreeTier(tier)) return FREE_ROLLOUT_LOCKED_MESSAGE;
+  return rolloutLockedMessage(feature, dayIndex);
+}
+
 /** IA fora dos tipos natais permitidos no plano grátis. */
 export const FREE_AI_KIND_LOCKED_MESSAGE =
   "No plano grátis só estão disponíveis interpretações dinâmicas ligadas ao mapa natal (resumo, essência e planetas).";

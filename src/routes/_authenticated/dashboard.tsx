@@ -15,7 +15,9 @@ const NatalChartWheel = lazy(() =>
   import("@/components/NatalChartWheel").then((m) => ({ default: m.NatalChartWheel })),
 );
 import { useDailyMoment } from "@/hooks/use-daily-moment";
+import { useProfile } from "@/hooks/use-profile";
 import { useAuth } from "@/hooks/use-auth";
+import { PremiumRolloutUpsellCard } from "@/components/PremiumRolloutUpsellCard";
 import { ENGAGEMENT_ROUTES, ENGAGEMENT_TOPICS } from "@/lib/engagement";
 import { usePageEngagement } from "@/hooks/use-page-engagement";
 import { useSubscriptionRollout } from "@/hooks/use-subscription-rollout";
@@ -25,7 +27,11 @@ import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { GenerateAnnualForecastFnResult } from "@/lib/types/server-fn-results";
-import { rolloutLockedMessage } from "@/lib/subscription-rollout";
+import {
+  isMapaTier,
+  isPaidRolloutTier,
+  rolloutLockedMessageForTier,
+} from "@/lib/subscription-rollout";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -87,6 +93,8 @@ function Dashboard() {
   const currentYear = useMemo(() => new Date().getUTCFullYear(), []);
   const currentMonth = useMemo(() => new Date().getUTCMonth() + 1, []);
   const rollout = useSubscriptionRollout();
+  const { data: profile } = useProfile();
+  const tier = profile?.subscription_tier ?? "FREE";
 
   const annualForecastQuery = useQuery<GenerateAnnualForecastFnResult>({
     queryKey: ["annual-forecast", primary?.id, currentYear],
@@ -108,7 +116,20 @@ function Dashboard() {
   }, [annualForecastQuery.data, currentMonth]);
 
   const showDashTransits = !rollout || !rollout.active || rollout.gates.transits;
+  const transitsLocked = !!rollout?.active && !rollout.gates.transits;
+  const premiumExploreLocked =
+    !!rollout?.active &&
+    !rollout.gates.synastry &&
+    !rollout.gates.annualForecast &&
+    !rollout.gates.transits;
   const blockExtraMap = charts.length >= 1 && rollout?.active && !rollout.gates.extraCharts;
+  const lockedMessage = (feature: Parameters<typeof rolloutLockedMessageForTier>[1]) =>
+    rolloutLockedMessageForTier(tier, feature, rollout?.dayIndex ?? 0);
+  const transitsLockedAlertTitle = isMapaTier(tier)
+    ? "Funcionalidade Premium"
+    : isPaidRolloutTier(tier)
+      ? "Trânsitos no painel em breve"
+      : "Funcionalidade Premium";
 
   function handleNewMap() {
     navigate({ to: "/mapas/novo" });
@@ -125,11 +146,7 @@ function Dashboard() {
           type="button"
           onClick={handleNewMap}
           disabled={blockExtraMap}
-          title={
-            blockExtraMap && rollout
-              ? rolloutLockedMessage("extraCharts", rollout.dayIndex)
-              : undefined
-          }
+          title={blockExtraMap ? lockedMessage("extraCharts") : undefined}
           className="bg-mystical text-white hover:opacity-90"
         >
           <Plus className="mr-1 h-4 w-4" /> Novo mapa
@@ -346,11 +363,21 @@ function Dashboard() {
                   ) : null}
                 </div>
               </div>
-            ) : rollout?.active && !rollout.gates.transits ? (
+            ) : transitsLocked ? (
               <Alert className="border-primary/25 bg-primary/5">
-                <AlertTitle>Trânsitos no painel em breve</AlertTitle>
-                <AlertDescription>
-                  {rolloutLockedMessage("transits", rollout.dayIndex)}
+                <AlertTitle>{transitsLockedAlertTitle}</AlertTitle>
+                <AlertDescription className={isMapaTier(tier) ? "space-y-3" : undefined}>
+                  <p>{lockedMessage("transits")}</p>
+                  {isMapaTier(tier) ? (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="border-primary/30 hover:bg-primary/5"
+                    >
+                      <Link to="/planos">Ver planos Premium</Link>
+                    </Button>
+                  ) : null}
                 </AlertDescription>
               </Alert>
             ) : null}
@@ -379,167 +406,190 @@ function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border border-accent/20 shadow-soft md:col-span-3">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarRange className="h-5 w-5 text-primary" /> Trânsitos & calendário
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>
-              Veja uma janela de datas, marque dias intensos, filtre aspectos e exporte PDF. Envie
-              um resumo por email quando o servidor tiver Resend configurado.
-            </p>
+        {transitsLocked ? (
+          <PremiumRolloutUpsellCard
+            className="md:col-span-3"
+            title="Trânsitos & calendário"
+            description={lockedMessage("transits")}
+          />
+        ) : (
+          <Card className="border border-accent/20 shadow-soft md:col-span-3">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarRange className="h-5 w-5 text-primary" /> Trânsitos & calendário
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-muted-foreground">
+              <p>
+                Veja uma janela de datas, marque dias intensos, filtre aspectos e exporte PDF. Envie
+                um resumo por email quando o servidor tiver Resend configurado.
+              </p>
 
-            {currentMonthForecast && showDashTransits ? (
-              <div className="rounded-lg border border-primary/15 bg-primary/5 p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-medium uppercase text-muted-foreground">
-                    Previsão do mês atual
-                  </p>
-                  <Badge variant="secondary" className="text-[10px]">
-                    Intensidade média {currentMonthForecast.avgIntensity}/100
-                  </Badge>
+              {currentMonthForecast && showDashTransits ? (
+                <div className="rounded-lg border border-primary/15 bg-primary/5 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">
+                      Previsão do mês atual
+                    </p>
+                    <Badge variant="secondary" className="text-[10px]">
+                      Intensidade média {currentMonthForecast.avgIntensity}/100
+                    </Badge>
+                  </div>
+                  <Progress value={currentMonthForecast.avgIntensity} className="h-1.5" />
+                  {currentMonthForecast.peakDays.slice(0, 2).length > 0 && (
+                    <p className="text-xs text-foreground/80">
+                      <span className="font-medium">Pico: </span>
+                      {currentMonthForecast.peakDays.slice(0, 2).map((d) => (
+                        <span key={d.date} className="mr-3">
+                          {new Date(d.date + "T12:00:00Z").toLocaleDateString("pt-BR", {
+                            day: "numeric",
+                            month: "short",
+                          })}{" "}
+                          ({d.intensity}/100)
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                  {(currentMonthForecast.retrogradePeriods.length > 0 ||
+                    currentMonthForecast.ingresses.length > 0) && (
+                    <p className="text-xs text-foreground/75">
+                      {currentMonthForecast.retrogradePeriods.map((r) => (
+                        <span key={`${r.planet}-${r.startDate}`} className="mr-2">
+                          ⟲ {r.planet} retrógrado
+                        </span>
+                      ))}
+                      {currentMonthForecast.ingresses.map((i) => (
+                        <span key={`${i.planet}-${i.date}`} className="mr-2">
+                          ↗ {i.planet} em {i.intoSign}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                  <Link
+                    to="/transitos"
+                    className="inline-block text-xs font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    Ver previsão anual completa →
+                  </Link>
                 </div>
-                <Progress value={currentMonthForecast.avgIntensity} className="h-1.5" />
-                {currentMonthForecast.peakDays.slice(0, 2).length > 0 && (
-                  <p className="text-xs text-foreground/80">
-                    <span className="font-medium">Pico: </span>
-                    {currentMonthForecast.peakDays.slice(0, 2).map((d) => (
-                      <span key={d.date} className="mr-3">
-                        {new Date(d.date + "T12:00:00Z").toLocaleDateString("pt-BR", {
-                          day: "numeric",
-                          month: "short",
-                        })}{" "}
-                        ({d.intensity}/100)
-                      </span>
-                    ))}
-                  </p>
-                )}
-                {(currentMonthForecast.retrogradePeriods.length > 0 ||
-                  currentMonthForecast.ingresses.length > 0) && (
-                  <p className="text-xs text-foreground/75">
-                    {currentMonthForecast.retrogradePeriods.map((r) => (
-                      <span key={`${r.planet}-${r.startDate}`} className="mr-2">
-                        ⟲ {r.planet} retrógrado
-                      </span>
-                    ))}
-                    {currentMonthForecast.ingresses.map((i) => (
-                      <span key={`${i.planet}-${i.date}`} className="mr-2">
-                        ↗ {i.planet} em {i.intoSign}
-                      </span>
-                    ))}
-                  </p>
-                )}
-                <Link
-                  to="/transitos"
-                  className="inline-block text-xs font-medium text-primary underline-offset-4 hover:underline"
-                >
-                  Ver previsão anual completa →
-                </Link>
-              </div>
-            ) : null}
+              ) : null}
 
-            <div className="flex flex-wrap gap-2">
-              <Button asChild className="bg-mystical text-white hover:opacity-90">
-                <Link to="/transitos">
-                  <Sparkles className="mr-1 h-4 w-4" /> Abrir trânsitos
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to="/momento">
-                  <Sparkles className="mr-1 h-4 w-4" /> Momento com o céu
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild className="bg-mystical text-white hover:opacity-90">
+                  <Link to="/transitos">
+                    <Sparkles className="mr-1 h-4 w-4" /> Abrir trânsitos
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to="/momento">
+                    <Sparkles className="mr-1 h-4 w-4" /> Momento com o céu
+                  </Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {primary && (
         <div>
           <h2 className="mb-3 font-display text-xl font-semibold">Explorar</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Link to="/compatibilidade">
-              <Card className="h-full transition-all hover:border-primary hover:shadow-soft">
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Heart className="h-5 w-5 text-primary" />
-                    {charts.length >= 2 ? (
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400"
-                      >
-                        Pronto para usar
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary" className="text-[10px]">
-                        2 mapas
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="font-display font-semibold text-sm">Sinastria</p>
-                  <p className="text-xs text-muted-foreground leading-snug">
-                    Compare dois mapas e descubra compatibilidade de amor, trabalho e amizade.
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
+          {premiumExploreLocked ? (
+            <PremiumRolloutUpsellCard
+              title="Explorar o céu com Premium"
+              description={lockedMessage("synastry")}
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {(!rollout || !rollout.active || rollout.gates.synastry) && (
+                <Link to="/compatibilidade">
+                  <Card className="h-full transition-all hover:border-primary hover:shadow-soft">
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Heart className="h-5 w-5 text-primary" />
+                        {charts.length >= 2 ? (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] bg-green-500/15 text-green-700 dark:text-green-400"
+                          >
+                            Pronto para usar
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-[10px]">
+                            2 mapas
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="font-display font-semibold text-sm">Sinastria</p>
+                      <p className="text-xs text-muted-foreground leading-snug">
+                        Compare dois mapas e descubra compatibilidade de amor, trabalho e amizade.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              )}
 
-            <Link to="/transitos">
-              <Card className="h-full transition-all hover:border-primary hover:shadow-soft">
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <BarChart2 className="h-5 w-5 text-primary" />
-                    <Badge variant="secondary" className="text-[10px]">
-                      Anual
-                    </Badge>
-                  </div>
-                  <p className="font-display font-semibold text-sm">Previsão do ano</p>
-                  <p className="text-xs text-muted-foreground leading-snug">
-                    Veja meses de maior intensidade, retrogradações e ingressos planetários.
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
+              {(!rollout || !rollout.active || rollout.gates.annualForecast) && (
+                <Link to="/transitos">
+                  <Card className="h-full transition-all hover:border-primary hover:shadow-soft">
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <BarChart2 className="h-5 w-5 text-primary" />
+                        <Badge variant="secondary" className="text-[10px]">
+                          Anual
+                        </Badge>
+                      </div>
+                      <p className="font-display font-semibold text-sm">Previsão do ano</p>
+                      <p className="text-xs text-muted-foreground leading-snug">
+                        Veja meses de maior intensidade, retrogradações e ingressos planetários.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              )}
 
-            {!morningDeep ? (
-              <Link to="/momento">
-                <Card className="h-full transition-all hover:border-primary hover:shadow-soft">
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Sparkles className="h-5 w-5 text-primary" />
-                      <Badge variant="secondary" className="text-[10px]">
-                        Hoje
-                      </Badge>
-                    </div>
-                    <p className="font-display font-semibold text-sm">Carta do dia profunda</p>
-                    <p className="text-xs text-muted-foreground leading-snug">
-                      Mensagem personalizada com afirmação, tema do dia e dica prática.
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
-            ) : (
-              <Link to="/momento">
-                <Card className="h-full transition-all hover:border-primary hover:shadow-soft border-primary/20 bg-primary/5">
-                  <CardContent className="p-4 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Sparkles className="h-5 w-5 text-primary" />
-                      <Badge variant="secondary" className="text-[10px] bg-primary/15 text-primary">
-                        Gerada hoje
-                      </Badge>
-                    </div>
-                    <p className="font-display font-semibold text-sm">Carta do dia</p>
-                    <p className="text-xs text-muted-foreground leading-snug italic">
-                      {morningDeep.main_message?.slice(0, 80)}
-                      {(morningDeep.main_message?.length ?? 0) > 80 ? "…" : ""}
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
-            )}
-          </div>
+              {showDashTransits &&
+                (!morningDeep ? (
+                  <Link to="/momento">
+                    <Card className="h-full transition-all hover:border-primary hover:shadow-soft">
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Sparkles className="h-5 w-5 text-primary" />
+                          <Badge variant="secondary" className="text-[10px]">
+                            Hoje
+                          </Badge>
+                        </div>
+                        <p className="font-display font-semibold text-sm">Carta do dia profunda</p>
+                        <p className="text-xs text-muted-foreground leading-snug">
+                          Mensagem personalizada com afirmação, tema do dia e dica prática.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ) : (
+                  <Link to="/momento">
+                    <Card className="h-full transition-all hover:border-primary hover:shadow-soft border-primary/20 bg-primary/5">
+                      <CardContent className="p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Sparkles className="h-5 w-5 text-primary" />
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] bg-primary/15 text-primary"
+                          >
+                            Gerada hoje
+                          </Badge>
+                        </div>
+                        <p className="font-display font-semibold text-sm">Carta do dia</p>
+                        <p className="text-xs text-muted-foreground leading-snug italic">
+                          {morningDeep.main_message?.slice(0, 80)}
+                          {(morningDeep.main_message?.length ?? 0) > 80 ? "…" : ""}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+            </div>
+          )}
         </div>
       )}
 

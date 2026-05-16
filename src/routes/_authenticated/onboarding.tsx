@@ -58,6 +58,7 @@ function Onboarding() {
     if (user) {
       await supabase.from("profiles").update({ name: displayName }).eq("id", user.id);
     }
+    trackMetaEvent("SubmitApplication", { content_name: "natal_chart_onboarding" });
     toast.success("Seu mapa está pronto!");
     navigate({ to: "/mapas/$id", params: { id: chartId }, search: { new: true } });
   }

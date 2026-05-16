@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Check, Crown, Sparkles, Map } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useProfile } from "@/hooks/use-profile";
 import { amountForSubscriptionPlan, formatSubscriptionPriceBrl } from "@/lib/subscription-pricing";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 export const Route = createFileRoute("/_authenticated/planos")({
   component: PlanosPage,

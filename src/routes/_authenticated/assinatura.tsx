@@ -27,7 +27,11 @@ import {
 import { withSupabaseAuth } from "@/lib/server-fn-client";
 import { getServerFnErrorDetails } from "@/lib/server-fn-errors";
 import { toastServerFnError } from "@/lib/toast-server-fn-error";
-import { formatSubscriptionPriceBrl, SUBSCRIPTION_PLAN_AMOUNTS } from "@/lib/subscription-pricing";
+import {
+  formatSubscriptionPriceBrl,
+  SUBSCRIPTION_PLAN_AMOUNTS,
+  type SubscriptionProductId,
+} from "@/lib/subscription-pricing";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ENGAGEMENT_TOPICS,
@@ -42,6 +46,7 @@ import {
   markCheckoutMapaIntent,
 } from "@/lib/mapa-product-copy";
 import { cn } from "@/lib/utils";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 const SESSION_MP_ORDER_REF = "astromap_mp_order_ref";
 
@@ -389,6 +394,15 @@ function PremiumPlansPage() {
           channel: "mp_checkout_pro",
           produto: mapaFlow ? "mapa" : "premium",
         });
+        const productMpPro: SubscriptionProductId = mapaFlow ? "mapa" : selectedPremiumPlan ?? "mensal";
+        trackMetaEvent("Purchase", {
+          content_ids: [productMpPro],
+          content_name: mapaFlow ? "Mapa natal" : `AstroMap ${productMpPro}`,
+          value: SUBSCRIPTION_PLAN_AMOUNTS[productMpPro],
+          currency: "BRL",
+          num_items: 1,
+          channel: "mp_checkout_pro",
+        });
       }
       void qc.invalidateQueries({ queryKey: ["profile", user.id] });
       void qc.invalidateQueries({ queryKey: ["charts", user.id] });
@@ -450,6 +464,15 @@ function PremiumPlansPage() {
           channel: "syncpay_pix",
           produto: mapaFlow ? "mapa" : "premium",
         });
+        const productPix: SubscriptionProductId = mapaFlow ? "mapa" : selectedPremiumPlan ?? "mensal";
+        trackMetaEvent("Purchase", {
+          content_ids: [productPix],
+          content_name: mapaFlow ? "Mapa natal" : `AstroMap ${productPix}`,
+          value: SUBSCRIPTION_PLAN_AMOUNTS[productPix],
+          currency: "BRL",
+          num_items: 1,
+          channel: "syncpay_pix",
+        });
       }
       void qc.invalidateQueries({ queryKey: ["profile", user.id] });
       void qc.invalidateQueries({ queryKey: ["charts", user.id] });
@@ -492,6 +515,14 @@ function PremiumPlansPage() {
       recordCheckoutEngagement(supabase, user?.id, ENGAGEMENT_TOPICS.checkout_initiate_pix, {
         plan,
       });
+      trackMetaEvent("InitiateCheckout", {
+        content_ids: [plan],
+        content_name: plan === "mapa" ? "Mapa natal" : `AstroMap ${plan}`,
+        value: SUBSCRIPTION_PLAN_AMOUNTS[plan],
+        currency: "BRL",
+        num_items: 1,
+        payment_method: "pix",
+      });
     },
     onSuccess: async (res, plan) => {
       setPixCode(res.pix_code);
@@ -533,6 +564,14 @@ function PremiumPlansPage() {
           plan,
         },
       );
+      trackMetaEvent("InitiateCheckout", {
+        content_ids: [plan],
+        content_name: plan === "mapa" ? "Mapa natal" : `AstroMap ${plan}`,
+        value: SUBSCRIPTION_PLAN_AMOUNTS[plan],
+        currency: "BRL",
+        num_items: 1,
+        payment_method: "card_mp_pro",
+      });
     },
     onSuccess: (res) => {
       const { externalReference: ref, redirectUrl: url } =
@@ -591,6 +630,14 @@ function PremiumPlansPage() {
       checkoutReady,
       mpTransparent,
       mpCheckoutPro,
+    });
+    const produto: SubscriptionProductId = isMapa ? "mapa" : "mensal";
+    trackMetaEvent("ViewContent", {
+      content_type: "product",
+      content_ids: [isMapa ? "mapa" : "premium"],
+      content_name: isMapa ? "Mapa natal" : "AstroMap Premium",
+      value: SUBSCRIPTION_PLAN_AMOUNTS[produto],
+      currency: "BRL",
     });
   }, [
     user?.id,
@@ -1347,6 +1394,13 @@ function PremiumPlansPage() {
                       ENGAGEMENT_TOPICS.checkout_payment_confirmed_mp_transparent,
                       { status, plan: selectedPremiumPlan },
                     );
+                    trackMetaEvent("AddPaymentInfo", {
+                      content_ids: [selectedPremiumPlan],
+                      value: SUBSCRIPTION_PLAN_AMOUNTS[selectedPremiumPlan],
+                      currency: "BRL",
+                      payment_method: "card_mp_transparent",
+                      status,
+                    });
                     if (status === "approved") {
                       recordCheckoutEngagement(
                         supabase,
@@ -1354,6 +1408,14 @@ function PremiumPlansPage() {
                         ENGAGEMENT_TOPICS.checkout_payment_confirmed,
                         { channel: "mp_transparent", produto: "premium" },
                       );
+                      trackMetaEvent("Purchase", {
+                        content_ids: [selectedPremiumPlan],
+                        content_name: `AstroMap ${selectedPremiumPlan}`,
+                        value: SUBSCRIPTION_PLAN_AMOUNTS[selectedPremiumPlan],
+                        currency: "BRL",
+                        num_items: 1,
+                        channel: "mp_transparent",
+                      });
                       void qc.invalidateQueries({ queryKey: ["profile", user.id] });
                       void qc.invalidateQueries({ queryKey: ["charts", user.id] });
                       const planLabel =
@@ -1482,6 +1544,13 @@ function PremiumPlansPage() {
                       ENGAGEMENT_TOPICS.checkout_payment_confirmed_mp_transparent,
                       { status, plan: "mapa" },
                     );
+                    trackMetaEvent("AddPaymentInfo", {
+                      content_ids: ["mapa"],
+                      value: SUBSCRIPTION_PLAN_AMOUNTS.mapa,
+                      currency: "BRL",
+                      payment_method: "card_mp_transparent",
+                      status,
+                    });
                     if (status === "approved") {
                       if (!mapaTransparentSuccessRecorded.current) {
                         mapaTransparentSuccessRecorded.current = true;
@@ -1491,6 +1560,14 @@ function PremiumPlansPage() {
                           ENGAGEMENT_TOPICS.checkout_payment_confirmed,
                           { channel: "mp_transparent", produto: "mapa" },
                         );
+                        trackMetaEvent("Purchase", {
+                          content_ids: ["mapa"],
+                          content_name: "Mapa natal",
+                          value: SUBSCRIPTION_PLAN_AMOUNTS.mapa,
+                          currency: "BRL",
+                          num_items: 1,
+                          channel: "mp_transparent",
+                        });
                       }
                       clearCheckoutMapaIntent();
                       if (user?.id) {

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { BirthChartForm } from "@/components/BirthChartForm";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   component: Onboarding,
@@ -57,6 +58,7 @@ function Onboarding() {
     if (user) {
       await supabase.from("profiles").update({ name: displayName }).eq("id", user.id);
     }
+    trackMetaEvent("SubmitApplication", { content_name: "natal_chart_onboarding" });
     toast.success("Seu mapa está pronto!");
     navigate({ to: "/mapas/$id", params: { id: chartId }, search: { new: true } });
   }

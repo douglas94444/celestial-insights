@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
 import { sanitizePostAuthRedirectPath } from "@/lib/auth-redirect";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (search: Record<string, unknown>): { redirect?: string } => {
@@ -222,10 +223,12 @@ function SignUpForm() {
     }
     // Com "Confirmar email" no Supabase não há sessão até o utilizador abrir o link.
     if (data.session) {
+      trackMetaEvent("CompleteRegistration", { method: "email", status: "confirmed" });
       toast.success("Conta criada! Vamos configurar o seu mapa.");
       navigate({ to: "/onboarding" });
       return;
     }
+    trackMetaEvent("CompleteRegistration", { method: "email", status: "pending_email" });
     toast.success("Confirme o seu email", {
       description:
         "Enviámos um link para o seu email. Depois de confirmar, será enviado para o onboarding. Verifique também o spam.",

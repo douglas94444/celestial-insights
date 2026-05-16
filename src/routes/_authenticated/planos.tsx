@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Check, Crown, Sparkles, Map } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useProfile } from "@/hooks/use-profile";
 import { amountForSubscriptionPlan, formatSubscriptionPriceBrl } from "@/lib/subscription-pricing";
+import { trackMetaEvent } from "@/lib/meta-pixel";
 
 export const Route = createFileRoute("/_authenticated/planos")({
   component: PlanosPage,
@@ -41,6 +43,15 @@ function PlanosPage() {
   const priceMapaFmt = formatSubscriptionPriceBrl(amountForSubscriptionPlan("mapa"));
   const priceMensal = formatSubscriptionPriceBrl(amountForSubscriptionPlan("mensal"));
   const priceAnual = formatSubscriptionPriceBrl(amountForSubscriptionPlan("anual"));
+
+  useEffect(() => {
+    trackMetaEvent("ViewContent", {
+      content_type: "product_group",
+      content_ids: ["mapa", "mensal", "anual"],
+      content_name: "planos",
+      currency: "BRL",
+    });
+  }, []);
 
   return (
     <div className="container mx-auto max-w-5xl space-y-8 p-4 pb-12 md:p-6">

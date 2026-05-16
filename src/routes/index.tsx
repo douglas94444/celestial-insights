@@ -257,20 +257,10 @@ function LandingScreenshot({
             : frame
         }
       >
-        {variant === "heroDashboard" ? (
-          <div className="pointer-events-none absolute left-4 top-4 z-[2] flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-primary/35 bg-background/55 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary backdrop-blur-sm">
-              Dentro da app
-            </span>
-            <span className="rounded-full border border-border/60 bg-background/40 px-2.5 py-1 text-[11px] text-muted-foreground backdrop-blur-sm">
-              Mapa + horóscopo do dia
-            </span>
-          </div>
-        ) : null}
         <img
           src={src}
           alt={alt}
-          className={`relative z-[1] ${imgClass}`}
+          className={`relative ${imgClass}`}
           loading={priority ? "eager" : "lazy"}
           decoding="async"
           {...(priority ? ({ fetchPriority: "high" } as const) : {})}
